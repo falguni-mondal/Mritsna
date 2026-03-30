@@ -10,8 +10,6 @@ const Hero = () => {
   const line2Ref = useRef(null);
   const subheadingRef = useRef(null);
   const exclusiveTextRef = useRef(null);
-  
-  // Only one ref needed now for the flattened card
   const productCardRef = useRef(null);
 
   // CTA Refs
@@ -23,11 +21,23 @@ const Hero = () => {
   const ctaIconLightRef = useRef(null);
 
   const { contextSafe } = useGSAP(() => {
-    // Hide elements initially to prevent a flash of unstyled content
-    gsap.set([line1Ref.current, line2Ref.current, exclusiveTextRef.current], { yPercent: 110 });
-    gsap.set([subheadingRef.current, ctaRef.current], { opacity: 0, y: 30 });
+    // 1. Headings, Subheading, AND Exclusive Text all start invisible, shifted down, and heavily blurred
+    gsap.set([line1Ref.current, line2Ref.current], { 
+      autoAlpha: 0, 
+      y: 40, 
+      filter: "blur(12px)" 
+    });
     
-    // Initialize the card with 0 opacity, 0 blur, and lowered Y position
+    gsap.set([subheadingRef.current, exclusiveTextRef.current], { 
+      autoAlpha: 0, 
+      y: 40, 
+      filter: "blur(6px)" 
+    });
+
+    // 2. CTA button gets a standard fade state
+    gsap.set(ctaRef.current, { autoAlpha: 0, y: 30 });
+    
+    // 3. Product Card initial state (with backdrop filter fix)
     gsap.set(productCardRef.current, { 
       autoAlpha: 0, 
       y: 30,
@@ -37,27 +47,36 @@ const Hero = () => {
 
     const tl = gsap.timeline({ defaults: { ease: "power4.out" } });
 
-    // 1. Reveal main headings
+    // 1. Reveal main headings: Fade in, slide up, and un-blur
     tl.to([line1Ref.current, line2Ref.current], {
-      yPercent: 0,
-      duration: 1.2,
-      stagger: 0.15,
+      autoAlpha: 1,
+      y: 0,
+      filter: "blur(0px)",
+      duration: 1.4,
+      stagger: 0.2, 
     })
-    // 2. Fade in subheading and CTA
-    .to([subheadingRef.current, ctaRef.current], {
-      opacity: 1,
+    
+    // Create a timing label so the next elements sync up perfectly
+    .add("secondaryReveal", "-=1.0")
+    
+    // 2. Blur reveal for Subheading and Exclusive text (they happen exactly together)
+    .to([subheadingRef.current, exclusiveTextRef.current], {
+      autoAlpha: 1,
+      y: 0,
+      filter: "blur(0px)",
+      duration: 1.2,
+      ease: "power3.out",
+    }, "secondaryReveal") 
+    
+    // 3. Fade in CTA button (starts 0.1s after the subheading begins)
+    .to(ctaRef.current, {
+      autoAlpha: 1,
       y: 0,
       duration: 1,
-      stagger: 0.1,
       ease: "power3.out",
-    }, "-=0.9") 
-    // 3. Slide up the exclusive text
-    .to(exclusiveTextRef.current, {
-      yPercent: 0,
-      duration: 1,
-      ease: "power3.out",
-    }, "<")
-    // 4. Fade, float, AND blur the card simultaneously to completely bypass the browser snapping bug
+    }, "secondaryReveal+=0.1")
+    
+    // 4. Fade, float, AND blur the card simultaneously (starts 0.15s after the subheading begins)
     .to(productCardRef.current, {
       autoAlpha: 1,
       y: 0,
@@ -65,7 +84,8 @@ const Hero = () => {
       webkitBackdropFilter: "blur(12px)",
       duration: 1.2,
       ease: "power3.out", 
-    }, "<0.15");
+    }, "secondaryReveal+=0.15");
+    
   }, { scope: containerRef });
 
   // Directional Hover Animation for CTA
@@ -103,12 +123,8 @@ const Hero = () => {
       <div className="hero-left flex flex-col justify-center">
         <div className="hero-heading-container w-full mb-6 md:mb-10 lg:mb-6">
           <h1 className="hero-heading text-5xl md:text-7xl lg:text-6xl head-font flex flex-col lg:gap-1">
-            <div className="overflow-hidden">
-              <div ref={line1Ref} className="leading-none pb-1">Crafted in Silence.</div>
-            </div>
-            <div className="overflow-hidden">
-              <div ref={line2Ref} className="leading-none pb-1">Felt in Every Detail.</div>
-            </div>
+            <div ref={line1Ref} className="leading-none pb-1">Crafted in Silence.</div>
+            <div ref={line2Ref} className="leading-none pb-1">Felt in Every Detail.</div>
           </h1>
         </div>
 
@@ -160,14 +176,12 @@ const Hero = () => {
       </div>
 
       <div className="hero-right flex flex-col lg:items-end justify-end mb-5 lg:mb-3 mt-10 md:mt-16 lg:mt-0">
-        <div className="overflow-hidden mb-2 md:mb-4 lg:mb-2">
+        <div className="mb-2 md:mb-4 lg:mb-2">
           <h2 ref={exclusiveTextRef} className="uppercase text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-wider txt-light opacity-90">
             Exclusive of this month.
           </h2>
         </div>
 
-        {/* FLATTENED DOM: Wrapper removed. Everything operates inside this single Link component. */}
-        {/* Notice that I removed the Tailwind `backdrop-blur-md` class because GSAP handles the blur inline now. */}
         <Link
           to="/"
           ref={productCardRef}

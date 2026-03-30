@@ -8,10 +8,11 @@ import Navmenu from "./Navmenu";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Refs for the Magic Line animation
+  // Refs for Animations
+  const navbarRef = useRef(null);
   const navContainerRef = useRef(null);
   const underlineRef = useRef(null);
-  const isHovering = useRef(false); // Track if the mouse is actively inside the nav
+  const isHovering = useRef(false);
 
   const navigations = [
     { name: "shop", path: "/shop" },
@@ -26,9 +27,24 @@ const Navbar = () => {
     { name: "wishlist", path: "/wishlist" },
   ];
 
+  // --- 1. Initial Load Animation ---
+  useGSAP(() => {
+    // Hide navbar above the screen initially
+    gsap.set(navbarRef.current, { yPercent: -30, opacity: 0 });
+
+    // Slide down just as the Hero animation finishes
+    gsap.to(navbarRef.current, {
+      yPercent: 0,
+      opacity: 1,
+      duration: 1,
+      ease: "power3.out",
+      delay: 0.8, // Timed perfectly to overlap the end of the Hero timeline
+    });
+  }, { scope: navbarRef });
+
+  // --- 2. Magic Line Hover Animation ---
   const { contextSafe } = useGSAP({ scope: navContainerRef });
 
-  // Handle individual link hover
   const handleItemEnter = contextSafe((e) => {
     const item = e.currentTarget;
     const targetLeft = item.offsetLeft;
@@ -41,7 +57,6 @@ const Navbar = () => {
     }
 
     // Slide to the hovered item.
-    // overwrite: true forces GSAP to instantly kill the "leave" animation if it's still running
     gsap.to(underlineRef.current, {
       left: targetLeft,
       width: targetWidth,
@@ -52,9 +67,8 @@ const Navbar = () => {
     });
   });
 
-  // Handle mouse leaving the entire left navigation area
   const handleNavLeave = contextSafe(() => {
-    isHovering.current = false; // Mark that we've left the container
+    isHovering.current = false;
     const containerWidth = navContainerRef.current.offsetWidth;
 
     // Shoot off to the far right, shrink to 0, and fade out
@@ -69,7 +83,7 @@ const Navbar = () => {
   });
 
   return (
-    <div className="navbar w-full fixed top-0 left-0 z-[99999]">
+    <div ref={navbarRef} className="navbar w-full fixed top-0 left-0 z-[99999]">
       <div
         className="w-full py-4 px-6 lg:px-10 flex justify-between items-center txt-light"
         id="navbar-content"
