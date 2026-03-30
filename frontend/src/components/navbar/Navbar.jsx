@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { Icon } from "@iconify/react";
 import { Link } from "react-router-dom";
 const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
   const navigations = [
     {
       name: "shop",
@@ -49,8 +48,8 @@ const Navbar = () => {
   ];
 
   return (
-    <div className="navbar w-full py-3 px-3 lg:px-10 flex justify-between items-center txt-light fixed top-0 left-0 z-999999999">
-      <nav className="w-1/3 hidden lg:block" id="desktop-first-nav">
+    <div className="navbar w-full py-3 px-10 flex justify-between items-center txt-light fixed top-0 left-0 z-999999999">
+      <nav className="w-1/3" id="desktop-first-nav">
         <ul className="nav-list flex items-center gap-10 uppercase text-[0.7rem]">
           {navigations.map(({ name, path }) => (
             <li key={`${name}-desk-nav`} className="nav-list-item">
@@ -60,9 +59,9 @@ const Navbar = () => {
         </ul>
       </nav>
 
-      <div className="logo lg:w-1/3 flex justify-center items-center">
+      <div className="logo w-1/3 flex justify-center items-center">
         <Link to="/">
-          <img className="w-20 lg:w-36" src="/logo_white.svg" alt="" />
+          <img className="w-36" src="/logo_white.svg" alt="" />
         </Link>
       </div>
 
@@ -80,7 +79,7 @@ const Navbar = () => {
                 ))}
             </div> */}
 
-      <nav className="w-1/3 hidden lg:block" id="desktop-second-nav">
+      <nav className="w-1/3" id="desktop-second-nav">
         <ul className="nav-list flex justify-end items-center gap-10 uppercase text-[0.7rem]">
           <li className="nav-list-item brac-elem flex justify-center gap-1 cursor-pointer">
             <span className="inline-flex w-1 border-y border-l rounded-[1px]"></span>
@@ -98,24 +97,6 @@ const Navbar = () => {
           ))}
         </ul>
       </nav>
-
-      <div className="nav-icon lg:hidden flex justify-center items-center">
-        <div
-          onClick={() => setIsOpen(prev => !prev)}
-          className="w-7 h-2 flex flex-col justify-between cursor-pointer"
-        >
-          <span
-            className={`block h-[1.5px] bg-white/80 transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] ${
-              isOpen ? "rotate-45 translate-y-[7px]" : ""
-            }`}
-          />
-          <span
-            className={`block h-[1.5px] bg-white/80 transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] ${
-              isOpen ? "-rotate-45 -translate-y-[7px]" : ""
-            }`}
-          />
-        </div>
-      </div>
     </div>
   );
 };
