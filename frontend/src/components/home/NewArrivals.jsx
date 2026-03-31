@@ -10,6 +10,23 @@ import "swiper/css";
 // Register GSAP ScrollTrigger
 gsap.registerPlugin(ScrollTrigger);
 
+// Custom helper to split text into individually animatable words
+const SplitText = ({ children, className = "" }) => {
+  if (typeof children !== "string") return <span className={className}>{children}</span>;
+  
+  return (
+    <span className={`inline-block ${className}`}>
+      {children.split(" ").map((word, index) => (
+        <span key={index} className="inline-block mr-[0.25em] whitespace-nowrap">
+          <span className="reveal-word inline-block will-change-[transform,filter,opacity]">
+            {word}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+};
+
 const NewArrivals = () => {
   const sectionRef = useRef(null);
   const headingRef = useRef(null);
@@ -26,37 +43,94 @@ const NewArrivals = () => {
   ];
 
   useGSAP(() => {
-    // 1. Reveal the heading when scrolling into view
-    gsap.fromTo(
-      headingRef.current,
-      { opacity: 0, y: 50 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 75%", 
-        },
-      }
-    );
+    const words = gsap.utils.toArray(".reveal-word", headingRef.current);
+    let mm = gsap.matchMedia();
 
-    // 2. Reveal the entire slider container gently
-    gsap.fromTo(
-      sliderWrapperRef.current,
-      { opacity: 0, y: 40 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1.2,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: headingRef.current, // Triggers just after the heading appears
-          start: "top 60%", 
-        },
-      }
-    );
+    // ==========================================
+    // DESKTOP: Triggers optimized for wide screens
+    // ==========================================
+    mm.add("(min-width: 1024px)", () => {
+      // 1. Reveal the heading words
+      gsap.fromTo(
+        words,
+        { opacity: 0, y: 40, filter: "blur(12px)", scale: 0.95 },
+        {
+          opacity: 1,
+          y: 0,
+          filter: "blur(0px)",
+          scale: 1,
+          duration: 1,
+          stagger: 0.15,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 75%", 
+            toggleActions: "play none none reverse" 
+          },
+        }
+      );
+
+      // 2. Reveal the slider container
+      gsap.fromTo(
+        sliderWrapperRef.current,
+        { opacity: 0, y: 40 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 1.2,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: headingRef.current, 
+            start: "top 60%",
+            toggleActions: "play none none reverse"
+          },
+        }
+      );
+    });
+
+    // ==========================================
+    // MOBILE: Triggers optimized for tall screens
+    // ==========================================
+    mm.add("(max-width: 1023px)", () => {
+      // 1. Reveal the heading words slightly earlier on scroll
+      gsap.fromTo(
+        words,
+        { opacity: 0, y: 40, filter: "blur(12px)", scale: 0.95 },
+        {
+          opacity: 1,
+          y: 0,
+          filter: "blur(0px)",
+          scale: 1,
+          duration: 1,
+          stagger: 0.15,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 90%", // Triggers earlier as it enters the mobile viewport
+            toggleActions: "play none none reverse" 
+          },
+        }
+      );
+
+      // 2. Reveal the slider container
+      gsap.fromTo(
+        sliderWrapperRef.current,
+        { opacity: 0, y: 40 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 1.2,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: headingRef.current, 
+            start: "top 60%", // Adjusted relative to the new heading start
+            toggleActions: "play none none reverse"
+          },
+        }
+      );
+    });
+
+    return () => mm.revert();
   }, { scope: sectionRef });
 
   return (
@@ -66,34 +140,28 @@ const NewArrivals = () => {
       id="new-arrivals"
     >
       <div className="w-full px-6 lg:px-10 mb-12 lg:mb-20">
-        {/* Editorial Typography Lockup */}
-        <div ref={headingRef} className="relative inline-block mt-10 lg:mt-0 opacity-0">
+        <div ref={headingRef} className="relative inline-block mt-10 lg:mt-0">
           <span className="absolute left-1 lg:top-4 lg:left-2 text-xs lg:text-base font-bold tracking-[0.2em] uppercase">
-            New
+            <SplitText>New</SplitText>
           </span>
-          <h2 className="head-font text-6xl md:text-8xl lg:text-[7rem] font-bold tracking-tight lowercase leading-none">
-            arrivals
+          <h2 className="head-font text-6xl md:text-8xl lg:text-[7rem] font-bold tracking-tight lowercase leading-none pb-4">
+            <SplitText>arrivals</SplitText>
           </h2>
         </div>
       </div>
 
-      {/* Swiper Slider Container */}
-      <div ref={sliderWrapperRef} className="w-full pl-6 lg:pl-10 opacity-0">
+      <div ref={sliderWrapperRef} className="w-full pl-6 lg:pl-10">
         <Swiper
           grabCursor={true}
-          // Native Swiper breakpoints are much more reliable than Tailwind widths for slides
           breakpoints={{
-            // Mobile: Shows 1 full slide, and 20% of the next one
             0: {
               slidesPerView: 1.2,
               spaceBetween: 16,
             },
-            // Tablet: Shows 2 full slides, and 50% of the next one
             768: {
               slidesPerView: 2.5,
               spaceBetween: 24,
             },
-            // Desktop: Shows 3 full slides, and 50% of the next one
             1024: {
               slidesPerView: 4.5,
               spaceBetween: 10,
@@ -107,8 +175,7 @@ const NewArrivals = () => {
                 to={`/product/${product.id}`}
                 className="group flex flex-col cursor-pointer block w-full"
               >
-                {/* Product Background */}
-                <div className="w-full aspect-4/5 bg-[#eeeeee] flex items-center justify-center overflow-hidden transition-colors duration-500 group-hover:bg-[#e4e4e4]">
+                <div className="w-full aspect-[4/5] bg-[#eeeeee] flex items-center justify-center overflow-hidden transition-colors duration-500 group-hover:bg-[#e4e4e4]">
                   <img
                     src={product.img}
                     alt={product.name}
@@ -116,7 +183,6 @@ const NewArrivals = () => {
                   />
                 </div>
 
-                {/* Product Meta - Updated to stack vertically */}
                 <div className="flex flex-col items-start mt-4 lg:mt-5 text-sm lg:text-base tracking-wide font-medium">
                   <h3 className="">
                     {product.name}

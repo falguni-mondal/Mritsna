@@ -5,23 +5,66 @@ import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(ScrollTrigger);
 
+// Custom helper to split text into individually animatable words
+const SplitText = ({ children, className = "" }) => {
+  if (typeof children !== "string") return <span className={className}>{children}</span>;
+  
+  return (
+    <span className={`inline-block ${className}`}>
+      {children.split(" ").map((word, index) => (
+        // We add a right margin to replace the space character
+        <span key={index} className="inline-block mr-[0.25em] whitespace-nowrap">
+          {/* Removed opacity from will-change since we are no longer animating it */}
+          <span className="reveal-word inline-block will-change-[transform,filter]">
+            {word}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+};
+
 const Curation = () => {
   const sectionRef = useRef(null);
 
   useGSAP(() => {
+    const words = gsap.utils.toArray(".reveal-word");
     let mm = gsap.matchMedia();
 
-    // Desktop Animation
+    // ==========================================
+    // DESKTOP & TABLET ANIMATION
+    // ==========================================
     mm.add("(min-width: 768px)", () => {
+      
+      // 1. Pure Optical Focus Reveal (Desktop Trigger)
+      gsap.fromTo(words, 
+        { 
+          filter: "blur(12px)",
+          scale: 0.95
+        }, 
+        { 
+          filter: "blur(0px)",
+          scale: 1,
+          stagger: 0.15, 
+          duration: 1, 
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 25%", // Desktop start point
+            toggleActions: "play none none reverse",
+          }
+        }
+      );
+
+      // 2. Desktop Parallax Animation
       const parallaxElements = gsap.utils.toArray(".parallax-item");
       parallaxElements.forEach((el) => {
         const speed = parseFloat(el.dataset.speed);
         
-        // THE FIX: Use fromTo to balance the travel distance
         gsap.fromTo(el, 
-          { y: () => window.innerHeight * speed * 0.2 }, // Starts slightly lower
+          { y: () => window.innerHeight * speed * 0.2 }, 
           {
-            y: () => -window.innerHeight * speed * 0.2,  // Ends slightly higher
+            y: () => -window.innerHeight * speed * 0.2, 
             ease: "none",
             scrollTrigger: {
               trigger: sectionRef.current,
@@ -35,13 +78,36 @@ const Curation = () => {
       });
     });
 
-    // Mobile Animation
+    // ==========================================
+    // MOBILE ANIMATION
+    // ==========================================
     mm.add("(max-width: 767px)", () => {
+      
+      // 1. Pure Optical Focus Reveal (Mobile Trigger)
+      gsap.fromTo(words, 
+        { 
+          filter: "blur(12px)",
+          scale: 0.95
+        }, 
+        { 
+          filter: "blur(0px)",
+          scale: 1,
+          stagger: 0.15, 
+          duration: 1, 
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 60%", // Adjusted for smaller vertical viewports
+            toggleActions: "play none none reverse",
+          }
+        }
+      );
+
+      // 2. Mobile Parallax Animation
       const parallaxElements = gsap.utils.toArray(".parallax-item");
       parallaxElements.forEach((el) => {
         const speed = parseFloat(el.dataset.speed);
         
-        // THE FIX: Balanced travel distance for mobile
         gsap.fromTo(el, 
           { y: () => window.innerHeight * speed * 0.06 }, 
           {
@@ -65,7 +131,6 @@ const Curation = () => {
   return (
     <section
       ref={sectionRef}
-      // THE FIX: Removed pb-40 lg:pb-60. Replaced with minimal pb-10 to let the next section sit flush.
       className="w-full bg-[#f8f8f8] text-[#1a1a1a] pt-32 pb-10 relative overflow-hidden"
       id="curated-collection"
     >
@@ -80,8 +145,9 @@ const Curation = () => {
             Curated Series
           </span>
           <h2 className="head-font text-6xl md:text-8xl lg:text-[10rem] leading-[0.85] tracking-tighter">
-            The art of <br />
-            stillness
+            {/* SplitText handles the blur reveal while the parent handles the parallax */}
+            <SplitText>the art of</SplitText> <br />
+            <SplitText>stillness</SplitText>
           </h2>
         </div>
 

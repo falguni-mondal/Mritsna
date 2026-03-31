@@ -190,7 +190,7 @@ const CategoryIndex = () => {
                 </div>
                 
                 <div className="overflow-hidden mb-10">
-                  <h3 className="desk-title head-font text-8xl xl:text-[8rem] tracking-tighter capitalize leading-[0.9] pt-2 pb-6">
+                  <h3 className="desk-title head-font text-8xl xl:text-[8rem] tracking-tighter lowercase leading-[0.9] pt-2 pb-6">
                     {category.title}
                   </h3>
                 </div>
@@ -270,7 +270,7 @@ const CategoryIndex = () => {
                 </div>
                 
                 <div className="overflow-hidden mb-8">
-                  <h3 className="mob-title head-font text-6xl tracking-tighter capitalize leading-none pt-2 pb-4">
+                  <h3 className="mob-title head-font text-6xl tracking-tighter lowercase leading-none pt-2 pb-4">
                     {category.title}
                   </h3>
                 </div>

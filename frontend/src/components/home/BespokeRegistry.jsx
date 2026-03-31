@@ -28,68 +28,92 @@ const BespokeRegistry = () => {
   const sectionRef = useRef(null);
 
   useGSAP(() => {
-    // 1. Target all the words in the massive registry heading
+    // Select DOM elements once to use in both desktop and mobile timelines
     const words = gsap.utils.toArray(".reveal-word");
-    // 2. Target the input line for the email form
     const inputLine = sectionRef.current.querySelector(".input-line");
-    // 3. Target the bespoke image
     const bespokeImg = sectionRef.current.querySelector(".bespoke-img");
-    // 4. Target the bespoke text elements
     const bespokeText = gsap.utils.toArray(".bespoke-reveal");
 
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: sectionRef.current,
-        start: "top 25%", // Starts animating when the section is 25% into the viewport
-        end: "center center", // Finishes when the section reaches the middle
-        scrub: 1, // Buttery smooth scrubbing tied to the scrollbar
-      }
+    let mm = gsap.matchMedia();
+
+    // ==========================================
+    // DESKTOP ANIMATION
+    // ==========================================
+    mm.add("(min-width: 1024px)", () => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 25%",       // Your corrected desktop start
+          end: "center center",   // Finishes when the section reaches the middle
+          scrub: 1, 
+        }
+      });
+
+      tl.fromTo(words, 
+        { y: 40, opacity: 0, filter: "blur(12px)", scale: 0.95 }, 
+        { y: 0, opacity: 1, filter: "blur(0px)", scale: 1, stagger: 0.1, ease: "power2.out" }, 
+        0
+      )
+      .fromTo(inputLine,
+        { scaleX: 0, transformOrigin: "left center" },
+        { scaleX: 1, ease: "power2.out" },
+        0.2
+      )
+      .fromTo(bespokeImg,
+        { scale: 1.1, filter: "blur(10px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, ease: "power2.out" },
+        0.1
+      )
+      .fromTo(bespokeText,
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, stagger: 0.1, ease: "power2.out" },
+        0.3
+      );
     });
 
-    // The Word-by-Word Blurry Reveal
-    tl.fromTo(words, 
-      { 
-        y: 40, 
-        opacity: 0, 
-        filter: "blur(12px)",
-        scale: 0.95
-      }, 
-      { 
-        y: 0, 
-        opacity: 1, 
-        filter: "blur(0px)",
-        scale: 1,
-        stagger: 0.1, // This creates the sequential ripple effect across the words
-        ease: "power2.out"
-      }, 
-      0 // Start at the absolute beginning of the timeline
-    )
-    
-    // The Elegant Input Line Draw
-    .fromTo(inputLine,
-      { scaleX: 0, transformOrigin: "left center" },
-      { scaleX: 1, ease: "power2.out" },
-      0.2 // Start slightly after the text begins
-    )
+    // ==========================================
+    // MOBILE ANIMATION
+    // ==========================================
+    mm.add("(max-width: 1023px)", () => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 90%",       // Starts slightly earlier on smaller screens
+          end: "bottom 90%",      // Stretches the end point way down so the bottom elements don't animate off-screen
+          scrub: 1,
+        }
+      });
 
-    // The Bespoke Elements (Image and Text fading up)
-    .fromTo(bespokeImg,
-      { scale: 1.1, filter: "blur(10px)", opacity: 0 },
-      { scale: 1, filter: "blur(0px)", opacity: 1, ease: "power2.out" },
-      0.1
-    )
-    .fromTo(bespokeText,
-      { y: 30, opacity: 0 },
-      { y: 0, opacity: 1, stagger: 0.1, ease: "power2.out" },
-      0.3
-    );
+      tl.fromTo(words, 
+        { y: 40, opacity: 0, filter: "blur(12px)", scale: 0.95 }, 
+        { y: 0, opacity: 1, filter: "blur(0px)", scale: 1, stagger: 0.1, ease: "power2.out" }, 
+        0
+      )
+      .fromTo(inputLine,
+        { scaleX: 0, transformOrigin: "left center" },
+        { scaleX: 1, ease: "power2.out" },
+        0.2
+      )
+      // On mobile, we push the image and bottom text slightly further down the timeline 
+      // so they animate when the user actually scrolls to them
+      .fromTo(bespokeImg,
+        { scale: 1.1, filter: "blur(10px)", opacity: 0 },
+        { scale: 1, filter: "blur(0px)", opacity: 1, ease: "power2.out" },
+        0.4
+      )
+      .fromTo(bespokeText,
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, stagger: 0.1, ease: "power2.out" },
+        0.6
+      );
+    });
 
+    return () => mm.revert();
   }, { scope: sectionRef });
 
   return (
     <section 
       ref={sectionRef}
-      // A warm, alabaster stone background to contrast the dark Category Index
       className="w-full bg-[#f4f3f0] text-[#1a1a1a] py-32 lg:py-48 relative z-20 overflow-hidden"
     >
       <div className="max-w-[1400px] mx-auto w-full px-6 lg:px-12">
@@ -120,9 +144,7 @@ const BespokeRegistry = () => {
                 className="w-full bg-transparent border-none outline-none pb-4 text-sm font-light placeholder:text-[#1a1a1a]/40 text-[#1a1a1a]"
                 required
               />
-              {/* The animating underline */}
               <div className="input-line absolute bottom-0 left-0 w-full h-[1px] bg-[#1a1a1a]/20" />
-              {/* The active hover underline */}
               <div className="absolute bottom-0 left-0 w-full h-[1.5px] bg-[#1a1a1a] scale-x-0 origin-left transition-transform duration-500 group-hover:scale-x-100" />
               
               <button 
@@ -146,7 +168,6 @@ const BespokeRegistry = () => {
                 className="bespoke-img w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105"
               />
               
-              {/* An elegant overlay button that appears on hover */}
               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center">
                  <span className="bg-[#f8f8f8] text-[#1a1a1a] px-8 py-4 text-xs font-bold tracking-[0.2em] uppercase rounded-full">
                    View Portfolio
