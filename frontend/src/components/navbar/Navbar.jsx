@@ -173,7 +173,7 @@ const Navbar = () => {
           {/* Logo */}
           <div className="logo lg:w-1/3 flex justify-start lg:justify-center items-center">
             <Link to="/">
-              <img className="w-20 lg:w-36" src="/logo_white.svg" alt="Mritsna Logo" />
+              <img className="w-22 lg:w-36" src="/logo_white.svg" alt="Mritsna Logo" />
             </Link>
           </div>
 

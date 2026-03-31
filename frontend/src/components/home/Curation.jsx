@@ -79,8 +79,8 @@ const Curation = () => {
           <span className="block text-[0.55rem] lg:text-[0.65rem] font-bold tracking-[0.3em] uppercase mb-4 md:ml-2">
             Curated Series
           </span>
-          <h2 className="head-font text-6xl md:text-8xl lg:text-[10rem] leading-[0.85] tracking-tighter lowercase">
-            the art of <br />
+          <h2 className="head-font text-6xl md:text-8xl lg:text-[10rem] leading-[0.85] tracking-tighter">
+            The art of <br />
             stillness
           </h2>
         </div>

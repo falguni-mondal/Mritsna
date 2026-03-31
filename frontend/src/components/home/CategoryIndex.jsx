@@ -45,19 +45,24 @@ const CategoryIndex = () => {
     let mm = gsap.matchMedia();
 
     // ==========================================
-    // DESKTOP: Mask Reveal Timeline
+    // DESKTOP: Text Mask Reveal + Image Card Stack
     // ==========================================
     mm.add("(min-width: 1024px)", () => {
       const titles = gsap.utils.toArray(".desk-title");
       const subs = gsap.utils.toArray(".desk-sub");
       const links = gsap.utils.toArray(".desk-link");
-      const imgs = gsap.utils.toArray(".desk-img");
+      
+      // Target the wrappers instead of the image tags for the stacking effect
+      const imgPanels = gsap.utils.toArray(".desk-img-panel");
 
-      // Push all elements down perfectly 100% out of their hugging masks
+      // Set Z-Indexes so the next image slides OVER the previous one
+      gsap.set(imgPanels, { zIndex: (i) => i });
+      
+      // Push all items (except the first) down
+      gsap.set(imgPanels.slice(1), { yPercent: 100 });
       gsap.set(titles.slice(1), { yPercent: 100 });
       gsap.set(subs.slice(1), { yPercent: 100 });
       gsap.set(links.slice(1), { yPercent: 100 });
-      gsap.set(imgs.slice(1), { yPercent: 100 });
 
       const tl = gsap.timeline({
         scrollTrigger: {
@@ -72,37 +77,50 @@ const CategoryIndex = () => {
       categories.forEach((_, i) => {
         if (i === categories.length - 1) return;
 
-        const currentElements = [imgs[i], subs[i], titles[i], links[i]];
-        const nextElements = [imgs[i + 1], subs[i + 1], titles[i + 1], links[i + 1]];
+        const currentText = [subs[i], titles[i], links[i]];
+        const nextText = [subs[i + 1], titles[i + 1], links[i + 1]];
+        
+        // We only need to animate the NEXT image. The current stays still.
+        const nextImgPanel = imgPanels[i + 1];
 
-        tl.to(currentElements, { 
+        // 1. Text does the Mask Reveal
+        tl.to(currentText, { 
             yPercent: -100, 
             ease: "power3.inOut", 
             duration: 1, 
-            stagger: 0.05 
         }, `slide${i}`)
-        .to(nextElements, { 
+        .to(nextText, { 
             yPercent: 0, 
             ease: "power3.inOut", 
             duration: 1, 
-            stagger: 0.05 
+        }, `slide${i}`)
+        
+        // 2. The Next Image slides up OVER the current image (Current stays at 0)
+        .to(nextImgPanel, { 
+            yPercent: 0, 
+            ease: "power3.inOut", 
+            duration: 1 
         }, `slide${i}`);
       });
     });
 
     // ==========================================
-    // MOBILE: Mask Reveal Timeline
+    // MOBILE: Text Mask Reveal + Image Card Stack
     // ==========================================
     mm.add("(max-width: 1023px)", () => {
       const titles = gsap.utils.toArray(".mob-title");
       const subs = gsap.utils.toArray(".mob-sub");
       const links = gsap.utils.toArray(".mob-link");
-      const imgs = gsap.utils.toArray(".mob-img");
       
+      // Target the wrappers so the gradient and image slide together
+      const imgPanels = gsap.utils.toArray(".mob-img-panel");
+      
+      gsap.set(imgPanels, { zIndex: (i) => i });
+
+      gsap.set(imgPanels.slice(1), { yPercent: 100 });
       gsap.set(titles.slice(1), { yPercent: 100 });
       gsap.set(subs.slice(1), { yPercent: 100 });
       gsap.set(links.slice(1), { yPercent: 100 });
-      gsap.set(imgs.slice(1), { yPercent: 100 });
       
       const tl = gsap.timeline({
         scrollTrigger: {
@@ -117,20 +135,24 @@ const CategoryIndex = () => {
       categories.forEach((_, i) => {
         if (i === categories.length - 1) return;
 
-        const currentElements = [imgs[i], subs[i], titles[i], links[i]];
-        const nextElements = [imgs[i + 1], subs[i + 1], titles[i + 1], links[i + 1]];
+        const currentText = [subs[i], titles[i], links[i]];
+        const nextText = [subs[i + 1], titles[i + 1], links[i + 1]];
+        const nextImgPanel = imgPanels[i + 1];
 
-        tl.to(currentElements, { 
+        tl.to(currentText, { 
             yPercent: -100, 
             ease: "power3.inOut", 
             duration: 1, 
-            stagger: 0.05 
         }, `slide${i}`)
-        .to(nextElements, { 
+        .to(nextText, { 
             yPercent: 0, 
             ease: "power3.inOut", 
             duration: 1, 
-            stagger: 0.05 
+        }, `slide${i}`)
+        .to(nextImgPanel, { 
+            yPercent: 0, 
+            ease: "power3.inOut", 
+            duration: 1 
         }, `slide${i}`);
       });
     });
@@ -139,12 +161,12 @@ const CategoryIndex = () => {
   }, []);
 
   return (
-    <div className="bg-[#1a1a1a]">
+    <div className="bg-dark">
       
       {/* ========================================== */}
       {/* DESKTOP LAYOUT                             */}
       {/* ========================================== */}
-      <div className="hidden lg:block w-full text-[#f8f8f8]">
+      <div className="hidden lg:block w-full txt-light">
         
         <section className="pt-32 pb-16 px-12 max-w-[1400px] mx-auto w-full relative z-10">
           <span className="block text-[0.6rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-4">
@@ -155,23 +177,20 @@ const CategoryIndex = () => {
           </p>
         </section>
 
-        <section ref={desktopPinRef} className="w-full h-screen flex relative bg-[#1a1a1a]">
+        <section ref={desktopPinRef} className="w-full h-dvh flex relative bg-dark">
           
           <div className="w-[55%] h-full relative flex flex-col justify-center pl-12 pr-20">
             {categories.map((category) => (
               <div key={`desk-txt-${category.id}`} className="absolute inset-0 w-full h-full flex flex-col justify-center pl-12 pr-20 pointer-events-none">
                 
                 <div className="overflow-hidden mb-6">
-                  {/* Padding added directly to the animating element */}
-                  <span className="desk-sub block text-xs font-bold tracking-[0.3em] uppercase opacity-50 pb-2">
+                  <span className="desk-sub block text-xs font-light tracking-[0.3em] uppercase opacity-50 pb-2">
                     0{category.id.replace('0', '')} — {category.subtitle}
                   </span>
                 </div>
                 
-                {/* Clean overflow hidden wrapper, no weird negative margins */}
                 <div className="overflow-hidden mb-10">
-                  {/* pt-2 pb-6 perfectly captures the massive font's ascenders and descenders */}
-                  <h3 className="desk-title head-font text-8xl xl:text-[8rem] tracking-tighter lowercase leading-[0.9] pt-2 pb-6">
+                  <h3 className="desk-title head-font text-8xl xl:text-[8rem] tracking-tighter capitalize leading-[0.9] pt-2 pb-6">
                     {category.title}
                   </h3>
                 </div>
@@ -179,9 +198,9 @@ const CategoryIndex = () => {
                 <div className="overflow-hidden">
                   <Link 
                     to={category.link}
-                    className="desk-link group relative inline-flex items-center text-sm font-bold tracking-[0.2em] uppercase pt-2 pb-2 w-max pointer-events-auto"
+                    className="desk-link group relative inline-flex items-center text-sm tracking-[0.2em] uppercase pt-2 pb-2 w-max pointer-events-auto"
                   >
-                    <span>Explore Collection</span>
+                    <span>Explore {category.title}</span>
                     <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-[#f8f8f8] transition-all duration-500 origin-left group-hover:scale-x-0" />
                   </Link>
                 </div>
@@ -192,11 +211,12 @@ const CategoryIndex = () => {
 
           <div className="w-[45%] h-full relative">
             {categories.map((category) => (
-              <div key={`desk-img-${category.id}`} className="absolute inset-0 w-full h-full overflow-hidden">
+              // The Wrapper (.desk-img-panel) is now what animates, physically layering over the previous one
+              <div key={`desk-img-${category.id}`} className="desk-img-panel absolute inset-0 w-full h-full overflow-hidden">
                 <img 
                   src={category.image} 
                   alt={category.title}
-                  className="desk-img w-full h-full object-cover"
+                  className="w-full h-full object-cover"
                 />
               </div>
             ))}
@@ -209,7 +229,7 @@ const CategoryIndex = () => {
       {/* ========================================== */}
       {/* MOBILE LAYOUT                              */}
       {/* ========================================== */}
-      <div className="block lg:hidden w-full text-[#f8f8f8]">
+      <div className="block lg:hidden w-full txt-light">
         
         <section className="pt-24 pb-8 px-6 w-full relative z-10">
           <span className="block text-[0.6rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-4">
@@ -220,16 +240,20 @@ const CategoryIndex = () => {
           </p>
         </section>
 
-        <section ref={mobilePinRef} className="w-full h-[100dvh] relative bg-[#1a1a1a]">
+        <section ref={mobilePinRef} className="w-full h-dvh relative bg-dark">
           
           <div className="absolute inset-0 w-full h-full z-10">
             {categories.map((category) => (
-              <div key={`mob-img-wrap-${category.id}`} className="absolute inset-0 w-full h-full overflow-hidden">
-                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-black/80 z-20 mix-blend-multiply pointer-events-none" />
+              // The Wrapper (.mob-img-panel) animates, carrying both the dark overlay and image over the old one
+              <div key={`mob-img-wrap-${category.id}`} className="mob-img-panel absolute inset-0 w-full h-full overflow-hidden">
+                 
+                 {/* Transparent black overlay added here */}
+                 <div className="absolute inset-0 bg-black/40 z-20 pointer-events-none" />
+                 
                  <img 
                    src={category.image} 
                    alt={category.title}
-                   className="mob-img w-full h-full object-cover origin-top"
+                   className="w-full h-full object-cover origin-top"
                  />
               </div>
             ))}
@@ -237,18 +261,16 @@ const CategoryIndex = () => {
 
           <div className="absolute inset-0 w-full h-full z-30 pointer-events-none">
             {categories.map((category) => (
-              <div key={`mob-txt-${category.id}`} className="absolute inset-0 w-full h-full flex flex-col items-center justify-center text-[#f8f8f8] mix-blend-difference px-6 text-center">
+              <div key={`mob-txt-${category.id}`} className="absolute inset-0 w-full h-full flex flex-col items-center justify-center txt-light mix-blend-difference px-6 text-center">
                 
                 <div className="overflow-hidden mb-4">
-                  <span className="mob-sub block text-[0.6rem] font-bold tracking-[0.3em] uppercase opacity-80 pb-2">
+                  <span className="mob-sub block text-[0.6rem] font-light tracking-[0.3em] uppercase opacity-80 pb-2">
                     0{category.id.replace('0', '')} — {category.subtitle}
                   </span>
                 </div>
                 
-                {/* Clean overflow hidden wrapper */}
                 <div className="overflow-hidden mb-8">
-                  {/* Padding added directly to encapsulate the mobile font */}
-                  <h3 className="mob-title head-font text-6xl tracking-tighter lowercase leading-none pt-2 pb-4">
+                  <h3 className="mob-title head-font text-6xl tracking-tighter capitalize leading-none pt-2 pb-4">
                     {category.title}
                   </h3>
                 </div>
@@ -256,9 +278,9 @@ const CategoryIndex = () => {
                 <div className="overflow-hidden">
                   <Link 
                     to={category.link}
-                    className="mob-link relative inline-flex items-center text-xs font-bold tracking-[0.2em] uppercase pt-2 pb-2 pointer-events-auto"
+                    className="mob-link relative inline-flex items-center text-xs tracking-[0.2em] uppercase pt-2 pb-2 pointer-events-auto"
                   >
-                    <span>Explore</span>
+                    <span>Explore {category.title}</span>
                     <span className="absolute bottom-0 left-0 w-full h-[1px] bg-[#f8f8f8] transition-all duration-500" />
                   </Link>
                 </div>

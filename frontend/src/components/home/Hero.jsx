@@ -122,9 +122,9 @@ const Hero = () => {
     >
       <div className="hero-left flex flex-col justify-center">
         <div className="hero-heading-container w-full mb-6 md:mb-10 lg:mb-6">
-          <h1 className="hero-heading text-5xl md:text-7xl lg:text-6xl head-font flex flex-col">
-            <div ref={line1Ref} className="leading-none pb-1">Crafted in Silence.</div>
-            <div ref={line2Ref} className="leading-none pb-1">Felt in Every Detail.</div>
+          <h1 className="hero-heading text-6xl md:text-6xl lg:text-6xl head-font flex flex-col">
+            <div ref={line1Ref} className="leading-none lg:pb-1">Crafted in Silence.</div>
+            <div ref={line2Ref} className="leading-none lg:pb-1">Felt in Every Detail.</div>
           </h1>
         </div>
 
@@ -149,7 +149,7 @@ const Hero = () => {
             />
 
             {/* Dark Text (Default State) */}
-            <span ref={ctaTextDarkRef} className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-medium txt-dark">
+            <span ref={ctaTextDarkRef} className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-semibold txt-dark">
               explore now 
               <div ref={ctaIconDarkRef} className="flex items-center justify-center">
                 <Icon className="text-sm md:text-lg lg:text-sm" icon="iconamoon:arrow-right-1" />
@@ -157,7 +157,7 @@ const Hero = () => {
             </span>
 
             {/* Light Text (Hover State) */}
-            <span ref={ctaTextLightRef} className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-medium txt-light opacity-0">
+            <span ref={ctaTextLightRef} className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-semibold txt-light opacity-0">
               explore now 
               <div ref={ctaIconLightRef} className="flex items-center justify-center">
                 <Icon className="text-sm md:text-lg lg:text-sm" icon="iconamoon:arrow-right-1" />
@@ -165,7 +165,7 @@ const Hero = () => {
             </span>
 
             {/* Invisible spacer text to maintain button width/height properly */}
-            <span className="invisible flex items-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-medium">
+            <span className="invisible flex items-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-semibold">
               explore now 
               <div className="flex items-center justify-center">
                 <Icon className="text-sm md:text-lg lg:text-sm" icon="iconamoon:arrow-right-1" />

@@ -84,7 +84,7 @@ const Origins = () => {
   return (
     <section
       ref={sectionRef}
-      className="w-full flex flex-col lg:flex-row bg-[#f8f8f8] text-[#1a1a1a] mt-20 lg:32"
+      className="w-full flex flex-col lg:flex-row bg-[#f8f8f8] text-[#1a1a1a] mt-20 lg:mt-40"
       id="origins-story"
     >
       {/* Left Side: Massive Image */}

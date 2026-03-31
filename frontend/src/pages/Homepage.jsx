@@ -1,3 +1,4 @@
+import BespokeRegistry from "../components/home/BespokeRegistry";
 import CategoryIndex from "../components/home/CategoryIndex";
 import Curation from "../components/home/Curation";
 import Hero from "../components/home/Hero";
@@ -12,6 +13,7 @@ const Homepage = () => {
       <Origins />
       <Curation />
       <CategoryIndex />
+      <BespokeRegistry />
     </div>
   );
 };
