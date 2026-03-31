@@ -3,16 +3,28 @@ import { Link } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navmenu from "./Navmenu";
+
+// Register the plugin
+gsap.registerPlugin(ScrollTrigger);
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
-  // Refs for Animations
+  // Refs for Animations & Structure
   const navbarRef = useRef(null);
+  
+  // Left Nav Refs
   const navContainerRef = useRef(null);
   const underlineRef = useRef(null);
   const isHovering = useRef(false);
+
+  // Right Nav Refs
+  const rightNavContainerRef = useRef(null);
+  const rightUnderlineRef = useRef(null);
+  const isRightHovering = useRef(false);
 
   const navigations = [
     { name: "shop", path: "/shop" },
@@ -27,36 +39,37 @@ const Navbar = () => {
     { name: "wishlist", path: "/wishlist" },
   ];
 
-  // --- 1. Initial Load Animation ---
-  useGSAP(() => {
-    // Hide navbar above the screen initially
+  // --- 1. Initial Load Animation & Scroll Blend ---
+  const { contextSafe } = useGSAP(() => {
     gsap.set(navbarRef.current, { yPercent: -30, opacity: 0 });
 
-    // Slide down just as the Hero animation finishes
     gsap.to(navbarRef.current, {
       yPercent: 0,
       opacity: 1,
       duration: 1,
       ease: "power3.out",
-      delay: 0.8, // Timed perfectly to overlap the end of the Hero timeline
+      delay: 0.8, 
+    });
+
+    ScrollTrigger.create({
+      start: () => window.innerHeight * 0.9, 
+      onEnter: () => navbarRef.current?.classList.add("mix-blend-difference"),
+      onLeaveBack: () => navbarRef.current?.classList.remove("mix-blend-difference"),
+      invalidateOnRefresh: true, 
     });
   }, { scope: navbarRef });
 
-  // --- 2. Magic Line Hover Animation ---
-  const { contextSafe } = useGSAP({ scope: navContainerRef });
-
+  // --- 2. Left Nav Hover Animation ---
   const handleItemEnter = contextSafe((e) => {
     const item = e.currentTarget;
     const targetLeft = item.offsetLeft;
     const targetWidth = item.offsetWidth;
 
-    // If it's a fresh entry (or quick re-entry), instantly snap to the left edge
     if (!isHovering.current) {
       gsap.set(underlineRef.current, { left: 0, width: 0 });
       isHovering.current = true;
     }
 
-    // Slide to the hovered item.
     gsap.to(underlineRef.current, {
       left: targetLeft,
       width: targetWidth,
@@ -71,7 +84,6 @@ const Navbar = () => {
     isHovering.current = false;
     const containerWidth = navContainerRef.current.offsetWidth;
 
-    // Shoot off to the far right, shrink to 0, and fade out
     gsap.to(underlineRef.current, {
       left: containerWidth,
       width: 0,
@@ -82,98 +94,157 @@ const Navbar = () => {
     });
   });
 
+  // --- 3. Right Nav Hover Animation ---
+  const handleRightItemEnter = contextSafe((e) => {
+    const item = e.currentTarget;
+    const containerWidth = rightNavContainerRef.current.offsetWidth;
+    const targetLeft = item.offsetLeft;
+    const targetWidth = item.offsetWidth;
+    
+    const targetRight = containerWidth - (targetLeft + targetWidth);
+
+    if (!isRightHovering.current) {
+      gsap.set(rightUnderlineRef.current, { right: 0, left: "auto", width: 0 });
+      isRightHovering.current = true;
+    }
+
+    gsap.to(rightUnderlineRef.current, {
+      right: targetRight,
+      width: targetWidth,
+      opacity: 1,
+      duration: 0.4,
+      ease: "power3.out",
+      overwrite: true, 
+    });
+  });
+
+  const handleRightNavLeave = contextSafe(() => {
+    isRightHovering.current = false;
+    const containerWidth = rightNavContainerRef.current.offsetWidth;
+
+    gsap.to(rightUnderlineRef.current, {
+      right: containerWidth,
+      width: 0,
+      opacity: 0,
+      duration: 0.4,
+      ease: "power3.out",
+      overwrite: true,
+    });
+  });
+
+  // NOTE: Wrapped the return in a Fragment <> so Navmenu sits outside the blended navbarRef
   return (
-    <div ref={navbarRef} className="navbar w-full fixed top-0 left-0 z-[99999]">
-      <div
-        className="w-full py-4 px-6 lg:px-10 flex justify-between items-center txt-light"
-        id="navbar-content"
-      >
-        {/* Desktop Left Navigation */}
-        <nav className="w-1/3 hidden lg:block" id="desktop-first-nav">
-          <ul 
-            ref={navContainerRef}
-            onMouseLeave={handleNavLeave}
-            className="nav-list flex items-center gap-10 uppercase text-[0.7rem] tracking-wider relative"
-          >
-            {/* The Animated Magic Underline */}
-            <li
-              ref={underlineRef}
-              className="absolute -bottom-2 h-[1px] bg-light opacity-0 pointer-events-none"
-              style={{ left: 0, width: 0 }}
-            />
+    <>
+      <div ref={navbarRef} className="navbar w-full fixed top-0 left-0 z-[99999] transition-colors">
+        <div
+          className="w-full py-4 px-6 lg:px-10 flex justify-between items-center txt-light"
+          id="navbar-content"
+        >
+          {/* Desktop Left Navigation */}
+          <nav className="w-1/3 hidden lg:block" id="desktop-first-nav">
+            <ul 
+              ref={navContainerRef}
+              onMouseLeave={handleNavLeave}
+              className="nav-list flex items-center gap-10 uppercase text-[0.7rem] tracking-wider relative"
+            >
+              <li
+                ref={underlineRef}
+                className="absolute -bottom-1 h-px bg-light opacity-0 pointer-events-none"
+                style={{ left: 0, width: 0 }}
+              />
 
-            {navigations.map(({ name, path }) => (
-              <li 
-                key={`${name}-desk-nav`} 
-                className="nav-list-item"
-                onMouseEnter={handleItemEnter}
-              >
-                <Link 
-                  to={path}
-                  className="hover:opacity-70 transition-opacity duration-300 py-1"
+              {navigations.map(({ name, path }) => (
+                <li 
+                  key={`${name}-desk-nav`} 
+                  className="nav-list-item"
+                  onMouseEnter={handleItemEnter}
                 >
-                  {name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+                  <Link 
+                    to={path}
+                    className="hover:opacity-70 transition-opacity duration-300 py-1 inline-block"
+                  >
+                    {name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
 
-        {/* Logo */}
-        <div className="logo lg:w-1/3 flex justify-start lg:justify-center items-center">
-          <Link to="/">
-            <img className="w-20 lg:w-36" src="/logo_white.svg" alt="Mritsna Logo" />
-          </Link>
-        </div>
-
-        {/* Desktop Right Navigation */}
-        <nav className="w-1/3 hidden lg:block" id="desktop-second-nav">
-          <ul className="nav-list flex justify-end items-center gap-10 uppercase text-[0.7rem] tracking-wider">
-            <li className="nav-list-item brac-elem flex justify-center gap-1 cursor-pointer hover:opacity-70 transition-opacity duration-300">
-              <span className="inline-flex w-1 border-y border-l border-[rgba(248,248,248,0.4)] rounded-[1px]"></span>
-              <span>search</span>
-              <span className="inline-flex w-1 border-y border-r border-[rgba(248,248,248,0.4)] rounded-[1px]"></span>
-            </li>
-            {serviceNavs.map(({ name, path }) => (
-              <li key={`${name}-desk-nav`} className="nav-list-item">
-                <Link 
-                  className="brac-elem flex justify-center gap-1 hover:opacity-70 transition-opacity duration-300" 
-                  to={path}
-                >
-                  <span className="inline-flex w-1 border-y border-l border-[rgba(248,248,248,0.4)] rounded-[1px]"></span>
-                  {name}
-                  <span className="inline-flex w-1 border-y border-r border-[rgba(248,248,248,0.4)] rounded-[1px]"></span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        {/* Mobile Right Section: Search + Hamburger */}
-        <div className="flex items-center gap-5 lg:hidden">
-          {/* Mobile Search Icon */}
-          <div className="cursor-pointer text-xl flex items-center justify-center hover:opacity-70 transition-opacity duration-300">
-            <Icon icon="iconamoon:search" />
+          {/* Logo */}
+          <div className="logo lg:w-1/3 flex justify-start lg:justify-center items-center">
+            <Link to="/">
+              <img className="w-20 lg:w-36" src="/logo_white.svg" alt="Mritsna Logo" />
+            </Link>
           </div>
 
-          {/* Hamburger Nav Icon */}
-          <div
-            onClick={() => setIsOpen((prev) => !prev)}
-            className="nav-icon w-7 h-2 flex flex-col justify-between cursor-pointer"
-          >
-            <span
-              className="block h-[1.5px] bg-light transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)]"
-            />
-            <span
-              className="block h-[1.5px] bg-light transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)]"
-            />
+          {/* Desktop Right Navigation */}
+          <nav className="w-1/3 hidden lg:block" id="desktop-second-nav">
+            <ul 
+              ref={rightNavContainerRef}
+              onMouseLeave={handleRightNavLeave}
+              className="nav-list flex justify-end items-center gap-10 uppercase text-[0.7rem] tracking-wider relative"
+            >
+              <li
+                ref={rightUnderlineRef}
+                className="absolute -bottom-1 h-px bg-light opacity-0 pointer-events-none"
+                style={{ right: 0, width: 0 }}
+              />
+
+              <li 
+                className="nav-list-item"
+                onMouseEnter={handleRightItemEnter}
+              >
+                <span className="cursor-pointer hover:opacity-70 transition-opacity duration-300 py-1 inline-block">
+                  search
+                </span>
+              </li>
+              
+              {serviceNavs.map(({ name, path }) => (
+                <li 
+                  key={`${name}-desk-nav`} 
+                  className="nav-list-item"
+                  onMouseEnter={handleRightItemEnter}
+                >
+                  <Link 
+                    className="hover:opacity-70 transition-opacity duration-300 py-1 inline-block" 
+                    to={path}
+                  >
+                    {name}
+                    {name === "cart" && (
+                      <span className="ml-1 tracking-widest font-medium opacity-80">
+                        [{cartCount}]
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Mobile Right Section: Search + Hamburger */}
+          <div className="flex items-center gap-5 lg:hidden">
+            <div className="cursor-pointer text-xl flex items-center justify-center hover:opacity-70 transition-opacity duration-300">
+              <Icon icon="iconamoon:search" />
+            </div>
+
+            <div
+              onClick={() => setIsOpen((prev) => !prev)}
+              className="nav-icon w-7 h-2 flex flex-col justify-between cursor-pointer"
+            >
+              <span
+                className={`block h-[1.5px] bg-light transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] ${isOpen ? "rotate-45 translate-y-[3px]" : ""}`}
+              />
+              <span
+                className={`block h-[1.5px] bg-light transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] ${isOpen ? "-rotate-45 -translate-y-[3px]" : ""}`}
+              />
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay is now outside the blended parent! */}
       <Navmenu isOpen={isOpen} setIsOpen={setIsOpen} />
-    </div>
+    </>
   );
 };
 

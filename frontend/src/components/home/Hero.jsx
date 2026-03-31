@@ -122,7 +122,7 @@ const Hero = () => {
     >
       <div className="hero-left flex flex-col justify-center">
         <div className="hero-heading-container w-full mb-6 md:mb-10 lg:mb-6">
-          <h1 className="hero-heading text-5xl md:text-7xl lg:text-6xl head-font flex flex-col lg:gap-1">
+          <h1 className="hero-heading text-5xl md:text-7xl lg:text-6xl head-font flex flex-col">
             <div ref={line1Ref} className="leading-none pb-1">Crafted in Silence.</div>
             <div ref={line2Ref} className="leading-none pb-1">Felt in Every Detail.</div>
           </h1>
