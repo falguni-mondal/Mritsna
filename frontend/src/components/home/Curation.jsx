@@ -97,7 +97,7 @@ const Curation = () => {
           ease: "power2.out",
           scrollTrigger: {
             trigger: sectionRef.current,
-            start: "top 60%", // Adjusted for smaller vertical viewports
+            start: "top 30%", // Adjusted for smaller vertical viewports
             toggleActions: "play none none reverse",
           }
         }
@@ -144,7 +144,7 @@ const Curation = () => {
           <span className="block text-[0.55rem] lg:text-[0.65rem] font-bold tracking-[0.3em] uppercase mb-4 md:ml-2">
             Curated Series
           </span>
-          <h2 className="head-font text-6xl md:text-8xl lg:text-[10rem] leading-[0.85] tracking-tighter">
+          <h2 className="head-font text-6xl md:text-8xl lg:text-[8rem] leading-[0.85] tracking-tighter">
             {/* SplitText handles the blur reveal while the parent handles the parallax */}
             <SplitText>the art of</SplitText> <br />
             <SplitText>stillness</SplitText>
@@ -182,7 +182,7 @@ const Curation = () => {
 
         {/* --- IMAGE 2: MACRO DETAIL --- */}
         <div 
-          className="parallax-item w-[80%] md:w-[40%] lg:w-[30%] ml-auto mr-[5%] mt-10 md:mt-14 relative z-10"
+          className="parallax-item w-[80%] md:w-[40%] lg:w-[30%] ml-auto mr-[5%] mt-10 md:mt-5 relative z-10"
           data-speed="1.8" 
         >
           <div className="aspect-square overflow-hidden shadow-sm">

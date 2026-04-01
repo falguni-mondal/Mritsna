@@ -43,7 +43,7 @@ const BespokeRegistry = () => {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: "top 25%",       // Your corrected desktop start
+          start: "top 40%",       // Your corrected desktop start
           end: "center center",   // Finishes when the section reaches the middle
           scrub: 1, 
         }
@@ -78,7 +78,7 @@ const BespokeRegistry = () => {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: "top 90%",       // Starts slightly earlier on smaller screens
+          start: "top 100%",       // Starts slightly earlier on smaller screens
           end: "bottom 90%",      // Stretches the end point way down so the bottom elements don't animate off-screen
           scrub: 1,
         }
@@ -104,7 +104,7 @@ const BespokeRegistry = () => {
       .fromTo(bespokeText,
         { y: 30, opacity: 0 },
         { y: 0, opacity: 1, stagger: 0.1, ease: "power2.out" },
-        0.6
+        0.3
       );
     });
 

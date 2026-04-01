@@ -47,15 +47,6 @@ body {
 
 
 
-/* HOMEPAGE................................................................................................... */
-
-/* {HERO} */
-#home-hero {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.0)), url("/hero.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
 .brac-elem {
   transition: all;
   transition-duration: 0.5s;

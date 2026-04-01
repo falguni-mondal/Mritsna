@@ -106,7 +106,7 @@ const NewArrivals = () => {
           ease: "power3.out",
           scrollTrigger: {
             trigger: sectionRef.current,
-            start: "top 90%", // Triggers earlier as it enters the mobile viewport
+            start: "top 50%", // Triggers earlier as it enters the mobile viewport
             toggleActions: "play none none reverse" 
           },
         }
@@ -123,7 +123,7 @@ const NewArrivals = () => {
           ease: "power3.out",
           scrollTrigger: {
             trigger: headingRef.current, 
-            start: "top 60%", // Adjusted relative to the new heading start
+            start: "top 50%", // Adjusted relative to the new heading start
             toggleActions: "play none none reverse"
           },
         }
@@ -139,12 +139,12 @@ const NewArrivals = () => {
       className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a] pt-32 pb-20 overflow-hidden"
       id="new-arrivals"
     >
-      <div className="w-full px-6 lg:px-10 mb-12 lg:mb-20">
+      <div className="w-full px-6 lg:px-10 mb-14 lg:mb-20">
         <div ref={headingRef} className="relative inline-block mt-10 lg:mt-0">
           <span className="absolute left-1 lg:top-4 lg:left-2 text-xs lg:text-base font-bold tracking-[0.2em] uppercase">
             <SplitText>New</SplitText>
           </span>
-          <h2 className="head-font text-6xl md:text-8xl lg:text-[7rem] font-bold tracking-tight lowercase leading-none pb-4">
+          <h2 className="head-font text-6xl md:text-8xl lg:text-[8rem] leading-none tracking-tighter">
             <SplitText>arrivals</SplitText>
           </h2>
         </div>

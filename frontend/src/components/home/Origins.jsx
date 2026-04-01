@@ -48,7 +48,7 @@ const Origins = () => {
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: textContainerRef.current,
-        start: "top 75%", 
+        start: "top 50%", 
       }
     });
 
