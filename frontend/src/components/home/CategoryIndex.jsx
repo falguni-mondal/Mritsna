@@ -53,276 +53,205 @@ const categories = [
   },
 ];
 
-const CategoryIndex = () => {
-  const desktopPinRef = useRef(null);
-  const mobilePinRef = useRef(null);
-  const deskHeadingRef = useRef(null);
-  const mobHeadingRef = useRef(null);
+const leftCategories = categories.filter((_, i) => i % 2 === 0);
+const rightCategories = categories.filter((_, i) => i % 2 !== 0);
 
+const CategoryIndex = () => {
+  const desktopSectionRef = useRef(null);
+  const centerCardRef = useRef(null);
+  const mobCardRef = useRef(null); 
+  
   useGSAP(() => {
     let mm = gsap.matchMedia();
 
     // ==========================================
-    // DESKTOP LAYOUT
+    // DESKTOP ANIMATION (NO JS PINNING NEEDED)
     // ==========================================
     mm.add("(min-width: 1024px)", () => {
-      const deskWords = gsap.utils.toArray(".reveal-word", deskHeadingRef.current);
+      
+      // Reveal the text inside the center card when it enters view
+      const deskWords = gsap.utils.toArray(".reveal-word", centerCardRef.current);
       gsap.fromTo(deskWords,
-        { opacity: 0, y: 40, filter: "blur(12px)", scale: 0.95 },
+        { opacity: 0, y: 30, filter: "blur(8px)" },
         { 
           opacity: 1, 
           y: 0, 
           filter: "blur(0px)", 
-          scale: 1, 
           duration: 1, 
+          stagger: 0.1,
           ease: "power3.out",
           scrollTrigger: {
-            trigger: deskHeadingRef.current,
-            start: "top 75%", 
-            toggleActions: "play none none reverse"
+            trigger: centerCardRef.current,
+            start: "top 80%", 
+            toggleActions: "play none none reverse", 
           }
         }
       );
 
-      const titles = gsap.utils.toArray(".desk-title");
-      const subs = gsap.utils.toArray(".desk-sub");
-      const links = gsap.utils.toArray(".desk-link");
-      const imgPanels = gsap.utils.toArray(".desk-img-panel");
-
-      gsap.set(imgPanels, { zIndex: (i) => i });
-      gsap.set(imgPanels.slice(1), { yPercent: 100 });
-      gsap.set(titles.slice(1), { yPercent: 100 });
-      gsap.set(subs.slice(1), { yPercent: 100 });
-      gsap.set(links.slice(1), { yPercent: 100 });
-
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: desktopPinRef.current,
-          start: "top top",
-          end: "+=250%", // Generous scroll distance to accommodate the dead zones
-          pin: true,
-          scrub: 0.5, 
-          snap: {
-            snapTo: "labels", // Snaps to the exact resting points we define
-            directional: false, // Enforces the 50% threshold rule
-            delay: 0.1, 
-            duration: { min: 0.3, max: 0.6 },
-            ease: "power2.inOut"
+      // Fade up the category images as you scroll to them
+      gsap.utils.toArray(".desk-cat-item").forEach(item => {
+        gsap.fromTo(item,
+          { opacity: 0, y: 60 },
+          { 
+            opacity: 1, 
+            y: 0, 
+            duration: 1.2, 
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: item,
+              start: "top 85%",
+              toggleActions: "play none none reverse", 
+            }
           }
-        }
-      });
-
-      // Label and Dwell time for the very first slide
-      tl.addLabel("slide0");
-      tl.to({}, { duration: 0.5 }); 
-
-      categories.forEach((_, i) => {
-        if (i === categories.length - 1) return;
-
-        const currentText = [subs[i], titles[i], links[i]];
-        const nextText = [subs[i + 1], titles[i + 1], links[i + 1]];
-        const nextImgPanel = imgPanels[i + 1];
-
-        // The actual transition
-        tl.to(currentText, { yPercent: -100, ease: "none", duration: 1 }, `trans${i}`)
-          .to(nextText, { yPercent: 0, ease: "none", duration: 1 }, `trans${i}`)
-          .to(nextImgPanel, { yPercent: 0, ease: "none", duration: 1 }, `trans${i}`);
-
-        // Label and Dwell time for the newly arrived slide
-        tl.addLabel(`slide${i + 1}`);
-        tl.to({}, { duration: 0.5 });
+        );
       });
     });
 
     // ==========================================
-    // MOBILE LAYOUT
+    // MOBILE ANIMATION
     // ==========================================
     mm.add("(max-width: 1023px)", () => {
-      const mobWords = gsap.utils.toArray(".reveal-word", mobHeadingRef.current);
+      
+      const mobWords = gsap.utils.toArray(".reveal-word", mobCardRef.current);
       gsap.fromTo(mobWords,
-        { opacity: 0, y: 40, filter: "blur(12px)", scale: 0.95 },
+        { opacity: 0, y: 30, filter: "blur(8px)" },
         { 
           opacity: 1, 
           y: 0, 
           filter: "blur(0px)", 
-          scale: 1, 
           duration: 1, 
+          stagger: 0.1,
           ease: "power3.out",
           scrollTrigger: {
-            trigger: mobHeadingRef.current,
-            start: "top 60%", 
-            toggleActions: "play none none reverse"
+            trigger: mobCardRef.current,
+            start: "top 85%", 
+            toggleActions: "play none none reverse",
           }
         }
       );
 
-      const titles = gsap.utils.toArray(".mob-title");
-      const subs = gsap.utils.toArray(".mob-sub");
-      const links = gsap.utils.toArray(".mob-link");
-      const imgPanels = gsap.utils.toArray(".mob-img-panel");
-      
-      gsap.set(imgPanels, { zIndex: (i) => i });
-      gsap.set(imgPanels.slice(1), { yPercent: 100 });
-      gsap.set(titles.slice(1), { yPercent: 100 });
-      gsap.set(subs.slice(1), { yPercent: 100 });
-      gsap.set(links.slice(1), { yPercent: 100 });
-      
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: mobilePinRef.current,
-          start: "top top",
-          end: "+=400%", 
-          pin: true,
-          scrub: 0.5,
-          snap: {
-            snapTo: "labels", 
-            directional: false, 
-            delay: 0.1, 
-            duration: { min: 0.3, max: 0.6 },
-            ease: "power2.inOut"
+      gsap.utils.toArray(".mob-cat-item").forEach(item => {
+        gsap.fromTo(item,
+          { opacity: 0, y: 40 },
+          { 
+            opacity: 1, 
+            y: 0, 
+            duration: 1, 
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: item,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            }
           }
-        }
-      });
-
-      // Label and Dwell time for the very first slide
-      tl.addLabel("slide0");
-      tl.to({}, { duration: 0.5 }); 
-
-      categories.forEach((_, i) => {
-        if (i === categories.length - 1) return;
-
-        const currentText = [subs[i], titles[i], links[i]];
-        const nextText = [subs[i + 1], titles[i + 1], links[i + 1]];
-        const nextImgPanel = imgPanels[i + 1];
-
-        // The actual transition
-        tl.to(currentText, { yPercent: -100, ease: "none", duration: 1 }, `trans${i}`)
-          .to(nextText, { yPercent: 0, ease: "none", duration: 1 }, `trans${i}`)
-          .to(nextImgPanel, { yPercent: 0, ease: "none", duration: 1 }, `trans${i}`);
-
-        // Label and Dwell time for the newly arrived slide
-        tl.addLabel(`slide${i + 1}`);
-        tl.to({}, { duration: 0.5 });
+        );
       });
     });
 
     return () => mm.revert();
   }, []);
 
+  const CategoryItem = ({ cat, className = "" }) => (
+    <Link to={cat.link} className={`group flex flex-col cursor-pointer ${className}`}>
+      <div className="w-full aspect-[3/4] overflow-hidden mb-6 bg-[#e4e4e2]">
+        <img 
+          src={cat.image} 
+          alt={cat.title}
+          className="w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105"
+        />
+      </div>
+      <div className="flex flex-col">
+        <span className="text-[0.6rem] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">
+          0{cat.id.replace('0', '')} — {cat.subtitle}
+        </span>
+        <div className="flex items-center gap-4">
+          <h3 className="head-font text-4xl lg:text-5xl lowercase tracking-tight">
+            {cat.title}
+          </h3>
+          <span className="opacity-0 -translate-x-4 transition-all duration-500 ease-out group-hover:opacity-100 group-hover:translate-x-0">
+            →
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+
   return (
-    <div className="bg-dark mt-20">
+    <div className="w-full bg-[#f8f8f8] text-[#1a1a1a] mt-10 lg:mt-24">
       
-      {/* DESKTOP LAYOUT */}
-      <div className="hidden lg:block w-full txt-light pt-20">
-        <h2 ref={deskHeadingRef} className="head-font text-6xl md:text-8xl lg:text-[7rem] tracking-tighter lowercase leading-[0.9] px-6 lg:px-10 mix-blend-difference relative mb-10">
-          <SplitText>categories</SplitText>
-        </h2>
-        <section className="pb-16 px-12 max-w-[1400px] mx-auto w-full relative z-10">
-          <span className="block text-[0.6rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-4">
-            Shop by Form
-          </span>
-          <p className="text-base font-light opacity-80 max-w-sm leading-relaxed">
-            Explore the Mritsna archives. Each piece is categorized by its functional intent and architectural shape.
-          </p>
-        </section>
-
-        <section ref={desktopPinRef} className="w-full h-dvh flex relative bg-dark">
-          <div className="w-[55%] h-full relative flex flex-col justify-center pl-12 pr-20">
-            {categories.map((category) => (
-              <div key={`desk-txt-${category.id}`} className="absolute inset-0 w-full h-full flex flex-col justify-center pl-12 pr-20 pointer-events-none">
-                <div className="overflow-hidden mb-6">
-                  <span className="desk-sub block text-xs font-light tracking-[0.3em] uppercase opacity-50 pb-2">
-                    0{category.id.replace('0', '')} — {category.subtitle}
-                  </span>
-                </div>
-                <div className="overflow-hidden mb-10">
-                  <h3 className="desk-title head-font text-8xl xl:text-[8rem] tracking-tighter lowercase leading-[0.9] pt-2 pb-6">
-                    {category.title}
-                  </h3>
-                </div>
-                <div className="overflow-hidden">
-                  <Link 
-                    to={category.link}
-                    className="desk-link group relative inline-flex items-center text-sm tracking-[0.2em] uppercase pt-2 pb-2 w-max pointer-events-auto"
-                  >
-                    <span>Explore {category.title}</span>
-                    <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-[#f8f8f8] transition-all duration-500 origin-left group-hover:scale-x-0" />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="w-[45%] h-full relative">
-            {categories.map((category) => (
-              <div key={`desk-img-${category.id}`} className="desk-img-panel absolute inset-0 w-full h-full overflow-hidden">
-                <img 
-                  src={category.image} 
-                  alt={category.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {/* MOBILE LAYOUT */}
-      <div className="block lg:hidden w-full txt-light pt-14">
-        <h2 ref={mobHeadingRef} className="head-font text-6xl md:text-8xl lg:text-[7rem] tracking-tighter lowercase leading-[0.9] px-6 lg:px-10 mix-blend-difference relative mb-10">
-          <SplitText>categories</SplitText>
-        </h2>
+      {/* ========================================== */}
+      {/* DESKTOP LAYOUT (3 Columns)                 */}
+      {/* ========================================== */}
+      <section ref={desktopSectionRef} className="hidden lg:flex max-w-[1500px] mx-auto px-12 relative pt-32 pb-40">
         
-        <section className="pb-8 px-6 w-full relative z-10">
+        {/* Left Column */}
+        <div className="w-1/3 flex flex-col gap-32">
+          {leftCategories.map(cat => (
+            <CategoryItem key={cat.id} cat={cat} className="desk-cat-item pr-10" />
+          ))}
+        </div>
+
+        {/* Center Column (NATIVE CSS STICKY) */}
+        {/* We let this column stretch to the full height of the section automatically via flex */}
+        <div className="w-1/3 flex justify-center">
+          {/* This is where the magic happens:
+            `sticky` + `top-[50vh]` + `-translate-y-1/2` natively pins the element 
+            exactly in the center of the screen while the user scrolls down this section.
+          */}
+          <div className="sticky top-[50vh] -translate-y-1/2 w-[90%] max-w-[400px] h-fit z-20">
+            <div 
+              ref={centerCardRef} 
+              className="w-full bg-white p-12 lg:p-16 flex flex-col items-center text-center shadow-[0_30px_60px_-15px_rgba(0,0,0,0.05)] rounded-[2px]"
+            >
+              <h2 className="head-font text-5xl lg:text-6xl tracking-tighter lowercase mb-8">
+                <SplitText>categories</SplitText>
+              </h2>
+              <span className="block text-[0.6rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-6">
+                Shop by Form
+              </span>
+              <p className="text-sm font-light opacity-80 leading-relaxed">
+                Explore the Mritsna archives. Each piece is categorized by its functional intent and architectural shape.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (Masonry Offset) */}
+        <div className="w-1/3 flex flex-col gap-32 pt-[25vh]">
+          {rightCategories.map(cat => (
+            <CategoryItem key={cat.id} cat={cat} className="desk-cat-item pl-10" />
+          ))}
+        </div>
+
+      </section>
+
+      {/* ========================================== */}
+      {/* MOBILE LAYOUT (Stacked)                    */}
+      {/* ========================================== */}
+      <section className="flex lg:hidden flex-col px-6 pt-24 pb-32">
+        
+        <div 
+          ref={mobCardRef}
+          className="w-full bg-white p-10 flex flex-col items-center text-center shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] rounded-[2px] mb-20"
+        >
+          <h2 className="head-font text-5xl tracking-tighter lowercase mb-6">
+            <SplitText>categories</SplitText>
+          </h2>
           <span className="block text-[0.6rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-4">
             Shop by Form
           </span>
-          <p className="text-sm font-light opacity-80 leading-relaxed">
+          <p className="text-sm font-light opacity-80 leading-relaxed max-w-xs">
             Explore the Mritsna archives. Each piece is categorized by its functional intent and architectural shape.
           </p>
-        </section>
+        </div>
 
-        <section ref={mobilePinRef} className="w-full h-dvh relative bg-dark">
-          <div className="absolute inset-0 w-full h-full z-10">
-            {categories.map((category) => (
-              <div key={`mob-img-wrap-${category.id}`} className="mob-img-panel absolute inset-0 w-full h-full overflow-hidden">
-                 <div className="absolute inset-0 bg-black/40 z-20 pointer-events-none" />
-                 <img 
-                   src={category.image} 
-                   alt={category.title}
-                   className="w-full h-full object-cover origin-top"
-                 />
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-col gap-20">
+          {categories.map(cat => (
+            <CategoryItem key={cat.id} cat={cat} className="mob-cat-item" />
+          ))}
+        </div>
 
-          <div className="absolute inset-0 w-full h-full z-30 pointer-events-none">
-            {categories.map((category) => (
-              <div key={`mob-txt-${category.id}`} className="absolute inset-0 w-full h-full flex flex-col items-center justify-center txt-light mix-blend-difference px-6 text-center">
-                <div className="overflow-hidden mb-4">
-                  <span className="mob-sub block text-[0.6rem] font-light tracking-[0.3em] uppercase opacity-80 pb-2">
-                    0{category.id.replace('0', '')} — {category.subtitle}
-                  </span>
-                </div>
-                <div className="overflow-hidden mb-8">
-                  <h3 className="mob-title head-font text-6xl tracking-tighter lowercase leading-none pt-2 pb-4">
-                    {category.title}
-                  </h3>
-                </div>
-                <div className="overflow-hidden">
-                  <Link 
-                    to={category.link}
-                    className="mob-link relative inline-flex items-center text-xs tracking-[0.2em] uppercase pt-2 pb-2 pointer-events-auto"
-                  >
-                    <span>Explore {category.title}</span>
-                    <span className="absolute bottom-0 left-0 w-full h-[1px] bg-[#f8f8f8] transition-all duration-500" />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+      </section>
 
     </div>
   );
