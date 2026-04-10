@@ -43,7 +43,7 @@ const BespokeRegistry = () => {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: "top 40%",       // Your corrected desktop start
+          start: "top 60%",       // Your corrected desktop start
           end: "center center",   // Finishes when the section reaches the middle
           scrub: 1, 
         }

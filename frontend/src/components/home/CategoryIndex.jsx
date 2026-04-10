@@ -65,11 +65,11 @@ const CategoryIndex = () => {
     let mm = gsap.matchMedia();
 
     // ==========================================
-    // DESKTOP ANIMATION (NO JS PINNING NEEDED)
+    // DESKTOP ANIMATION
     // ==========================================
     mm.add("(min-width: 1024px)", () => {
       
-      // Reveal the text inside the center card when it enters view
+      // -- Reveal Animations --
       const deskWords = gsap.utils.toArray(".reveal-word", centerCardRef.current);
       gsap.fromTo(deskWords,
         { opacity: 0, y: 30, filter: "blur(8px)" },
@@ -88,7 +88,6 @@ const CategoryIndex = () => {
         }
       );
 
-      // Fade up the category images as you scroll to them
       gsap.utils.toArray(".desk-cat-item").forEach(item => {
         gsap.fromTo(item,
           { opacity: 0, y: 60 },
@@ -151,8 +150,13 @@ const CategoryIndex = () => {
     return () => mm.revert();
   }, []);
 
+
   const CategoryItem = ({ cat, className = "" }) => (
-    <Link to={cat.link} className={`group flex flex-col cursor-pointer ${className}`}>
+    <Link 
+      to={cat.link} 
+      data-cursor="explore"
+      className={`group flex flex-col cursor-none lg:cursor-none ${className}`}
+    >
       <div className="w-full aspect-[3/4] overflow-hidden mb-6 bg-[#e4e4e2]">
         <img 
           src={cat.image} 
@@ -177,7 +181,7 @@ const CategoryIndex = () => {
   );
 
   return (
-    <div className="w-full bg-[#f8f8f8] text-[#1a1a1a] mt-10 lg:mt-24">
+    <div className="w-full bg-[#f8f8f8] text-[#1a1a1a] mt-10 lg:mt-24 relative">
       
       {/* ========================================== */}
       {/* DESKTOP LAYOUT (3 Columns)                 */}
@@ -192,12 +196,7 @@ const CategoryIndex = () => {
         </div>
 
         {/* Center Column (NATIVE CSS STICKY) */}
-        {/* We let this column stretch to the full height of the section automatically via flex */}
         <div className="w-1/3 flex justify-center">
-          {/* This is where the magic happens:
-            `sticky` + `top-[50vh]` + `-translate-y-1/2` natively pins the element 
-            exactly in the center of the screen while the user scrolls down this section.
-          */}
           <div className="sticky top-[50vh] -translate-y-1/2 w-[90%] max-w-[400px] h-fit z-20">
             <div 
               ref={centerCardRef} 

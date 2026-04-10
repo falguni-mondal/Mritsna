@@ -277,6 +277,7 @@ const Hero = () => {
           <Link
             to="/"
             ref={productCardRef}
+            data-cursor="explore"
             className="relative group w-full md:w-[28rem] lg:w-[22rem] flex flex-row lg:flex-col items-center lg:items-start gap-5 lg:gap-4 txt-light pointer-events-auto"
           >
             <div
