@@ -24,14 +24,13 @@ const SplitText = ({ children, className = "" }) => {
   );
 };
 
-const Hero = () => {
+const Hero2 = () => {
   const masterRef = useRef(null); 
   const mediaWrapperRef = useRef(null); 
-  const curtainRef = useRef(null); // The white slider
-  const videoRef = useRef(null); 
+  const curtainRef = useRef(null); 
   const containerRef = useRef(null); 
 
-  const bgRef = useRef(null); 
+  const bgRef = useRef(null); // Now directly referencing the video for parallax
   const subheadingRef = useRef(null);
   const exclusiveTextRef = useRef(null);
   const productCardRef = useRef(null);
@@ -60,55 +59,55 @@ const Hero = () => {
     });
 
     // ==========================================
-    // 2. The 200ms Staggered Reveal Sequence
+    // 2. The Fluid, Elegant Reveal Sequence
     // ==========================================
     const words = gsap.utils.toArray(".reveal-word", containerRef.current);
 
-    // Initial setups for the grand reveal
-    gsap.set(mediaWrapperRef.current, { scale: 0.4 }); // Starts scaled down
-    gsap.set(curtainRef.current, { yPercent: 0 }); // Curtain covers everything
-    gsap.set(containerRef.current, { autoAlpha: 0 }); // UI hidden
-    gsap.set([subheadingRef.current, exclusiveTextRef.current], { autoAlpha: 0, y: 20, filter: "blur(6px)" });
+    gsap.set(mediaWrapperRef.current, { scale: 0.4 }); 
+    gsap.set(curtainRef.current, { yPercent: 0 }); 
+    gsap.set(containerRef.current, { autoAlpha: 0 }); 
+    gsap.set([subheadingRef.current, exclusiveTextRef.current], { autoAlpha: 0, y: 25, filter: "blur(4px)" });
     gsap.set(ctaRef.current, { autoAlpha: 0, y: 20 });
-    gsap.set(productCardRef.current, { autoAlpha: 0, y: 30 });
+    gsap.set(productCardRef.current, { autoAlpha: 0, y: 40 });
 
-    // Timeline with a slight delay so the user registers the initial state on load
     const tl = gsap.timeline({ delay: 0.3 });
 
-    // Step 1: TIME 0.0s - The white curtain slides up
+    // Step 1: TIME 0.0s - The white curtain slides up swiftly
     tl.to(curtainRef.current, {
       yPercent: -100,
-      duration: 1.5,
-      ease: "power4.inOut"
+      duration: 1.0,
+      ease: "power3.inOut"
     }, 0)
     
-    // Step 2: TIME 0.2s - Exactly 200ms later, the scale expansion begins
+    // Step 2: TIME 0.2s - Expansion starts. Duration 1.8s (Finishes at 2.0s)
     .to(mediaWrapperRef.current, {
       scale: 1,
       borderRadius: "0px",
-      duration: 1.5,
+      duration: 1.8,
       ease: "power4.inOut"
-    }, 1)
+    }, 0.2)
     
-    // Step 3: Fade in the dark overlay so text is readable
+    // Step 3: TIME 1.0s - Fade in overlay halfway through expansion
     .to(".hero-overlay", {
       opacity: 1,
       duration: 1.5,
       ease: "power2.out"
-    }, 1.2)
+    }, 1.0)
     
-    // Step 4: Make UI container interactive
+    // Step 4: Make UI container interactive just before text appears
     .to(containerRef.current, {
       autoAlpha: 1,
       duration: 0.1,
-    }, 0.8)
+    }, 1.1)
     
-    // Step 5: Run text and product animations seamlessly
+    // Step 5: TIME 1.2s - Text begins to cascade in while expansion is finishing
     .fromTo(words,
-      { opacity: 0, y: 30, filter: "blur(12px)", scale: 0.95 },
-      { opacity: 1, y: 0, filter: "blur(0px)", scale: 1, duration: 1.2, stagger: 0.08, ease: "power3.out" },
-      1.8
+      { opacity: 0, y: 35, filter: "blur(12px)", scale: 0.95 },
+      { opacity: 1, y: 0, filter: "blur(0px)", scale: 1, duration: 1.2, stagger: 0.06, ease: "power3.out" },
+      1.2
     )
+    
+    // Step 6: TIME 1.4s - Subheading and Exclusive text drift up smoothly
     .to([subheadingRef.current, exclusiveTextRef.current], {
       autoAlpha: 1,
       y: 0,
@@ -116,35 +115,26 @@ const Hero = () => {
       duration: 1.2,
       stagger: 0.1,
       ease: "power3.out"
-    }, 2) 
+    }, 1.4) 
+    
+    // Step 7: TIME 1.5s - CTA and Product Card settle into their final positions
     .to(ctaRef.current, {
       autoAlpha: 1,
       y: 0,
-      duration: 1,
+      duration: 1.0,
       ease: "power3.out"
-    }, 2.2)
+    }, 1.4)
     .to(productCardRef.current, {
       autoAlpha: 1,
       y: 0,
-      duration: 1.2,
+      duration: 1.4,
       ease: "power3.out"
-    }, 2.2);
+    }, 1.5);
     
   }, { scope: masterRef });
 
   // ==========================================
-  // 3. Independent Video Swap
-  // ==========================================
-  const handleVideoEnd = contextSafe(() => {
-    gsap.to(videoRef.current, {
-      opacity: 0,
-      duration: 1.5,
-      ease: "power2.inOut"
-    });
-  });
-
-  // ==========================================
-  // 4. Custom Hover Interactions
+  // 3. Custom Hover Interactions
   // ==========================================
   const handleMouseEnter = contextSafe((e) => {
     const rect = ctaRef.current.getBoundingClientRect();
@@ -183,28 +173,21 @@ const Hero = () => {
         ref={mediaWrapperRef} 
         className="absolute z-10 w-full h-full overflow-hidden"
       >
-        {/* Hardware accelerated parallax background image */}
-        <div 
-          ref={bgRef}
-          className="absolute top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat will-change-transform"
-          style={{ backgroundImage: 'url("/hero.jpeg")' }}
-        />
-        
-        {/* Intro video playing natively on top of the image */}
+        {/* Parallax looping video */}
         <video 
-          ref={videoRef}
-          src="/hero.webm" 
+          ref={bgRef}
+          src="/hero_org.webm" 
           autoPlay 
           muted 
+          loop
           playsInline
-          onEnded={handleVideoEnd}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute -top-[15%] left-0 w-full h-[125%] object-cover will-change-transform pointer-events-none"
         />
 
         {/* THE CURTAIN: The white div covering the video, waiting to slide up */}
         <div 
           ref={curtainRef}
-          className="absolute inset-0 bg-[#f8f8f8] z-20"
+          className="absolute inset-0 bg-[#f8f8f8] z-20 pointer-events-none"
         />
 
         {/* Gradient overlay for UI readability */}
@@ -214,7 +197,7 @@ const Hero = () => {
       {/* THE UI LAYER: The text and products */}
       <section
         ref={containerRef}
-        className="absolute inset-0 z-40 flex flex-col lg:flex-row justify-between pt-5 md:pt-32 lg:pt-0 px-6 md:px-12 lg:px-24 txt-light pb-5 lg:pb-0 invisible"
+        className="absolute inset-0 z-40 flex flex-col lg:flex-row justify-between pt-20 md:pt-32 lg:pt-0 px-6 md:px-12 lg:px-24 txt-light pb-5 lg:pb-0 invisible"
       >
         <div className="hero-left flex flex-col justify-center h-full pt-10 lg:pt-0 pointer-events-none">
           <div className="hero-heading-container w-full mb-6 md:mb-10 lg:mb-8 mt-4 lg:mt-0">
@@ -311,4 +294,4 @@ const Hero = () => {
   );
 };
 
-export default Hero;
+export default Hero2;

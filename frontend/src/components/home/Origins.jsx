@@ -28,57 +28,91 @@ const Origins = () => {
   };
 
   useGSAP(() => {
-    // 1. Pure Vertical Parallax for the Image
-    gsap.fromTo(
-      imageRef.current,
-      { yPercent: -10 },
-      {
-        yPercent: 10,
-        ease: "none",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top bottom",
-          end: "bottom top",
-          scrub: true, 
-        },
-      }
-    );
+    let mm = gsap.matchMedia();
 
-    // 2. Sequenced Typography Timeline
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: textContainerRef.current,
-        start: "top 50%", 
-      }
+    // ==========================================
+    // DESKTOP ANIMATION (Screens 1024px and wider)
+    // ==========================================
+    mm.add("(min-width: 1024px)", () => {
+      
+      // 1. Desktop Image Parallax
+      gsap.fromTo(
+        imageRef.current,
+        { yPercent: -10 },
+        {
+          yPercent: 10,
+          ease: "none",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top bottom",
+            end: "bottom top",
+            scrub: true, 
+          },
+        }
+      );
+
+      // 2. Desktop Typography Sequence
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: textContainerRef.current,
+          start: "top 75%", // Triggers when text container is 75% down the screen
+          toggleActions: "play none none reverse",
+        }
+      });
+
+      tl.fromTo(headingRefs.current,
+        { opacity: 0, y: 30, filter: "blur(8px)" },
+        { opacity: 1, y: 0, filter: "blur(0px)", duration: 1.2, stagger: 0.2, ease: "power3.out" }
+      )
+      .fromTo(bodyRefs.current,
+        { opacity: 0, y: 25 },
+        { opacity: 1, y: 0, duration: 1.2, stagger: 0.2, ease: "power2.out" },
+        "<0.4" 
+      );
     });
 
-    // Step A: Cinematic Blur Reveal for headings
-    tl.fromTo(
-      headingRefs.current,
-      { opacity: 0, y: 30, filter: "blur(8px)" },
-      {
-        opacity: 1,
-        y: 0,
-        filter: "blur(0px)",
-        duration: 1.2,
-        stagger: 0.2,
-        ease: "power3.out",
-      }
-    )
-    // Step B: Simple Fade for body text seamlessly picking up the stagger rhythm
-    .fromTo(
-      bodyRefs.current,
-      { opacity: 0, y: 25 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1.2,
-        stagger: 0.2,
-        ease: "power2.out",
-      },
-      "<0.4" // The magic position parameter: starts 0.4s into the previous animation
-    );
+    // ==========================================
+    // MOBILE ANIMATION (Screens under 1024px)
+    // ==========================================
+    mm.add("(max-width: 1023px)", () => {
+      
+      // 1. Mobile Image Parallax (Slightly softer due to smaller image height)
+      gsap.fromTo(
+        imageRef.current,
+        { yPercent: -5 },
+        {
+          yPercent: 5,
+          ease: "none",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top bottom",
+            end: "bottom top",
+            scrub: true, 
+          },
+        }
+      );
 
+      // 2. Mobile Typography Sequence
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: textContainerRef.current,
+          start: "top 60%", // Triggers slightly later because the text stacks below the image
+          toggleActions: "play none none reverse",
+        }
+      });
+
+      tl.fromTo(headingRefs.current,
+        { opacity: 0, y: 30, filter: "blur(8px)" },
+        { opacity: 1, y: 0, filter: "blur(0px)", duration: 1.0, stagger: 0.15, ease: "power3.out" }
+      )
+      .fromTo(bodyRefs.current,
+        { opacity: 0, y: 25 },
+        { opacity: 1, y: 0, duration: 1.0, stagger: 0.15, ease: "power2.out" },
+        "<0.3" 
+      );
+    });
+
+    return () => mm.revert(); // Clean up on unmount
   }, { scope: sectionRef });
 
   return (

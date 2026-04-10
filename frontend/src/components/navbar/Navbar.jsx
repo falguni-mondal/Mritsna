@@ -48,7 +48,7 @@ const Navbar = () => {
       opacity: 1,
       duration: 1,
       ease: "power3.out",
-      delay: 1.2, 
+      delay: 2.4, 
     });
 
     ScrollTrigger.create({
