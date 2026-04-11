@@ -1,10 +1,11 @@
-import React, { useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useRef, useContext, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navmenu from "./Navmenu";
+import { IntroContext } from "../../context/IntroContext"; // Adjust path if needed
 
 // Register the plugin
 gsap.registerPlugin(ScrollTrigger);
@@ -12,16 +13,21 @@ gsap.registerPlugin(ScrollTrigger);
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  
+  const [isScrolled, setIsScrolled] = useState(false);
+  // Global Context & Routing
+  const location = useLocation();
+  const { introPlayed } = useContext(IntroContext);
+  
+  // THE FIX (Part 1): Track the path to force a synchronous state reset
+  const [currentPath, setCurrentPath] = useState(location.pathname);
+
 
   // Refs for Animations & Structure
   const navbarRef = useRef(null);
-  
-  // Left Nav Refs
   const navContainerRef = useRef(null);
   const underlineRef = useRef(null);
   const isHovering = useRef(false);
-
-  // Right Nav Refs
   const rightNavContainerRef = useRef(null);
   const rightUnderlineRef = useRef(null);
   const isRightHovering = useRef(false);
@@ -39,25 +45,54 @@ const Navbar = () => {
     { name: "wishlist", path: "/wishlist" },
   ];
 
-  // --- 1. Initial Load Animation & Scroll Blend ---
-  const { contextSafe } = useGSAP(() => {
-    gsap.set(navbarRef.current, { yPercent: -30, opacity: 0 });
+  // ==========================================
+  // CONFIGURATION
+  // ==========================================
+  const scrollBlendRoutes = ["/"]; 
+  const isScrollBlendRoute = scrollBlendRoutes.includes(location.pathname);
 
+  // THE FIX (Part 1 Continued): Synchronous State Reset
+  // This intercepts the route change BEFORE the browser paints, 
+  // guaranteeing 'isScrolled' doesn't leak into the new page.
+  if (location.pathname !== currentPath) {
+    setCurrentPath(location.pathname);
+    setIsScrolled(false);
+  }
+
+  // Master style toggle. True on Shop pages permanently, or on Home page after scrolling.
+  const isDarkTheme = !isScrollBlendRoute || isScrolled;
+
+  // --- 1. Initial Load Animation & Scroll Tracking ---
+  const { contextSafe } = useGSAP(() => {
+    
+    const entryDelay = (!introPlayed && location.pathname === "/") ? 2.4 : 0.2;
+
+    // Standard Entrance
+    gsap.set(navbarRef.current, { yPercent: -30, opacity: 0 });
     gsap.to(navbarRef.current, {
       yPercent: 0,
       opacity: 1,
       duration: 1,
       ease: "power3.out",
-      delay: 2.4, 
+      delay: entryDelay, 
     });
 
-    ScrollTrigger.create({
-      start: () => window.innerHeight * 0.9, 
-      onEnter: () => navbarRef.current?.classList.add("mix-blend-difference"),
-      onLeaveBack: () => navbarRef.current?.classList.remove("mix-blend-difference"),
-      invalidateOnRefresh: true, 
-    });
-  }, { scope: navbarRef });
+    const existingTrigger = ScrollTrigger.getById("nav-blend");
+    if (existingTrigger) {
+      existingTrigger.kill();
+    }
+
+    if (isScrollBlendRoute) {
+      ScrollTrigger.create({
+        id: "nav-blend", 
+        start: () => window.innerHeight * 0.9, 
+        onEnter: () => setIsScrolled(true),      
+        onLeaveBack: () => setIsScrolled(false), 
+        invalidateOnRefresh: true, 
+      });
+    } 
+    
+  }, { scope: navbarRef, dependencies: [location.pathname] }); 
 
   // --- 2. Left Nav Hover Animation ---
   const handleItemEnter = contextSafe((e) => {
@@ -132,12 +167,21 @@ const Navbar = () => {
     });
   });
 
-  // NOTE: Wrapped the return in a Fragment <> so Navmenu sits outside the blended navbarRef
   return (
     <>
-      <div ref={navbarRef} className="navbar w-full fixed top-0 left-0 z-[99999] transition-colors">
+      {/* OUTER WRAPPER */}
+      <div 
+        key={location.pathname} // THE FIX (Part 2): Nuke the DOM node on route change to kill CSS transition memory
+        ref={navbarRef} 
+        className={`navbar w-full fixed top-0 left-0 z-[99999] transition-colors duration-500 border-b
+          ${isDarkTheme ? "bg-[#f8f8f8]/80 backdrop-blur-md border-black/5" : "bg-transparent border-transparent"}
+        `}
+      >
+        {/* INNER WRAPPER */}
         <div
-          className="w-full py-4 px-6 lg:px-10 flex justify-between items-center txt-light"
+          className={`w-full py-4 px-6 lg:px-10 flex justify-between items-center transition-colors duration-500
+            ${isDarkTheme ? "text-[#1a1a1a]" : "text-white"}
+          `}
           id="navbar-content"
         >
           {/* Desktop Left Navigation */}
@@ -149,7 +193,9 @@ const Navbar = () => {
             >
               <li
                 ref={underlineRef}
-                className="absolute -bottom-1 h-px bg-light opacity-0 pointer-events-none"
+                className={`absolute -bottom-1 h-px opacity-0 pointer-events-none transition-colors duration-500
+                  ${isDarkTheme ? "bg-[#1a1a1a]" : "bg-white"}
+                `}
                 style={{ left: 0, width: 0 }}
               />
 
@@ -173,7 +219,11 @@ const Navbar = () => {
           {/* Logo */}
           <div className="logo lg:w-1/3 flex justify-start lg:justify-center items-center">
             <Link to="/">
-              <img className="w-22 lg:w-36" src="/logo_white.svg" alt="Mritsna Logo" />
+              <img 
+                className="w-22 lg:w-36 transition-opacity duration-500" 
+                src={isDarkTheme ? "/logo_black.svg" : "/logo_white.svg"} 
+                alt="Mritsna Logo" 
+              />
             </Link>
           </div>
 
@@ -186,7 +236,9 @@ const Navbar = () => {
             >
               <li
                 ref={rightUnderlineRef}
-                className="absolute -bottom-1 h-px bg-light opacity-0 pointer-events-none"
+                className={`absolute -bottom-1 h-px opacity-0 pointer-events-none transition-colors duration-500
+                  ${isDarkTheme ? "bg-[#1a1a1a]" : "bg-white"}
+                `}
                 style={{ right: 0, width: 0 }}
               />
 
@@ -232,17 +284,22 @@ const Navbar = () => {
               className="nav-icon w-7 h-2 flex flex-col justify-between cursor-pointer"
             >
               <span
-                className={`block h-[1.5px] bg-light transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] ${isOpen ? "rotate-45 translate-y-[3px]" : ""}`}
+                className={`block h-[1.5px] transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] 
+                  ${isDarkTheme ? "bg-[#1a1a1a]" : "bg-white"} 
+                  ${isOpen ? "rotate-45 translate-y-[3px]" : ""}
+                `}
               />
               <span
-                className={`block h-[1.5px] bg-light transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] ${isOpen ? "-rotate-45 -translate-y-[3px]" : ""}`}
+                className={`block h-[1.5px] transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] 
+                  ${isDarkTheme ? "bg-[#1a1a1a]" : "bg-white"} 
+                  ${isOpen ? "-rotate-45 -translate-y-[3px]" : ""}
+                `}
               />
             </div>
           </div>
         </div>
       </div>
       
-      {/* Mobile Menu Overlay is now outside the blended parent! */}
       <Navmenu isOpen={isOpen} setIsOpen={setIsOpen} />
     </>
   );

@@ -36,7 +36,7 @@ const PreFooterContact = () => {
       const tlDesk = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: "top 50%", // Triggers when section is 75% down the viewport
+          start: "top 75%", // Triggers when section is 75% down the viewport
           toggleActions: "play none none reverse",
         }
       });

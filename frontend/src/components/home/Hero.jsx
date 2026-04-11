@@ -1,9 +1,10 @@
-import React, { useRef } from "react";
+import React, { useRef, useContext } from "react";
 import { Icon } from "@iconify/react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import { IntroContext } from "../../context/IntroContext"; // <-- Import the context
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -27,7 +28,7 @@ const SplitText = ({ children, className = "" }) => {
 const Hero = () => {
   const masterRef = useRef(null); 
   const mediaWrapperRef = useRef(null); 
-  const curtainRef = useRef(null); // The white slider
+  const curtainRef = useRef(null); 
   const videoRef = useRef(null); 
   const containerRef = useRef(null); 
 
@@ -44,9 +45,12 @@ const Hero = () => {
   const ctaIconDarkRef = useRef(null);
   const ctaIconLightRef = useRef(null);
 
+  // Consume the global state
+  const { introPlayed, setIntroPlayed } = useContext(IntroContext);
+
   const { contextSafe } = useGSAP(() => {
     // ==========================================
-    // 1. Background Parallax Animation
+    // 1. Background Parallax Animation (Always Runs)
     // ==========================================
     gsap.to(bgRef.current, {
       yPercent: 20,
@@ -59,88 +63,117 @@ const Hero = () => {
       }
     });
 
-    // ==========================================
-    // 2. The 200ms Staggered Reveal Sequence
-    // ==========================================
     const words = gsap.utils.toArray(".reveal-word", containerRef.current);
 
-    // Initial setups for the grand reveal
-    gsap.set(mediaWrapperRef.current, { scale: 0.4 }); // Starts scaled down
-    gsap.set(curtainRef.current, { yPercent: 0 }); // Curtain covers everything
-    gsap.set(containerRef.current, { autoAlpha: 0 }); // UI hidden
-    gsap.set([subheadingRef.current, exclusiveTextRef.current], { autoAlpha: 0, y: 20, filter: "blur(6px)" });
-    gsap.set(ctaRef.current, { autoAlpha: 0, y: 20 });
-    gsap.set(productCardRef.current, { autoAlpha: 0, y: 30 });
+    if (!introPlayed) {
+      // ==========================================
+      // HEAVY INTRO: First Visit or Hard Reload
+      // ==========================================
+      
+      // Initial setups for the grand reveal
+      gsap.set(mediaWrapperRef.current, { scale: 0.4 }); 
+      gsap.set(curtainRef.current, { yPercent: 0 }); 
+      gsap.set(containerRef.current, { autoAlpha: 0 }); 
+      gsap.set([subheadingRef.current, exclusiveTextRef.current], { autoAlpha: 0, y: 20, filter: "blur(6px)" });
+      gsap.set(ctaRef.current, { autoAlpha: 0, y: 20 });
+      gsap.set(productCardRef.current, { autoAlpha: 0, y: 30 });
 
-    // Timeline with a slight delay so the user registers the initial state on load
-    const tl = gsap.timeline({ delay: 0.3 });
+      // Timeline with onComplete to update global state
+      const tl = gsap.timeline({ 
+        delay: 0.3,
+        onComplete: () => {
+          setIntroPlayed(true); // Flag the intro as finished
+        }
+      });
 
-    // Step 1: TIME 0.0s - The white curtain slides up
-    tl.to(curtainRef.current, {
-      yPercent: -100,
-      duration: 1.5,
-      ease: "power4.inOut"
-    }, 0)
-    
-    // Step 2: TIME 0.2s - Exactly 200ms later, the scale expansion begins
-    .to(mediaWrapperRef.current, {
-      scale: 1,
-      borderRadius: "0px",
-      duration: 1.5,
-      ease: "power4.inOut"
-    }, 1)
-    
-    // Step 3: Fade in the dark overlay so text is readable
-    .to(".hero-overlay", {
-      opacity: 1,
-      duration: 1.5,
-      ease: "power2.out"
-    }, 1.2)
-    
-    // Step 4: Make UI container interactive
-    .to(containerRef.current, {
-      autoAlpha: 1,
-      duration: 0.1,
-    }, 0.8)
-    
-    // Step 5: Run text and product animations seamlessly
-    .fromTo(words,
-      { opacity: 0, y: 30, filter: "blur(12px)", scale: 0.95 },
-      { opacity: 1, y: 0, filter: "blur(0px)", scale: 1, duration: 1.2, stagger: 0.08, ease: "power3.out" },
-      1.8
-    )
-    .to([subheadingRef.current, exclusiveTextRef.current], {
-      autoAlpha: 1,
-      y: 0,
-      filter: "blur(0px)",
-      duration: 1.2,
-      stagger: 0.1,
-      ease: "power3.out"
-    }, 2) 
-    .to(ctaRef.current, {
-      autoAlpha: 1,
-      y: 0,
-      duration: 1,
-      ease: "power3.out"
-    }, 2.2)
-    .to(productCardRef.current, {
-      autoAlpha: 1,
-      y: 0,
-      duration: 1.2,
-      ease: "power3.out"
-    }, 2.2);
-    
-  }, { scope: masterRef });
+      tl.to(curtainRef.current, {
+        yPercent: -100,
+        duration: 1.5,
+        ease: "power4.inOut"
+      }, 0)
+      .to(mediaWrapperRef.current, {
+        scale: 1,
+        borderRadius: "0px",
+        duration: 1.5,
+        ease: "power4.inOut"
+      }, 1)
+      .to(".hero-overlay", {
+        opacity: 1,
+        duration: 1.5,
+        ease: "power2.out"
+      }, 1.2)
+      .to(containerRef.current, {
+        autoAlpha: 1,
+        duration: 0.1,
+      }, 0.8)
+      .fromTo(words,
+        { opacity: 0, y: 30, filter: "blur(12px)", scale: 0.95 },
+        { opacity: 1, y: 0, filter: "blur(0px)", scale: 1, duration: 1.2, stagger: 0.08, ease: "power3.out" },
+        1.8
+      )
+      .to([subheadingRef.current, exclusiveTextRef.current], {
+        autoAlpha: 1,
+        y: 0,
+        filter: "blur(0px)",
+        duration: 1.2,
+        stagger: 0.1,
+        ease: "power3.out"
+      }, 2) 
+      .to(ctaRef.current, {
+        autoAlpha: 1,
+        y: 0,
+        duration: 1,
+        ease: "power3.out"
+      }, 2.2)
+      .to(productCardRef.current, {
+        autoAlpha: 1,
+        y: 0,
+        duration: 1.2,
+        ease: "power3.out"
+      }, 2.2);
+
+    } else {
+      // ==========================================
+      // LIGHT ENTRY: Returning from another page
+      // ==========================================
+      
+      // Instantly snap the layout to its final cinematic state
+      gsap.set(mediaWrapperRef.current, { scale: 1, borderRadius: "0px" });
+      gsap.set(curtainRef.current, { display: "none" }); 
+      gsap.set(videoRef.current, { display: "none" }); // Skip the video, jump to image
+      gsap.set(".hero-overlay", { opacity: 1 });
+      gsap.set(containerRef.current, { autoAlpha: 1 });
+      
+      // Fast, clean stagger reveal for the UI elements
+      gsap.fromTo(words,
+        { opacity: 0, y: 20, filter: "blur(4px)" },
+        { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.8, stagger: 0.04, ease: "power2.out", delay: 0.2 }
+      );
+      
+      gsap.fromTo([subheadingRef.current, exclusiveTextRef.current], 
+        { autoAlpha: 0, y: 15 },
+        { autoAlpha: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power2.out", delay: 0.4 }
+      );
+      
+      gsap.fromTo([ctaRef.current, productCardRef.current], 
+        { autoAlpha: 0, y: 20 },
+        { autoAlpha: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power2.out", delay: 0.5 }
+      );
+    }
+  }, { scope: masterRef }); // Runs once on mount
 
   // ==========================================
   // 3. Independent Video Swap
   // ==========================================
   const handleVideoEnd = contextSafe(() => {
-    gsap.to(videoRef.current, {
-      opacity: 0,
-      duration: 1.5,
-      ease: "power2.inOut"
-    });
+    // Only fade out if the video is actually playing (First visit)
+    if (!introPlayed) {
+      gsap.to(videoRef.current, {
+        opacity: 0,
+        duration: 1.5,
+        ease: "power2.inOut"
+      });
+    }
   });
 
   // ==========================================
@@ -178,40 +211,39 @@ const Hero = () => {
       id="home-hero"
     >
       
-      {/* THE CINEMATIC BOX: Full screen structure, but scaled down initially by GSAP */}
+      {/* THE CINEMATIC BOX */}
       <div 
         ref={mediaWrapperRef} 
         className="absolute z-10 w-full h-full overflow-hidden"
       >
-        {/* Hardware accelerated parallax background image */}
         <div 
           ref={bgRef}
           className="absolute top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat will-change-transform"
           style={{ backgroundImage: 'url("/hero.jpeg")' }}
         />
         
-        {/* Intro video playing natively on top of the image */}
-        <video 
-          ref={videoRef}
-          src="/hero.webm" 
-          autoPlay 
-          muted 
-          playsInline
-          onEnded={handleVideoEnd}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        {/* Only render the video on the first visit so it doesn't drain resources */}
+        {!introPlayed && (
+          <video 
+            ref={videoRef}
+            src="/hero.webm" 
+            autoPlay 
+            muted 
+            playsInline
+            onEnded={handleVideoEnd}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
 
-        {/* THE CURTAIN: The white div covering the video, waiting to slide up */}
         <div 
           ref={curtainRef}
           className="absolute inset-0 bg-[#f8f8f8] z-20"
         />
 
-        {/* Gradient overlay for UI readability */}
         <div className="hero-overlay absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.0))] opacity-0 pointer-events-none z-30" />
       </div>
 
-      {/* THE UI LAYER: The text and products */}
+      {/* THE UI LAYER */}
       <section
         ref={containerRef}
         className="absolute inset-0 z-40 flex flex-col lg:flex-row justify-between pt-5 md:pt-32 lg:pt-0 px-6 md:px-12 lg:px-24 txt-light pb-5 lg:pb-0 invisible"
