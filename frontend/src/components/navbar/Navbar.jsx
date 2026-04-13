@@ -173,7 +173,7 @@ const Navbar = () => {
       <div 
         key={location.pathname} // THE FIX (Part 2): Nuke the DOM node on route change to kill CSS transition memory
         ref={navbarRef} 
-        className={`navbar w-full fixed top-0 left-0 z-[99999] transition-colors duration-500 border-b
+        className={`navbar w-full fixed top-0 left-0 z-[99999] transition-colors duration-500 border-b max-h-[80px]
           ${isDarkTheme ? "bg-[#f8f8f8]/80 backdrop-blur-md border-black/5" : "bg-transparent border-transparent"}
         `}
       >

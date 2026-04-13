@@ -1,12 +1,31 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom"; // <-- Import useLocation
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
 const CustomCursor = () => {
   const cursorRef = useRef(null);
   const textRef = useRef(null);
-  // NEW: A ref to hold our 0.2s class-swap timer
   const classTimer = useRef(null);
+  const location = useLocation(); // <-- Get current route
+
+  // THE FIX: Force reset the cursor on every page load
+  useEffect(() => {
+    if (cursorRef.current && textRef.current) {
+      clearTimeout(classTimer.current);
+      
+      // ONLY kill sizing animations, leave x/y tracking completely alone
+      gsap.killTweensOf(cursorRef.current, "width,height"); 
+      gsap.killTweensOf(textRef.current);
+
+      // Instantly strip the glass styling and restore the blend mode
+      cursorRef.current.classList.remove("bg-white/40", "backdrop-blur-md", "border", "border-white/50", "shadow-xl");
+      cursorRef.current.classList.add("bg-white", "mix-blend-difference");
+
+      gsap.set(cursorRef.current, { width: 16, height: 16 });
+      gsap.set(textRef.current, { autoAlpha: 0 });
+    }
+  }, [location.pathname]);
 
   useGSAP(() => {
     let mm = gsap.matchMedia();
@@ -29,7 +48,6 @@ const CustomCursor = () => {
         if (exploreTarget) {
           gsap.killTweensOf(cursorRef.current, "width,height");
           
-          // THE FIX: Instantly cancel the 0.2s timer if we enter a new product fast
           clearTimeout(classTimer.current);
           
           cursorRef.current.classList.remove("bg-white", "mix-blend-difference");
@@ -58,8 +76,6 @@ const CustomCursor = () => {
           
           gsap.killTweensOf(cursorRef.current, "width,height");
 
-          // THE FIX: Wait exactly 200ms before changing the colors back.
-          // This allows the cursor to safely glide over empty gaps between products.
           clearTimeout(classTimer.current);
           classTimer.current = setTimeout(() => {
             if (cursorRef.current) {
@@ -68,7 +84,6 @@ const CustomCursor = () => {
             }
           }, 200);
           
-          // The shrink animation starts immediately
           gsap.to(cursorRef.current, { 
             width: 16, 
             height: 16, 
@@ -94,7 +109,7 @@ const CustomCursor = () => {
         window.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseover", handleMouseOver);
         document.removeEventListener("mouseout", handleMouseOut);
-        clearTimeout(classTimer.current); // Cleanup timer on unmount
+        clearTimeout(classTimer.current);
       };
     });
 
