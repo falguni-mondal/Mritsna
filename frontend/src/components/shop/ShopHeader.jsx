@@ -39,8 +39,8 @@ const ShopHeader = ({ totalProducts }) => {
       <span className="shop-subtitle text-[0.65rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-6">
         04 Categories — {totalProducts} Pieces
       </span>
-      <h1 className="head-font text-6xl md:text-8xl lg:text-[8rem] leading-none tracking-tighter lowercase">
-        <SplitText>collection</SplitText>
+      <h1 className="head-font text-6xl md:text-8xl lg:text-[8rem] leading-none tracking-tighter">
+        <SplitText>Collection</SplitText>
       </h1>
     </div>
   );

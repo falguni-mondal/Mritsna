@@ -119,7 +119,7 @@ const CustomCursor = () => {
   return (
     <div
       ref={cursorRef}
-      className="hidden lg:flex fixed top-0 left-0 w-4 h-4 rounded-full bg-white mix-blend-difference items-center justify-center text-[#1a1a1a] pointer-events-none z-[9999]"
+      className="hidden lg:flex fixed top-0 left-0 w-4 h-4 rounded-full bg-white mix-blend-difference items-center justify-center text-[#1a1a1a] pointer-events-none z-99999999999"
     >
       <span 
         ref={textRef} 

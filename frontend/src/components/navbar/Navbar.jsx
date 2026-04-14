@@ -207,7 +207,7 @@ const Navbar = () => {
                 >
                   <Link 
                     to={path}
-                    className="hover:opacity-70 transition-opacity duration-300 py-1 inline-block"
+                    className="py-1 inline-block"
                   >
                     {name}
                   </Link>
@@ -246,7 +246,7 @@ const Navbar = () => {
                 className="nav-list-item"
                 onMouseEnter={handleRightItemEnter}
               >
-                <span className="cursor-pointer hover:opacity-70 transition-opacity duration-300 py-1 inline-block">
+                <span className="cursor-pointer py-1 inline-block">
                   search
                 </span>
               </li>
@@ -258,7 +258,7 @@ const Navbar = () => {
                   onMouseEnter={handleRightItemEnter}
                 >
                   <Link 
-                    className="hover:opacity-70 transition-opacity duration-300 py-1 inline-block" 
+                    className="py-1 inline-block" 
                     to={path}
                   >
                     {name}

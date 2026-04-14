@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
-// The exhaustive list of global dial codes and ISO 2-letter codes
+// list of global dial codes
 const countryData = [
   { co: "af", name: "Afghanistan", code: "+93" },
   { co: "al", name: "Albania", code: "+355" },
@@ -349,7 +349,11 @@ const SignUp = () => {
                     />
                   </div>
                   
-                  <div className="max-h-[300px] overflow-y-auto no-scrollbar flex flex-col">
+                  {/* THE FIX: Added overscroll-contain and data-lenis-prevent */}
+                  <div 
+                    className="max-h-[300px] overflow-y-auto overscroll-contain no-scrollbar flex flex-col"
+                    data-lenis-prevent="true"
+                  >
                     {filteredCountries.length === 0 && (
                       <p className="text-xs text-center py-6 opacity-50 font-light">No results found.</p>
                     )}
@@ -398,7 +402,6 @@ const SignUp = () => {
                 onClick={togglePasswordVisibility}
                 className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 text-black opacity-40 hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
               >
-                {/* Reverted to Iconify with span wrapper for GSAP */}
                 <span ref={eyeIconRef} className="flex items-center justify-center text-lg">
                   <Icon icon={showPassword ? "ph:eye-slash-light" : "ph:eye-light"} />
                 </span>
