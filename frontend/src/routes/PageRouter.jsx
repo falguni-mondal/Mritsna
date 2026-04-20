@@ -10,6 +10,7 @@ import Verification from "../pages/Verification";
 import Dashboard from "../pages/Dashboard";
 import GuestRoute from "../components/auth/GuestRoute";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
+import NotFound from "../pages/NotFound";
 
 const PageRouter = () => {
   return (
@@ -68,6 +69,10 @@ const PageRouter = () => {
           </ProtectedRoute>
         } 
       />
+
+
+
+      <Route path="*" element={<NotFound />} />
       
       {/* Example of future nested routes */}
       {/* <Route 

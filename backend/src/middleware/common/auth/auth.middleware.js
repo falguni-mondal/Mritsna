@@ -44,6 +44,34 @@ const revokeSuspiciousSession = async (req, res, next, session, reason, isOption
   return res.status(401).json({ success: false, message: "Security Violation: Session Terminated" });
 };
 
+// --- Helper: Handle Tampered Tokens ---
+const handleTamperedToken = async (req, res, next, refreshToken, isOptional) => {
+  console.warn(`[Security] Token tampering detected from IP: ${req.ip}`);
+  
+  if (refreshToken) {
+    try {
+      // Decode without verifying signature to extract the session ID
+      const decodedRefresh = jwt.decode(refreshToken);
+      if (decodedRefresh && decodedRefresh.jti) {
+        const session = await Session.findById(decodedRefresh.jti);
+        if (session) {
+          // Trigger the kill switch!
+          return await revokeSuspiciousSession(req, res, next, session, "Active Token Tampering", isOptional);
+        }
+      }
+    } catch (e) {
+      // If decode fails entirely, proceed to standard wipe
+    }
+  }
+
+  // If no session found, just wipe cookies and kick them out
+  res.clearCookie("accessToken", clearCookieOptions);
+  res.clearCookie("refreshToken", clearCookieOptions);
+  
+  if (isOptional) return handleOptionalFallback(req, res, next);
+  return res.status(401).json({ success: false, message: "Security Violation: Invalid Token" });
+};
+
 // --- Core Rotation Logic ---
 const refreshTokenSetup = async (req, res, next, refreshToken, isOptional = false) => {
   if (!refreshToken) {
@@ -112,6 +140,12 @@ const refreshTokenSetup = async (req, res, next, refreshToken, isOptional = fals
     next();
   } catch (error) {
     console.error("[Token Rotation Error]:", error.message);
+    
+    // If the refresh token itself was tampered with
+    if (error.name === "JsonWebTokenError") {
+      return await handleTamperedToken(req, res, next, refreshToken, isOptional);
+    }
+
     if (isOptional) return handleOptionalFallback(req, res, next);
     return res.status(401).json({ success: false, message: "Invalid session token." });
   }
@@ -132,7 +166,12 @@ export const isValidUser = async (req, res, next) => {
     req.user = decoded.sub;
     return next();
   } catch (error) {
-    return await refreshTokenSetup(req, res, next, refreshToken, false);
+    // Check EXACTLY why the token failed
+    if (error.name === "TokenExpiredError") {
+      return await refreshTokenSetup(req, res, next, refreshToken, false);
+    }
+    // If it's a JsonWebTokenError (tampering), drop the hammer
+    return await handleTamperedToken(req, res, next, refreshToken, false);
   }
 };
 
@@ -166,6 +205,9 @@ export const optionalAuth = async (req, res, next) => {
     req.user = decoded.sub;
     return next();
   } catch (error) {
-    return await refreshTokenSetup(req, res, next, refreshToken, true);
+    if (error.name === "TokenExpiredError") {
+      return await refreshTokenSetup(req, res, next, refreshToken, true);
+    }
+    return await handleTamperedToken(req, res, next, refreshToken, true);
   }
 };
