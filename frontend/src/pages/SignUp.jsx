@@ -1,8 +1,11 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { useDispatch, useSelector } from "react-redux";
+import { useForm } from "react-hook-form";
+import { registerUser, clearError } from "../store/features/user/userSlice";
 
 // list of global dial codes
 const countryData = [
@@ -250,6 +253,13 @@ const SignUp = () => {
   const containerRef = useRef(null);
   const dropdownRef = useRef(null);
   const eyeIconRef = useRef(null);
+  
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { isLoading, error: reduxError } = useSelector((state) => state.user);
+
+  // React Hook Form initialization
+  const { register, handleSubmit, formState: { errors }, clearErrors } = useForm();
 
   const [showPassword, setShowPassword] = useState(false);
   const [isCountryOpen, setIsCountryOpen] = useState(false);
@@ -274,6 +284,14 @@ const SignUp = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Clear Redux error on unmount or retry
+  useEffect(() => {
+    if (reduxError) {
+      const timer = setTimeout(() => dispatch(clearError()), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [reduxError, dispatch]);
+
   useGSAP(() => {
     gsap.fromTo(
       ".auth-anim",
@@ -290,8 +308,22 @@ const SignUp = () => {
     );
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  // Extract the first form error to display
+  const hookFormError = Object.values(errors)[0]?.message;
+  const displayError = hookFormError || reduxError;
+
+  const onSubmitForm = async (data) => {
+    // Append the selected country code to the payload
+    const payload = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phoneCode: selectedCountry.code,
+      phoneNumber: data.phoneNumber,
+      email: data.email,
+      password: data.password
+    };
+
+    const resultAction = await dispatch(registerUser(payload));
   };
 
   return (
@@ -305,16 +337,37 @@ const SignUp = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-8 w-full">
+        {/* Error Display */}
+        {displayError && (
+          <div className="auth-anim bg-red-50 text-red-600 text-xs text-center tracking-wide font-medium py-3 px-4 mb-6 border border-red-100">
+            {displayError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmitForm)} className="flex flex-col gap-8 w-full">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-6">
             <div className="auth-anim relative flex flex-col">
               <label className="text-[0.6rem] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">First Name</label>
-              <input type="text" required className="w-full bg-transparent border-b border-black/20 py-3 text-sm focus:outline-none focus:border-black transition-colors" />
+              <input 
+                type="text" 
+                {...register("firstName", { 
+                  required: "First name is required.",
+                  minLength: { value: 2, message: "First name must be at least 2 characters." }
+                })}
+                className="w-full bg-transparent border-b border-black/20 py-3 text-sm focus:outline-none focus:border-black transition-colors" 
+              />
             </div>
             <div className="auth-anim relative flex flex-col">
               <label className="text-[0.6rem] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Last Name</label>
-              <input type="text" required className="w-full bg-transparent border-b border-black/20 py-3 text-sm focus:outline-none focus:border-black transition-colors" />
+              <input 
+                type="text" 
+                {...register("lastName", { 
+                  required: "Last name is required.",
+                  minLength: { value: 2, message: "Last name must be at least 2 characters." }
+                })}
+                className="w-full bg-transparent border-b border-black/20 py-3 text-sm focus:outline-none focus:border-black transition-colors" 
+              />
             </div>
           </div>
 
@@ -349,7 +402,6 @@ const SignUp = () => {
                     />
                   </div>
                   
-                  {/* THE FIX: Added overscroll-contain and data-lenis-prevent */}
                   <div 
                     className="max-h-[300px] overflow-y-auto overscroll-contain no-scrollbar flex flex-col"
                     data-lenis-prevent="true"
@@ -365,6 +417,7 @@ const SignUp = () => {
                           setSelectedCountry(country);
                           setIsCountryOpen(false);
                           setSearchTerm("");
+                          clearErrors("phoneNumber"); // clear number errors if they change country
                         }}
                         className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-black/5 transition-colors text-left"
                       >
@@ -379,13 +432,27 @@ const SignUp = () => {
                 </div>
               </div>
 
-              <input type="tel" required className="flex-1 bg-transparent py-3 pl-4 text-sm focus:outline-none" />
+              <input 
+                type="tel" 
+                {...register("phoneNumber", { 
+                  required: "Contact number is required.",
+                  pattern: { value: /^\d{6,15}$/, message: "Provide a valid contact number (digits only)." }
+                })}
+                className="flex-1 bg-transparent py-3 pl-4 text-sm focus:outline-none" 
+              />
             </div>
           </div>
 
           <div className="auth-anim relative flex flex-col z-10">
             <label className="text-[0.6rem] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Email Address</label>
-            <input type="email" required className="w-full bg-transparent border-b border-black/20 py-3 text-sm focus:outline-none focus:border-black transition-colors" />
+            <input 
+              type="email" 
+              {...register("email", { 
+                required: "Email is required.",
+                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Provide a valid email address." }
+              })}
+              className="w-full bg-transparent border-b border-black/20 py-3 text-sm focus:outline-none focus:border-black transition-colors" 
+            />
           </div>
 
           <div className="auth-anim relative flex flex-col">
@@ -393,7 +460,10 @@ const SignUp = () => {
             <div className="relative w-full">
               <input 
                 type={showPassword ? "text" : "password"} 
-                required
+                {...register("password", { 
+                  required: "Password is required.",
+                  pattern: { value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$/, message: "Password must be at least 8 chars, containing 1 letter and 1 number." }
+                })}
                 className="w-full bg-transparent border-b border-black/20 py-3 pr-12 text-sm focus:outline-none focus:border-black transition-colors"
               />
               
@@ -409,8 +479,13 @@ const SignUp = () => {
             </div>
           </div>
 
-          <button type="submit" className="auth-anim mt-4 w-full bg-[#1a1a1a] text-white py-4 text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors">
-            Register
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className={`auth-anim mt-4 w-full text-white py-4 text-[0.65rem] font-bold tracking-[0.2em] uppercase transition-colors
+              ${isLoading ? 'bg-black/60 cursor-not-allowed' : 'bg-[#1a1a1a] hover:bg-black/80'}`}
+          >
+            {isLoading ? "Processing..." : "Register"}
           </button>
         </form>
 

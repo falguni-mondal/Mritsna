@@ -14,23 +14,72 @@ import ProtectedRoute from "../components/auth/ProtectedRoute";
 const PageRouter = () => {
   return (
     <Routes>
+      {/* ==========================================
+          PUBLIC ROUTES
+      ========================================== */}
       <Route path="/" element={<Homepage />} />
       <Route path="/about" element={<About />} />
       <Route path="/shop" element={<Shop />} />
       <Route path="/product/:id" element={<Product />} />
 
-      {/* GUEST ROUTES (Only accessible if NOT logged in) */}
-      <Route element={<GuestRoute />}>
-        <Route path="/account/signin" element={<SignIn />} />
-        <Route path="/account/signup" element={<SignUp />} />
-        <Route path="/account/verify" element={<Verification />} />
-      </Route>
+      {/* ==========================================
+          GUEST ROUTES (Only accessible if NOT logged in)
+      ========================================== */}
+      <Route 
+        path="/account/signin" 
+        element={
+          <GuestRoute>
+            <SignIn />
+          </GuestRoute>
+        } 
+      />
+      
+      <Route 
+        path="/account/signup" 
+        element={
+          <GuestRoute>
+            <SignUp />
+          </GuestRoute>
+        } 
+      />
 
-      {/* PROTECTED ROUTES (Only accessible IF logged in) */}
-      <Route element={<ProtectedRoute />}>
-        <Route path="/account" element={<Dashboard />} />
-        {/* Future nested routes: /account/orders, /account/addresses */}
-      </Route>
+      {/* ==========================================
+          SEMI-PROTECTED: VERIFICATION PAGE 
+          (Must be logged in, but UNVERIFIED)
+      ========================================== */}
+      <Route 
+        path="/account/verify" 
+        element={
+          <ProtectedRoute requireVerification={false}>
+            <Verification />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* ==========================================
+          FULLY PROTECTED ROUTES 
+          (Must be logged in AND Verified)
+      ========================================== */}
+      <Route 
+        path="/account" 
+        element={
+          <ProtectedRoute requireVerification={true}>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Example of future nested routes */}
+      {/* <Route 
+        path="/account/orders" 
+        element={
+          <ProtectedRoute requireVerification={true}>
+            <Orders />
+          </ProtectedRoute>
+        } 
+      /> 
+      */}
+      
     </Routes>
   );
 };

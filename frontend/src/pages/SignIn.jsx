@@ -1,12 +1,23 @@
-import React, { useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useRef, useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { useDispatch, useSelector } from "react-redux";
+import { useForm } from "react-hook-form";
+import { loginUser, clearError } from "../store/features/user/userSlice";
 
 const SignIn = () => {
   const containerRef = useRef(null);
   const iconRef = useRef(null); 
+  
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { isLoading, error: reduxError } = useSelector((state) => state.user);
+
+  // React Hook Form initialization
+  const { register, handleSubmit, formState: { errors } } = useForm();
+
   const [showPassword, setShowPassword] = useState(false);
 
   useGSAP(() => {
@@ -17,19 +28,29 @@ const SignIn = () => {
     );
   }, { scope: containerRef });
 
+  // Clear Redux error on unmount or retry
+  useEffect(() => {
+    if (reduxError) {
+      const timer = setTimeout(() => dispatch(clearError()), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [reduxError, dispatch]);
+
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
     
-    // Quick 360-degree GSAP flip on the native span wrapper
     gsap.fromTo(iconRef.current, 
       { rotationY: 0 }, 
       { rotationY: 180, duration: 0.4, ease: "power2.inOut", clearProps: "all" }
     );
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // FUTURE REDUX RTK DISPATCH
+  // Extract the first form error to display
+  const hookFormError = Object.values(errors)[0]?.message;
+  const displayError = hookFormError || reduxError;
+
+  const onSubmitForm = async (data) => {
+    const resultAction = await dispatch(loginUser(data));
   };
 
   return (
@@ -43,12 +64,22 @@ const SignIn = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-8 w-full">
+        {/* Error Display */}
+        {displayError && (
+          <div className="auth-anim bg-red-50 text-red-600 text-xs text-center tracking-wide font-medium py-3 px-4 mb-6 border border-red-100">
+            {displayError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmitForm)} className="flex flex-col gap-8 w-full">
           <div className="auth-anim relative flex flex-col">
             <label className="text-[0.6rem] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">Email Address</label>
             <input 
               type="email" 
-              required
+              {...register("email", { 
+                required: "Email is required.",
+                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Provide a valid email address." }
+              })}
               className="w-full bg-transparent border-b border-black/20 py-3 text-sm focus:outline-none focus:border-black transition-colors"
             />
           </div>
@@ -64,7 +95,9 @@ const SignIn = () => {
             <div className="relative w-full">
               <input 
                 type={showPassword ? "text" : "password"} 
-                required
+                {...register("password", { 
+                  required: "Password is required."
+                })}
                 className="w-full bg-transparent border-b border-black/20 py-3 pr-12 text-sm focus:outline-none focus:border-black transition-colors"
               />
               
@@ -73,7 +106,6 @@ const SignIn = () => {
                 onClick={togglePasswordVisibility}
                 className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 text-black opacity-40 hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
               >
-                {/* THE FIX: Reverted to Iconify but kept the span wrapper for GSAP */}
                 <span ref={iconRef} className="flex items-center justify-center text-lg">
                   <Icon icon={showPassword ? "ph:eye-slash-light" : "ph:eye-light"} />
                 </span>
@@ -83,9 +115,11 @@ const SignIn = () => {
 
           <button 
             type="submit" 
-            className="auth-anim mt-4 w-full bg-[#1a1a1a] text-white py-4 text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors"
+            disabled={isLoading}
+            className={`auth-anim mt-4 w-full text-white py-4 text-[0.65rem] font-bold tracking-[0.2em] uppercase transition-colors
+              ${isLoading ? 'bg-black/60 cursor-not-allowed' : 'bg-[#1a1a1a] hover:bg-black/80'}`}
           >
-            Sign In
+            {isLoading ? "Authenticating..." : "Sign In"}
           </button>
         </form>
 

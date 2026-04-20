@@ -1,17 +1,18 @@
-import { Navigate, Outlet } from "react-router-dom";
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
-const GuestRoute = () => {
-  // FUTURE REDUX IMPLEMENTATION:
-  // const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  
-  const mockAuth = false; // Change to true to test the redirect
+const GuestRoute = ({ children }) => {
+  const { isAuthenticated, user } = useSelector((state) => state.user);
 
-  if (mockAuth) {
-    // If they are already logged in, kick them to the dashboard
-    return <Navigate to="/account" replace />;
+  if (isAuthenticated) {
+    if (!user?.isVerified) {
+      return <Navigate to="/account/verify" replace />;
+    }
+    return <Navigate to="/" replace />;
   }
 
-  return <Outlet />;
+  return children;
 };
 
 export default GuestRoute;

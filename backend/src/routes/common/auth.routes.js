@@ -1,12 +1,14 @@
 import express from "express";
 import { 
+  checkAuth, // <-- Added checkAuth import
   register, 
   login, 
   logout, 
   logoutAllOtherDevices, 
   deactivateAccount, 
   sendVerificationEmail, 
-  verifyEmail 
+  verifyEmail, 
+  changeEmailAndResendOtp
 } from "../../controllers/common/auth.controller.js";
 import { isValidUser } from "../../middleware/common/auth/auth.middleware.js";
 import { validateLogin, validateRegister } from "../../middleware/user/auth.middleware.js";
@@ -14,8 +16,11 @@ import { validateLogin, validateRegister } from "../../middleware/user/auth.midd
 const router = express.Router();
 
 // ==========================================
-// PUBLIC ROUTES (No Token Required)
+// PUBLIC ROUTES
 // ==========================================
+
+// Immediately checks the user's session status on app load
+router.get("/check-auth", isValidUser, checkAuth);
 
 // Handles both brand new users and Guests claiming their Silent Accounts
 router.post("/register", validateRegister, register);
@@ -42,6 +47,8 @@ router.post("/send-verification", isValidUser, sendVerificationEmail);
 
 // Verifies the provided 6-digit OTP
 router.post("/verify-email", isValidUser, verifyEmail);
+
+router.post("/change-email", isValidUser, changeEmailAndResendOtp);
 
 
 export default router;

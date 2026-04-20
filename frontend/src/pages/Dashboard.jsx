@@ -1,10 +1,17 @@
 import React, { useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { useDispatch, useSelector } from "react-redux";
+import { logoutUser } from "../store/features/user/userSlice";
 
 const Dashboard = () => {
   const containerRef = useRef(null);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  
+  // Pull the live user data and loading state from Redux
+  const { user, isLoading } = useSelector((state) => state.user);
 
   useGSAP(() => {
     gsap.fromTo(
@@ -14,10 +21,17 @@ const Dashboard = () => {
     );
   }, { scope: containerRef });
 
-  const handleLogout = () => {
-    // FUTURE REDUX RTK DISPATCH:
-    // dispatch(logoutUser());
+  const handleLogout = async () => {
+    const resultAction = await dispatch(logoutUser());
+    
+    // Explicitly navigate them to the sign-in page upon successful logout
+    if (logoutUser.fulfilled.match(resultAction)) {
+      navigate("/account/signin");
+    }
   };
+
+  // Safe fallback while the user object hydrates (though ProtectedRoute usually handles this)
+  if (!user) return null; 
 
   return (
     <main ref={containerRef} className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a] pt-[120px] lg:pt-[160px] pb-20 px-6 lg:px-12">
@@ -47,10 +61,11 @@ const Dashboard = () => {
 
             <button 
               onClick={handleLogout}
-              className="dash-anim text-[0.65rem] font-bold tracking-[0.2em] uppercase opacity-50 hover:opacity-100 transition-opacity flex items-center gap-4 group mt-8 text-left"
+              disabled={isLoading}
+              className="dash-anim text-[0.65rem] font-bold tracking-[0.2em] uppercase opacity-50 hover:opacity-100 transition-opacity flex items-center gap-4 group mt-8 text-left disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <span className="w-2 h-[1px] bg-[#1a1a1a] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300" />
-              Log Out
+              {isLoading ? "Logging Out..." : "Log Out"}
             </button>
           </nav>
         </aside>
@@ -62,8 +77,12 @@ const Dashboard = () => {
           
           <div className="dash-anim border-b border-black/10 pb-8">
             <h2 className="text-[0.65rem] font-bold tracking-[0.2em] uppercase opacity-50 mb-4">Account Details</h2>
-            <p className="text-xl head-font">Welcome back.</p>
-            <p className="text-sm font-light mt-2 opacity-80">user@example.com</p>
+            <p className="text-2xl head-font capitalize tracking-wide">
+              Welcome back, {user.firstName}.
+            </p>
+            <div className="mt-4 flex flex-col gap-1">
+              <p className="text-sm font-light opacity-80">{user.email}</p>
+            </div>
           </div>
 
           <div className="dash-anim">

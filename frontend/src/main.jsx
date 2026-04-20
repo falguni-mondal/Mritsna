@@ -5,15 +5,17 @@ import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import SmoothScroll from "./configs/SmoothScroll.jsx";
 import { IntroProvider } from "./context/IntroContext.jsx";
+import { Provider } from "react-redux";
+import store from "./store/store.js";
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
-    <StrictMode>
-      <SmoothScroll>
-        <IntroProvider>
+    <SmoothScroll>
+      <IntroProvider>
+        <Provider store={store}>
           <App />
-        </IntroProvider>
-      </SmoothScroll>
-    </StrictMode>
+        </Provider>
+      </IntroProvider>
+    </SmoothScroll>
   </BrowserRouter>,
 );

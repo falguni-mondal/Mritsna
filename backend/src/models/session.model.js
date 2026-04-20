@@ -22,6 +22,10 @@ const sessionSchema = new mongoose.Schema(
       type: String, 
       default: "user" 
     },
+    isRevoked: {
+      type: Boolean,
+      default: false
+    },
     expiry_at: { 
       type: Date, 
       required: true
@@ -31,5 +35,7 @@ const sessionSchema = new mongoose.Schema(
     timestamps: true 
   }
 );
+
+sessionSchema.index({ expiry_at: 1 }, { expireAfterSeconds: 0 });
 
 export default mongoose.model("Session", sessionSchema);

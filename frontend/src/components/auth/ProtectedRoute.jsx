@@ -1,19 +1,27 @@
-import { Navigate, Outlet } from "react-router-dom";
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
-const ProtectedRoute = () => {
-  // FUTURE REDUX IMPLEMENTATION:
-  // import { useSelector } from 'react-redux';
-  // const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  
-  const mockAuth = false; // Change to true to test the Dashboard
+const ProtectedRoute = ({ children, requireVerification = true }) => {
+  const { isAuthenticated, user } = useSelector((state) => state.user);
 
-  if (!mockAuth) {
-    // If not logged in, kick them to sign in
+  // Not logged in at all? Kick to Sign In.
+  if (!isAuthenticated) {
     return <Navigate to="/account/signin" replace />;
   }
 
-  // If logged in, render the child routes (the Dashboard)
-  return <Outlet />;
+  // Are they trying to access a normal account page, but aren't verified? Kick to Verify.
+  if (requireVerification && !user?.isVerified) {
+    return <Navigate to="/account/verify" replace />;
+  }
+
+  // Are they trying to access the Verify page, but are ALREADY verified? Kick to Home.
+  if (!requireVerification && user?.isVerified) {
+    return <Navigate to="/" replace />;
+  }
+
+  // If all checks pass, render the page
+  return children;
 };
 
 export default ProtectedRoute;

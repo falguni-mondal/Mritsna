@@ -29,7 +29,10 @@ export const checkAuth = async (req, res) => {
       success: true,
       user: {
         id: user._id,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneCode: user.phoneCode,
+        phoneNumber: user.phoneNumber,
         email: user.email,
         role: user.role,
         isClaimed: user.isClaimed,
@@ -68,11 +71,10 @@ export const register = async (req, res) => {
       user.phoneCode = phoneCode;
       user.phoneNumber = phoneNumber;
       user.isClaimed = true;
-      await user.save();
     } else {
       // Creating a brand new user
       const hashedPassword = await bcrypt.hash(password, 10);
-      user = await User.create({
+      user = new User({
         firstName,
         lastName,
         phoneCode,
@@ -82,6 +84,32 @@ export const register = async (req, res) => {
         isClaimed: true,
       });
     }
+
+    // === NEW: AUTO-GENERATE & SEND OTP ON REGISTRATION ===
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+    
+    user.verificationToken = hashedOtp;
+    user.verificationTokenExpiry = Date.now() + 15 * 60 * 1000; 
+    
+    await user.save(); // Save the user with their new credentials AND the OTP
+
+    // Fire off the email via Resend
+    await sendEmail({
+      to: user.email,
+      subject: "Welcome to Mritsna - Your Verification Code",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+          <h2 style="color: #333; text-align: center;">Welcome to Mritsna</h2>
+          <p style="color: #555; font-size: 16px; text-align: center;">Use the verification code below to secure your account.</p>
+          <div style="background-color: #f9f9f9; padding: 15px; border-radius: 6px; text-align: center; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #111;">${otp}</span>
+          </div>
+          <p style="color: #888; font-size: 14px; text-align: center;">This code will expire in 15 minutes.</p>
+        </div>
+      `
+    });
+    // =======================================================
 
     const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const session = await Session.create({
@@ -99,7 +127,7 @@ export const register = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Registration successful. Welcome to Mritsna.",
+      message: "Registration successful. Please verify your email.",
       user: { 
         id: user._id, 
         firstName: user.firstName, 
@@ -195,7 +223,17 @@ export const login = async (req, res) => {
 
     return res.status(200).json({
       success: true, message: "Login successful.",
-      user: { id: user._id, name: user.name, email: user.email, role: user.role, isClaimed: user.isClaimed, isVerified: user.isVerified }
+      user: { 
+        id: user._id, 
+        firstName: user.firstName, 
+        lastName: user.lastName, 
+        phoneCode: user.phoneCode,
+        phoneNumber: user.phoneNumber, 
+        email: user.email, 
+        role: user.role, 
+        isClaimed: user.isClaimed, 
+        isVerified: user.isVerified 
+      }
     });
 
   } catch (error) {
@@ -405,11 +443,98 @@ export const verifyEmail = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Email successfully verified. Thank you!",
-      user: { id: user._id, name: user.name, email: user.email, role: user.role, isClaimed: user.isClaimed, isVerified: user.isVerified }
+      user: { 
+        id: user._id, 
+        firstName: user.firstName, 
+        lastName: user.lastName, 
+        phoneCode: user.phoneCode,
+        phoneNumber: user.phoneNumber, 
+        email: user.email, 
+        role: user.role, 
+        isClaimed: user.isClaimed, 
+        isVerified: user.isVerified 
+      }
     });
 
   } catch (error) {
     console.error("[Auth Controller - Verify Email OTP]:", error);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
+
+// --- CHANGE UNVERIFIED EMAIL & RESEND OTP ---
+export const changeEmailAndResendOtp = async (req, res) => {
+  try {
+    const { newEmail } = req.body;
+    const userId = req.user;
+
+    if (!newEmail) return res.status(400).json({ success: false, message: "New email is required." });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
+    if (user.isVerified) return res.status(400).json({ success: false, message: "Account is already verified." });
+
+    // Check if the new email belongs to someone else
+    const emailExists = await User.findOne({ email: newEmail.toLowerCase() });
+    if (emailExists && emailExists._id.toString() !== userId.toString()) {
+      return res.status(400).json({ success: false, message: "This email is already in use by another account." });
+    }
+
+    // Cooldown check
+    if (user.verificationTokenExpiry) {
+      const timeRemaining = user.verificationTokenExpiry.getTime() - Date.now();
+      const fourteenMinutes = 14 * 60 * 1000;
+      if (timeRemaining > fourteenMinutes) {
+        const secondsToWait = Math.ceil((timeRemaining - fourteenMinutes) / 1000);
+        return res.status(429).json({ success: false, message: `Please wait ${secondsToWait} seconds.` });
+      }
+    }
+
+    // Update Email
+    user.email = newEmail.toLowerCase();
+
+    // Generate New OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+    
+    user.verificationToken = hashedOtp;
+    user.verificationTokenExpiry = Date.now() + 15 * 60 * 1000; 
+    await user.save();
+
+    // Send the email
+    await sendEmail({
+      to: user.email,
+      subject: "Your New Mritsna Verification Code",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+          <h2 style="color: #333; text-align: center;">Verify Your New Email</h2>
+          <div style="background-color: #f9f9f9; padding: 15px; border-radius: 6px; text-align: center; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #111;">${otp}</span>
+          </div>
+          <p style="color: #888; font-size: 14px; text-align: center;">This code will expire in 15 minutes.</p>
+        </div>
+      `
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Email updated! A new 6-digit code has been sent.",
+      user: { 
+        id: user._id, 
+        firstName: user.firstName, 
+        lastName: user.lastName, 
+        phoneCode: user.phoneCode,
+        phoneNumber: user.phoneNumber, 
+        email: user.email, 
+        role: user.role, 
+        isClaimed: user.isClaimed, 
+        isVerified: user.isVerified 
+      }
+    });
+
+  } catch (error) {
+    console.error("[Auth Controller - Change Email]:", error);
     res.status(500).json({ success: false, message: "Internal server error." });
   }
 };

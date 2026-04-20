@@ -3,10 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { useDispatch, useSelector } from "react-redux";
+import { verifyOtp, sendVerificationOtp, changeEmail, clearError } from "../store/features/user/userSlice";
 
 const Verification = () => {
   const containerRef = useRef(null);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // Pull global state
+  const { user, isLoading, error: reduxError } = useSelector((state) => state.user);
   
   // ==========================================
   // STATES
@@ -19,8 +25,7 @@ const Verification = () => {
   const [timeLeft, setTimeLeft] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
-  // NEW: Email Modal States
-  const [displayedEmail, setDisplayedEmail] = useState("your@email.com"); // Mock initial email
+  // Email Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newEmailInput, setNewEmailInput] = useState("");
 
@@ -44,11 +49,20 @@ const Verification = () => {
     }
   }, [timeLeft]);
 
+  // Clear Redux error after 5 seconds to keep UI clean
+  useEffect(() => {
+    if (reduxError) {
+      const timer = setTimeout(() => dispatch(clearError()), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [reduxError, dispatch]);
+
   // ==========================================
   // OTP LOGIC
   // ==========================================
   const handleChange = (element, index) => {
     if (isNaN(element.value)) return;
+    if (reduxError) dispatch(clearError()); // Clear errors on typing
 
     const newCode = [...code];
     newCode[index] = element.value;
@@ -84,45 +98,54 @@ const Verification = () => {
     setCode(newCode);
     
     const focusIndex = pastedData.length < 6 ? pastedData.length : 5;
-    inputRefs.current[focusIndex].focus();
+    inputRefs.current[focusIndex]?.focus();
   };
 
   // ==========================================
   // SUBMIT & UPDATE LOGIC
   // ==========================================
-  const handleResend = () => {
-    // FUTURE REDUX: dispatch(resendVerificationEmail(displayedEmail));
-    setTimeLeft(60);
-    setCanResend(false);
+  const handleResend = async () => {
+    dispatch(clearError());
+    const resultAction = await dispatch(sendVerificationOtp());
+    
+    if (sendVerificationOtp.fulfilled.match(resultAction)) {
+      setTimeLeft(60);
+      setCanResend(false);
+    }
   };
 
-  const handleVerificationSubmit = (e) => {
+  const handleVerificationSubmit = async (e) => {
     e.preventDefault();
     const verificationCode = code.join("");
     
     if (verificationCode.length === 6) {
-      // FUTURE REDUX: dispatch(verifyEmail(verificationCode));
-      console.log("Verifying code:", verificationCode);
-      navigate("/account"); 
+      const resultAction = await dispatch(verifyOtp(verificationCode));
+      
+      if (verifyOtp.fulfilled.match(resultAction)) {
+        // Redux updates isVerified: true, so ProtectedRoute will automatically push them to "/" 
+        // But we can safely trigger navigate here as well to be explicit
+        navigate("/"); 
+      }
     }
   };
 
-  // THE FIX: In-Place Modal Submit Logic
-  const handleNewEmailSubmit = (e) => {
+  const handleNewEmailSubmit = async (e) => {
     e.preventDefault();
-    if (!newEmailInput) return;
+    if (!newEmailInput || newEmailInput === user?.email) return;
 
-    // 1. FUTURE REDUX: dispatch(updateGhostAccountEmail({ newEmail: newEmailInput }))
+    const resultAction = await dispatch(changeEmail(newEmailInput));
     
-    // 2. Update local UI state
-    setDisplayedEmail(newEmailInput);
-    
-    // 3. Reset the verification environment
-    setCode(new Array(6).fill(""));
-    setTimeLeft(60);
-    setCanResend(false);
-    setNewEmailInput("");
-    setIsModalOpen(false);
+    if (changeEmail.fulfilled.match(resultAction)) {
+      // Reset the verification environment
+      setCode(new Array(6).fill(""));
+      setTimeLeft(60);
+      setCanResend(false);
+      setNewEmailInput("");
+      setIsModalOpen(false);
+      
+      // Auto-focus the first OTP input
+      if (inputRefs.current[0]) inputRefs.current[0].focus();
+    }
   };
 
   // Format timer as 0:00
@@ -141,9 +164,18 @@ const Verification = () => {
             <h1 className="auth-anim head-font text-4xl lg:text-5xl tracking-wide mb-4">Verify</h1>
             <p className="auth-anim text-sm font-light opacity-60 tracking-widest uppercase leading-relaxed">
               Enter the 6-digit code sent to<br />
-              <span className="font-bold opacity-100 text-[#1a1a1a] tracking-normal lowercase">{displayedEmail}</span>
+              <span className="font-bold opacity-100 text-[#1a1a1a] tracking-normal lowercase">
+                {user?.email || "your email address"}
+              </span>
             </p>
           </div>
+
+          {/* Error Display for Main Verification */}
+          {reduxError && !isModalOpen && (
+            <div className="auth-anim bg-red-50 text-red-600 text-xs text-center tracking-wide font-medium py-3 px-4 mb-6 border border-red-100">
+              {reduxError}
+            </div>
+          )}
 
           <form onSubmit={handleVerificationSubmit} className="flex flex-col gap-10 w-full">
             
@@ -166,10 +198,11 @@ const Verification = () => {
 
             <button 
               type="submit" 
-              disabled={code.join("").length !== 6}
-              className="auth-anim mt-2 w-full bg-[#1a1a1a] text-white py-4 text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={code.join("").length !== 6 || isLoading}
+              className={`auth-anim mt-2 w-full text-white py-4 text-[0.65rem] font-bold tracking-[0.2em] uppercase transition-colors disabled:opacity-30 disabled:cursor-not-allowed
+                ${isLoading ? 'bg-black/60' : 'bg-[#1a1a1a] hover:bg-black/80'}`}
             >
-              Confirm
+              {isLoading && !isModalOpen ? "Verifying..." : "Confirm"}
             </button>
           </form>
 
@@ -177,9 +210,10 @@ const Verification = () => {
             {canResend ? (
               <button 
                 onClick={handleResend}
-                className="inline-block border-b border-black text-[0.65rem] font-bold tracking-[0.2em] uppercase pb-1 hover:opacity-60 transition-opacity"
+                disabled={isLoading}
+                className="inline-block border-b border-black text-[0.65rem] font-bold tracking-[0.2em] uppercase pb-1 hover:opacity-60 transition-opacity disabled:opacity-30"
               >
-                Resend Code
+                {isLoading && !isModalOpen ? "Sending..." : "Resend Code"}
               </button>
             ) : (
               <p className="text-[0.65rem] font-bold tracking-[0.1em] uppercase opacity-50">
@@ -190,7 +224,10 @@ const Verification = () => {
             <div className="mt-8">
               <button 
                 type="button"
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => {
+                  dispatch(clearError());
+                  setIsModalOpen(true);
+                }}
                 className="text-[0.55rem] tracking-[0.1em] uppercase opacity-40 hover:opacity-100 transition-opacity"
               >
                 Change Email Address
@@ -223,9 +260,16 @@ const Verification = () => {
           </button>
 
           <h2 className="head-font text-3xl mb-2">Update Email</h2>
-          <p className="text-xs font-light opacity-60 uppercase tracking-widest mb-10">
+          <p className="text-xs font-light opacity-60 uppercase tracking-widest mb-6">
             We will send a new code to this address.
           </p>
+
+          {/* Error Display for Modal */}
+          {reduxError && isModalOpen && (
+            <div className="bg-red-50 text-red-600 text-xs text-center tracking-wide font-medium py-3 px-4 mb-6 border border-red-100">
+              {reduxError}
+            </div>
+          )}
 
           <form onSubmit={handleNewEmailSubmit} className="flex flex-col gap-8 w-full">
             <div className="relative flex flex-col">
@@ -234,17 +278,22 @@ const Verification = () => {
                 type="email" 
                 required
                 value={newEmailInput}
-                onChange={(e) => setNewEmailInput(e.target.value)}
+                onChange={(e) => {
+                  setNewEmailInput(e.target.value);
+                  if (reduxError) dispatch(clearError());
+                }}
                 className="w-full bg-transparent border-b border-black/20 py-3 text-sm focus:outline-none focus:border-black transition-colors"
-                placeholder={displayedEmail}
+                placeholder={user?.email || "Enter new email..."}
               />
             </div>
 
             <button 
               type="submit" 
-              className="mt-2 w-full bg-[#1a1a1a] text-white py-4 text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors"
+              disabled={isLoading}
+              className={`mt-2 w-full text-white py-4 text-[0.65rem] font-bold tracking-[0.2em] uppercase transition-colors
+                ${isLoading ? 'bg-black/60 cursor-not-allowed' : 'bg-[#1a1a1a] hover:bg-black/80'}`}
             >
-              Request New Code
+              {isLoading && isModalOpen ? "Processing..." : "Request New Code"}
             </button>
           </form>
         </div>

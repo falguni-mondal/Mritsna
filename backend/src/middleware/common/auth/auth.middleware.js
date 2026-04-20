@@ -28,9 +28,12 @@ const revokeSuspiciousSession = async (req, res, next, session, reason, isOption
     timestamp: new Date().toISOString(),
   });
 
-  // Kill ALL sessions for this user to prevent widespread hijacking
+  // Kill ALL sessions for this user and flag them as revoked to prevent widespread hijacking
   if (session?.user) {
-    await Session.updateMany({ user: session.user }, { expiry_at: new Date() });
+    await Session.updateMany(
+      { user: session.user }, 
+      { isRevoked: true, expiry_at: new Date() }
+    );
   }
 
   res.clearCookie("accessToken", clearCookieOptions);
@@ -50,12 +53,15 @@ const refreshTokenSetup = async (req, res, next, refreshToken, isOptional = fals
 
   try {
     const decodedRefresh = jwt.verify(refreshToken, refreshSecret);
-    const session = await Session.findById(decodedRefresh.jti);
+    
+    const session = await Session.findOne({ 
+      _id: decodedRefresh.jti,
+      isRevoked: false 
+    });
 
-    // 1. Check if session exists and is not expired
     if (!session || session.expiry_at <= new Date()) {
       if (isOptional) return handleOptionalFallback(req, res, next);
-      return res.status(401).json({ success: false, message: "Session expired." });
+      return res.status(401).json({ success: false, message: "Session expired or revoked." });
     }
 
     const reqDeviceId = req.cookies.device_id;

@@ -16,7 +16,6 @@ const productData = {
   name: "Textured Vase",
   price: "₹ 1,200.00",
   category: "Vessels",
-  // NEW: Added a stock limit. Set this to 1 to see the button instantly disabled!
   stock: 3, 
   description: "A handcrafted ceramic vase featuring a raw, tactile surface. Thrown on the wheel and fired at high temperatures to ensure durability, this piece brings an earthy, minimalist elegance to any interior space.",
   details: {
@@ -48,7 +47,13 @@ const Product = () => {
   const [mobileInitialSlide, setMobileInitialSlide] = useState(0);
   const [currentMobileSlide, setCurrentMobileSlide] = useState(1);
 
-  // THE FIX: Enforce functional limits based on stock and minimum value (1)
+  // CTA Ripple Refs
+  const buyBtnRef = useRef(null);
+  const buyRippleRef = useRef(null);
+  const buyTextDarkRef = useRef(null);
+  const buyTextLightRef = useRef(null);
+
+  // Enforce functional limits based on stock and minimum value (1)
   const handleQuantity = (type) => {
     if (type === "dec" && quantity > 1) {
       setQuantity(quantity - 1);
@@ -67,8 +72,8 @@ const Product = () => {
     setDesktopZoom({ show: true, img, x, y });
   };
 
-  // --- Entrance Animation ---
-  useGSAP(() => {
+  // --- GSAP Animations (Extracted contextSafe for hover events) ---
+  const { contextSafe } = useGSAP(() => {
     const tl = gsap.timeline({ delay: 0.2 });
 
     tl.fromTo(".product-image", 
@@ -81,6 +86,30 @@ const Product = () => {
       "-=2.0" 
     );
   }, { scope: containerRef });
+
+  // --- Buy Button Ripple Logic ---
+  const handleBuyMouseEnter = contextSafe((e) => {
+    const rect = buyBtnRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    gsap.set(buyRippleRef.current, { x: x, y: y, scale: 0 });
+    gsap.to(buyRippleRef.current, { scale: 1, duration: 0.5, ease: "power3.out" });
+
+    gsap.to(buyTextDarkRef.current, { opacity: 0, duration: 0.3, ease: "power2.out" });
+    gsap.to(buyTextLightRef.current, { opacity: 1, duration: 0.3, ease: "power2.out" });
+  });
+
+  const handleBuyMouseLeave = contextSafe((e) => {
+    const rect = buyBtnRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    gsap.to(buyRippleRef.current, { scale: 0, x: x, y: y, duration: 0.5, ease: "power3.out" });
+
+    gsap.to(buyTextDarkRef.current, { opacity: 1, duration: 0.3, ease: "power2.out" });
+    gsap.to(buyTextLightRef.current, { opacity: 0, duration: 0.3, ease: "power2.out" });
+  });
 
   return (
     <>
@@ -170,10 +199,9 @@ const Product = () => {
                 <div className="product-info-item w-full flex flex-col gap-4 mb-12">
                   <div className="flex gap-4 h-14">
                     
-                    {/* THE FIX: Quantity Controls with Disabled States */}
+                    {/* Quantity Controls with Disabled States */}
                     <div className="flex items-center justify-between border border-black/10 px-4 w-32 shrink-0">
                       
-                      {/* Decrement Button */}
                       <button 
                         onClick={() => handleQuantity("dec")} 
                         disabled={quantity <= 1}
@@ -184,7 +212,6 @@ const Product = () => {
                       
                       <span className="text-sm font-medium">{quantity}</span>
                       
-                      {/* Increment Button */}
                       <button 
                         onClick={() => handleQuantity("inc")} 
                         disabled={quantity >= productData.stock}
@@ -202,7 +229,37 @@ const Product = () => {
                       <Icon icon="ph:heart-light" />
                     </button>
                   </div>
-                  <button className="w-full h-14 border border-[#1a1a1a] text-[#1a1a1a] text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-[#1a1a1a] hover:text-white transition-colors">Buy it now</button>
+                  
+                  {/* THE FIX: Animated "Buy it now" Ripple Button */}
+                  <button 
+                    ref={buyBtnRef}
+                    onMouseEnter={handleBuyMouseEnter}
+                    onMouseLeave={handleBuyMouseLeave}
+                    className="relative overflow-hidden w-full h-14 border border-[#1a1a1a] flex items-center justify-center group"
+                  >
+                    {/* The Ripple */}
+                    <div 
+                      ref={buyRippleRef} 
+                      className="absolute bg-[#1a1a1a] rounded-full pointer-events-none z-0"
+                      style={{ width: '1000px', height: '1000px', top: '-500px', left: '-500px', transform: 'scale(0)' }}
+                    />
+
+                    {/* Dark Text (Visible initially) */}
+                    <span ref={buyTextDarkRef} className="absolute inset-0 z-10 flex items-center justify-center text-[0.65rem] font-bold tracking-[0.2em] uppercase text-[#1a1a1a]">
+                      Buy it now
+                    </span>
+
+                    {/* Light Text (Revealed on hover) */}
+                    <span ref={buyTextLightRef} className="absolute inset-0 z-10 flex items-center justify-center text-[0.65rem] font-bold tracking-[0.2em] uppercase text-white opacity-0">
+                      Buy it now
+                    </span>
+
+                    {/* Invisible Placeholder to maintain button height/width structure */}
+                    <span className="invisible text-[0.65rem] font-bold tracking-[0.2em] uppercase">
+                      Buy it now
+                    </span>
+                  </button>
+
                 </div>
 
                 {/* Accordion */}
