@@ -9,6 +9,7 @@ import cors from "cors";
 
 // Routes
 import authRouter from "./routes/common/auth.routes.js";
+import adminAuthRoutes from "./routes/admin/admin.auth.routes.js";
 
 const app = express();
 
@@ -42,7 +43,7 @@ app.use(parser());
 
 // Dynamic CORS (Controlled via .env)
 // e.g., in .env: ALLOWED_ORIGINS=http://localhost:5173,https://mritsna.com
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [process.env.FRONTEND_URL];
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [process.env.FRONTEND_URL, "http://localhost:5174"];
 
 app.use(
   cors({
@@ -64,6 +65,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/admin/auth", adminAuthRoutes);
 
 
 // 7. Global Catch-All Error Handler (MANDATORY for preventing server crashes)
