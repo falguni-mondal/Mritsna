@@ -12,7 +12,7 @@ connectToDB()
     const server = app.listen(PORT, () => {
       console.log(`[Server] Mritsna API running on port ${PORT}`);
       console.log(`[Environment] ${process.env.NODE_ENV}`);
-    });
+    }); 
 
     // 3. Graceful Shutdown Protocol
     const exitHandler = () => {

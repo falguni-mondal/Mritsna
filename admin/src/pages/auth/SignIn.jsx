@@ -13,7 +13,6 @@ const SignIn = () => {
   const btnRef = useRef(null);
   const particlesRef = useRef([]); 
   
-  // State for password visibility
   const [showPassword, setShowPassword] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm();
@@ -50,7 +49,8 @@ const SignIn = () => {
 
     const rect = e.target.getBoundingClientRect();
     const dot = document.createElement("div");
-    dot.className = "absolute left-0 top-0 w-2 h-2 bg-[#1a1a1a] rounded-full z-50 pointer-events-none";
+    // Using your design system classes for the physics particles
+    dot.className = "absolute left-0 top-0 w-2 h-2 bg-dark rounded-full z-50 pointer-events-none";
     particleContainerRef.current.appendChild(dot);
     particlesRef.current.push(dot);
 
@@ -105,11 +105,11 @@ const SignIn = () => {
   return (
     <main 
       ref={containerRef}
-      className="w-full h-[100dvh] bg-[#f8f8f8] flex items-center justify-center px-6 relative overflow-hidden"
+      className="w-full h-[100dvh] bg-light flex items-center justify-center px-6 relative overflow-hidden"
     >
       <div ref={particleContainerRef} className="fixed inset-0 pointer-events-none z-50"></div>
 
-      <div className="brand-mark absolute top-10 left-10 z-20 opacity-0 pointer-events-none text-[#1a1a1a]">
+      <div className="brand-mark absolute top-10 left-10 z-20 opacity-0 pointer-events-none txt-dark">
         <h2 className="head-font text-2xl tracking-[0.2em] uppercase">
           Mritsna<span className="opacity-30">.</span>
         </h2>
@@ -118,11 +118,11 @@ const SignIn = () => {
       <div className="form-block w-full max-w-[400px] flex flex-col z-10 opacity-0">
         
         <div className="mb-14 text-center">
-          <Icon icon="iconamoon:shield-light" className="text-3xl text-[#1a1a1a] mx-auto mb-6 opacity-80" />
-          <h1 className="head-font text-5xl text-[#1a1a1a] mb-3 tracking-tight">
+          <Icon icon="iconamoon:shield-light" className="text-3xl txt-dark mx-auto mb-6 opacity-80" />
+          <h1 className="head-font text-5xl txt-dark mb-3 tracking-tight">
             Admin Portal
           </h1>
-          <p className="text-[0.65rem] font-bold tracking-[0.3em] uppercase opacity-40">Identity Required</p>
+          <p className="text-[0.65rem] font-bold tracking-[0.3em] uppercase opacity-40 txt-dark">Identity Required</p>
         </div>
 
         {error && (
@@ -139,13 +139,13 @@ const SignIn = () => {
               type="email" 
               id="email"
               placeholder=" " 
-              className="peer relative z-10 w-full bg-transparent border-b border-[#1a1a1a]/20 py-3 text-sm focus:outline-none focus:border-[#1a1a1a] transition-colors rounded-none"
+              className="peer relative z-10 w-full bg-transparent border-b border-[var(--dark)]/20 py-3 text-sm focus:outline-none focus:border-[var(--dark)] transition-colors rounded-none txt-dark"
             />
             <label 
               htmlFor="email" 
-              className="absolute left-0 top-3 text-sm text-[#1a1a1a]/50 transition-all duration-300 pointer-events-none z-0
-                         peer-focus:-top-4 peer-focus:text-[0.6rem] peer-focus:font-bold peer-focus:tracking-[0.2em] peer-focus:uppercase peer-focus:text-[#1a1a1a] 
-                         peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-[0.6rem] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:tracking-[0.2em] peer-[:not(:placeholder-shown)]:uppercase peer-[:not(:placeholder-shown)]:text-[#1a1a1a]"
+              className="absolute left-0 top-3 text-sm txt-dark opacity-50 transition-all duration-300 pointer-events-none z-0 w-3/4
+                         peer-focus:-top-4 peer-focus:text-[0.6rem] peer-focus:font-bold peer-focus:tracking-[0.2em] peer-focus:uppercase peer-focus:opacity-100 
+                         peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-[0.6rem] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:tracking-[0.2em] peer-[:not(:placeholder-shown)]:uppercase peer-[:not(:placeholder-shown)]:opacity-100"
             >
               Email Address
             </label>
@@ -153,7 +153,6 @@ const SignIn = () => {
           </div>
 
           <div className="relative group mt-2 bg-transparent z-10">
-            {/* Input - pr-10 ensures text doesn't go under the icon */}
             <input 
               {...register("password", { required: "Password is required" })}
               onKeyDown={handlePasswordType} 
@@ -161,12 +160,12 @@ const SignIn = () => {
               id="password"
               placeholder=" "
               autoComplete="off"
-              className="peer relative z-10 w-full bg-transparent border-b border-[#1a1a1a]/20 py-3 pr-10 text-sm focus:outline-none focus:border-[#1a1a1a] transition-colors rounded-none"
+              className="peer relative z-10 w-full bg-transparent border-b border-[var(--dark)]/20 py-3 pr-10 text-sm focus:outline-none focus:border-[var(--dark)] transition-colors rounded-none txt-dark"
             />
             
-            {/* Toggle Icon - explicitly placed above the label and input line */}
+            {/* The fixed toggle icon: Increased z-index, exact positioning, and independent opacity */}
             <div 
-              className="absolute right-0 bottom-3 z-30 cursor-pointer text-[#1a1a1a]/40 hover:text-[#1a1a1a] transition-colors flex items-center justify-center"
+              className="absolute right-0 bottom-2 z-50 cursor-pointer p-1 txt-dark opacity-40 hover:opacity-100 transition-opacity flex items-center justify-center"
               onClick={() => setShowPassword(!showPassword)}
             >
               <Icon 
@@ -177,9 +176,9 @@ const SignIn = () => {
 
             <label 
               htmlFor="password" 
-              className="absolute left-0 top-3 text-sm text-[#1a1a1a]/50 transition-all duration-300 pointer-events-none z-0
-                         peer-focus:-top-4 peer-focus:text-[0.6rem] peer-focus:font-bold peer-focus:tracking-[0.2em] peer-focus:uppercase peer-focus:text-[#1a1a1a] 
-                         peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-[0.6rem] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:tracking-[0.2em] peer-[:not(:placeholder-shown)]:uppercase peer-[:not(:placeholder-shown)]:text-[#1a1a1a]"
+              className="absolute left-0 top-3 text-sm txt-dark opacity-50 transition-all duration-300 pointer-events-none z-0 w-3/4
+                         peer-focus:-top-4 peer-focus:text-[0.6rem] peer-focus:font-bold peer-focus:tracking-[0.2em] peer-focus:uppercase peer-focus:opacity-100 
+                         peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-[0.6rem] peer-[:not(:placeholder-shown)]:font-bold peer-[:not(:placeholder-shown)]:tracking-[0.2em] peer-[:not(:placeholder-shown)]:uppercase peer-[:not(:placeholder-shown)]:opacity-100"
             >
               Password
             </label>
@@ -190,11 +189,11 @@ const SignIn = () => {
             type="submit" 
             ref={btnRef}
             disabled={isLoading}
-            className={`group relative w-full h-16 mt-6 border border-[#1a1a1a] bg-transparent text-[#1a1a1a] text-[0.65rem] font-bold tracking-[0.2em] uppercase overflow-hidden transition-all duration-500 z-10 ${isLoading ? 'opacity-50 cursor-wait' : 'hover:border-transparent'}`}
+            className={`group relative w-full h-16 mt-6 border border-[var(--dark)] bg-transparent txt-dark text-[0.65rem] font-bold tracking-[0.2em] uppercase overflow-hidden transition-all duration-500 z-10 ${isLoading ? 'opacity-50 cursor-wait' : 'hover:border-transparent'}`}
           >
-            <div className="absolute inset-0 bg-[#1a1a1a] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.7,0,0.3,1)] z-0"></div>
+            <div className="absolute inset-0 bg-dark translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.7,0,0.3,1)] z-0"></div>
             
-            <span className={`relative z-10 flex items-center justify-center gap-3 transition-colors duration-500 ${isLoading ? '' : 'group-hover:text-white'}`}>
+            <span className={`relative z-10 flex items-center justify-center gap-3 transition-colors duration-500 ${isLoading ? '' : 'group-hover:txt-light'}`}>
               {isLoading ? "Authenticating..." : "Continue"}
               {!isLoading && <Icon icon="iconamoon:arrow-right-1" className="text-sm transition-transform duration-500 group-hover:translate-x-2" />}
             </span>
@@ -204,7 +203,7 @@ const SignIn = () => {
       </div>
 
       <div className="form-block absolute bottom-8 text-center w-full opacity-0 z-10">
-        <p className="text-[0.55rem] font-bold tracking-[0.3em] uppercase opacity-20 text-[#1a1a1a]">
+        <p className="text-[0.55rem] font-bold tracking-[0.3em] uppercase opacity-40 txt-dark">
           Secure Connection Established
         </p>
       </div>

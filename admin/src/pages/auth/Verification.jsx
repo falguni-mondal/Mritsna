@@ -51,7 +51,8 @@ const Verification = () => {
 
     const rect = e.target.getBoundingClientRect();
     const dot = document.createElement("div");
-    dot.className = "absolute left-0 top-0 w-2 h-2 bg-[#1a1a1a] rounded-full z-50 pointer-events-none";
+    // Updated to use your design system
+    dot.className = "absolute left-0 top-0 w-2 h-2 bg-dark rounded-full z-50 pointer-events-none";
     particleContainerRef.current.appendChild(dot);
     particlesRef.current.push(dot);
 
@@ -122,10 +123,10 @@ const Verification = () => {
   };
 
   return (
-    <main ref={containerRef} className="w-full h-[100dvh] bg-[#f8f8f8] flex items-center justify-center px-6 relative overflow-hidden">
+    <main ref={containerRef} className="w-full h-[100dvh] bg-light flex items-center justify-center px-6 relative overflow-hidden">
       <div ref={particleContainerRef} className="fixed inset-0 pointer-events-none z-50"></div>
 
-      <div className="brand-mark absolute top-10 left-10 z-20 opacity-0 pointer-events-none text-[#1a1a1a]">
+      <div className="brand-mark absolute top-10 left-10 z-20 opacity-0 pointer-events-none txt-dark">
         <h2 className="head-font text-2xl tracking-[0.2em] uppercase">
           Mritsna<span className="opacity-30">.</span>
         </h2>
@@ -133,9 +134,9 @@ const Verification = () => {
 
       <div className="form-block w-full max-w-[400px] flex flex-col z-10 opacity-0">
         <div className="mb-14 text-center">
-          <Icon icon="iconamoon:lock-light" className="text-3xl text-[#1a1a1a] mx-auto mb-6 opacity-80" />
-          <h1 className="head-font text-5xl text-[#1a1a1a] mb-3 tracking-tight">Verification</h1>
-          <p className="text-[0.65rem] font-bold tracking-[0.3em] uppercase opacity-40">
+          <Icon icon="iconamoon:lock-light" className="text-3xl txt-dark mx-auto mb-6 opacity-80" />
+          <h1 className="head-font text-5xl txt-dark mb-3 tracking-tight">Verification</h1>
+          <p className="text-[0.65rem] font-bold tracking-[0.3em] uppercase opacity-40 txt-dark">
             Code sent to {admin?.email || "your email"}
           </p>
         </div>
@@ -164,7 +165,7 @@ const Verification = () => {
               maxLength="6"
               autoComplete="off"
               placeholder="000000"
-              className="w-full bg-transparent border-b border-[#1a1a1a]/20 py-3 text-center tracking-[1em] text-2xl focus:outline-none focus:border-[#1a1a1a] transition-colors placeholder:opacity-20"
+              className="w-full bg-transparent border-b border-[var(--dark)]/20 py-3 text-center tracking-[1em] text-2xl focus:outline-none focus:border-[var(--dark)] transition-colors placeholder:opacity-20 txt-dark"
             />
             {errors.otp && <span className="absolute -bottom-5 left-0 w-full text-center text-red-500 text-[0.65rem] uppercase tracking-wide">{errors.otp.message}</span>}
           </div>
@@ -173,10 +174,10 @@ const Verification = () => {
             type="submit" 
             ref={btnRef}
             disabled={isLoading}
-            className={`group relative w-full h-16 mt-6 border border-[#1a1a1a] bg-transparent text-[#1a1a1a] text-[0.65rem] font-bold tracking-[0.2em] uppercase overflow-hidden transition-all duration-500 z-10 ${isLoading ? 'opacity-50 cursor-wait' : 'hover:border-transparent'}`}
+            className={`group relative w-full h-16 mt-6 border border-[var(--dark)] bg-transparent txt-dark text-[0.65rem] font-bold tracking-[0.2em] uppercase overflow-hidden transition-all duration-500 z-10 ${isLoading ? 'opacity-50 cursor-wait' : 'hover:border-transparent'}`}
           >
-            <div className="absolute inset-0 bg-[#1a1a1a] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.7,0,0.3,1)] z-0"></div>
-            <span className={`relative z-10 flex items-center justify-center gap-3 transition-colors duration-500 ${isLoading ? '' : 'group-hover:text-white'}`}>
+            <div className="absolute inset-0 bg-dark translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.7,0,0.3,1)] z-0"></div>
+            <span className={`relative z-10 flex items-center justify-center gap-3 transition-colors duration-500 ${isLoading ? '' : 'group-hover:txt-light'}`}>
               {isLoading ? "Verifying..." : "Secure Session"}
               {!isLoading && <Icon icon="iconamoon:check-circle-1-light" className="text-sm transition-transform duration-500 group-hover:scale-110" />}
             </span>
@@ -186,7 +187,7 @@ const Verification = () => {
         {/* Resend Logic */}
         <div className="mt-8 flex justify-center items-center h-8">
           {timeLeft > 0 ? (
-            <p className="text-[0.65rem] font-bold tracking-[0.2em] uppercase opacity-40 text-[#1a1a1a]">
+            <p className="text-[0.65rem] font-bold tracking-[0.2em] uppercase opacity-40 txt-dark">
               Resend available in <span className="tabular-nums font-mono">00:{timeLeft.toString().padStart(2, '0')}</span>
             </p>
           ) : (
@@ -194,7 +195,7 @@ const Verification = () => {
               type="button"
               onClick={handleResend}
               disabled={isResending || isLoading}
-              className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-[#1a1a1a] border-b border-[#1a1a1a]/30 pb-1 hover:border-[#1a1a1a] transition-colors flex items-center gap-2"
+              className="text-[0.65rem] font-bold tracking-[0.2em] uppercase txt-dark border-b border-[var(--dark)]/30 pb-1 hover:border-[var(--dark)] transition-colors flex items-center gap-2"
             >
               {isResending ? "Dispatching..." : "Resend Code"}
               {!isResending && <Icon icon="iconamoon:reload-light" className="text-sm" />}

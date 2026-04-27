@@ -1,28 +1,72 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { GuestGuard, VerifyGuard, AdminGuard } from "./Guards";
 
-// Pages
+// Layout Shell
+import AdminLayout from "../components/Layout/AdminLayout";
+
+// Auth Pages
 import SignIn from "../pages/auth/SignIn";
 import Verification from "../pages/auth/Verification";
 
-// Temporary Dashboard Component
-const Dashboard = () => <div className="p-20 text-4xl head-font">Welcome to Command Center</div>;
+// Panel Pages
+import Dashboard from "../pages/panel/Dashboard";
+// import Products from "../pages/panel/Products";
+// import Orders from "../pages/panel/Orders";
+// import Carts from "../pages/panel/Carts";
+// import Wishlists from "../pages/panel/Wishlists";
+// import Reviews from "../pages/panel/Reviews";
+// import Coupons from "../pages/panel/Coupons";
 
 const PageRouter = () => {
   return (
     <Routes>
-      {/* Step 1: Sign In */}
-      <Route path="/signin" element={<GuestGuard><SignIn /></GuestGuard>} />
+      {/* Base Redirect: Instantly route root traffic to the secure dashboard */}
+      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+
+      {/* Public / Auth Routes */}
+      <Route 
+        path="/signin" 
+        element={
+          <GuestGuard>
+            <SignIn />
+          </GuestGuard>
+        } 
+      />
       
-      {/* Step 2: OTP Verification */}
-      <Route path="/verify" element={<VerifyGuard><Verification /></VerifyGuard>} />
-      
-      {/* Step 3: Protected Admin Area */}
-      <Route path="/" element={<AdminGuard><Dashboard /></AdminGuard>} />
-      
-      {/* Catch All */}
-      <Route path="*" element={<div className="p-20">404 - Admin Route Not Found</div>} />
+      <Route 
+        path="/verify" 
+        element={
+          <VerifyGuard>
+            <Verification />
+          </VerifyGuard>
+        } 
+      />
+
+      {/* Protected Admin Routes (Nested Architecture) */}
+      <Route 
+        path="/admin" 
+        element={
+          <AdminGuard>
+            <AdminLayout />
+          </AdminGuard>
+        }
+      >
+        {/* Child routes injected seamlessly into the AdminLayout Outlet */}
+        <Route path="dashboard" element={<Dashboard />} />
+        {/* <Route path="products" element={<Products />} />
+        <Route path="orders" element={<Orders />} />
+        <Route path="carts" element={<Carts />} />
+        <Route path="wishlists" element={<Wishlists />} />
+        <Route path="reviews" element={<Reviews />} />
+        <Route path="coupons" element={<Coupons />} /> */}
+
+        {/* Fallback for anyone hitting /admin directly without a sub-path */}
+        <Route index element={<Navigate to="dashboard" replace />} />
+      </Route>
+
+      {/* Catch-All: Redirect lost users back to safety */}
+      <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
   );
 };
