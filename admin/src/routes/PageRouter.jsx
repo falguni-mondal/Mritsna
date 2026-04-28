@@ -11,6 +11,7 @@ import Verification from "../pages/auth/Verification";
 
 // Panel Pages
 import Dashboard from "../pages/panel/Dashboard";
+import Products from "../pages/panel/Products";
 // import Products from "../pages/panel/Products";
 // import Orders from "../pages/panel/Orders";
 // import Carts from "../pages/panel/Carts";
@@ -54,12 +55,12 @@ const PageRouter = () => {
       >
         {/* Child routes injected seamlessly into the AdminLayout Outlet */}
         <Route path="dashboard" element={<Dashboard />} />
-        {/* <Route path="products" element={<Products />} />
-        <Route path="orders" element={<Orders />} />
-        <Route path="carts" element={<Carts />} />
-        <Route path="wishlists" element={<Wishlists />} />
-        <Route path="reviews" element={<Reviews />} />
-        <Route path="coupons" element={<Coupons />} /> */}
+        <Route path="products" element={<Products />} />
+        {/* <Route path="orders" element={<Orders />} /> */}
+        {/* <Route path="carts" element={<Carts />} /> */}
+        {/* <Route path="wishlists" element={<Wishlists />} /> */}
+        {/* <Route path="reviews" element={<Reviews />} /> */}
+        {/* <Route path="coupons" element={<Coupons />} /> */}
 
         {/* Fallback for anyone hitting /admin directly without a sub-path */}
         <Route index element={<Navigate to="dashboard" replace />} />

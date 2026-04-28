@@ -153,7 +153,6 @@ const refreshTokenSetup = async (req, res, next, refreshToken, isOptional = fals
 
 // --- EXPORTED MIDDLEWARES ---
 
-// For strict VIP routes (e.g., /account)
 export const isValidUser = async (req, res, next) => {
   const { accessToken, refreshToken } = req.cookies;
 
@@ -172,6 +171,33 @@ export const isValidUser = async (req, res, next) => {
     }
     // If it's a JsonWebTokenError (tampering), drop the hammer
     return await handleTamperedToken(req, res, next, refreshToken, false);
+  }
+};
+
+export const isAdmin = (req, res, next) => {
+  const { accessToken } = req.cookies;
+
+  if (!accessToken) {
+    return res.status(401).json({ success: false, message: "Unauthorized: Missing token." });
+  }
+
+  try {
+    const decoded = jwt.decode(accessToken);
+    
+    // Check if the payload contains the admin role
+    if (decoded && decoded.role === 'admin') {
+      return next();
+    }
+
+    // Log the unauthorized access attempt for your security audits
+    console.warn(`[Security Alert] Non-admin user (ID: ${req.user}) attempted to access a protected admin route.`);
+    
+    return res.status(403).json({ 
+      success: false, 
+      message: "Forbidden: You do not have the required admin privileges." 
+    });
+  } catch (error) {
+    next(error);
   }
 };
 

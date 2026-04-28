@@ -10,6 +10,7 @@ import cors from "cors";
 // Routes
 import authRouter from "./routes/common/auth.routes.js";
 import adminAuthRoutes from "./routes/admin/admin.auth.routes.js";
+import adminProductRoutes from './routes/admin/admin.product.routes.js';
 
 const app = express();
 
@@ -59,16 +60,17 @@ app.use(
 );
 
 
-// 6. Routes
+// ROUTES -------------------------------------------------------------------------------------------------------
 app.get("/api/health", (req, res) => {
   res.status(200).json({ success: true, message: "Server is healthy." });
 });
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin/auth", adminAuthRoutes);
+app.use('/api/v1/admin/products', adminProductRoutes);
 
 
-// 7. Global Catch-All Error Handler (MANDATORY for preventing server crashes)
+// Global Catch-All Error Handler (MANDATORY for preventing server crashes)
 app.use((err, req, res, next) => {
   console.error("[Global Error]:", err.message || err);
   
