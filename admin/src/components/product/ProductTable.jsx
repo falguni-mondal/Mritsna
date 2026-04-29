@@ -7,21 +7,30 @@ const ProductTable = ({ products, isLoading, onStatusToggle }) => {
 
   useEffect(() => {
     // Only run animation if we have data and we are not loading
-    if (!isLoading && products.length > 0 && tbodyRef.current) {
-      const rows = tbodyRef.current.querySelectorAll('.gsap-row');
+    if (!isLoading && products?.length > 0 && tbodyRef.current) {
       
-      gsap.fromTo(
-        rows,
-        { opacity: 0, y: 15 },
-        { 
-          opacity: 1, 
-          y: 0, 
-          stagger: 0.05, 
-          duration: 0.4, 
-          ease: 'power2.out',
-          clearProps: 'all' // Prevents GSAP styles from overriding hover states later
-        }
-      );
+      // We use gsap.context to ensure React can safely clean up the animation 
+      // if the component unmounts before the animation finishes.
+      let ctx = gsap.context(() => {
+        const rows = gsap.utils.toArray('.gsap-row');
+        
+        gsap.fromTo(
+          rows,
+          { opacity: 0, y: 15 },
+          { 
+            opacity: 1, 
+            y: 0, 
+            stagger: 0.05, 
+            duration: 0.4, 
+            ease: 'power2.out',
+            // 🌟 THE FIX: Only clear the transform (y axis). 
+            // If we clear 'all', Tailwind's opacity-0 class makes it vanish again!
+            clearProps: 'transform' 
+          }
+        );
+      }, tbodyRef);
+
+      return () => ctx.revert(); // Cleanup function
     }
   }, [isLoading, products]);
 

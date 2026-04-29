@@ -4,7 +4,9 @@ import {
   updateProduct,
   changeProductStatus,
   getAdminProducts,
-  getAdminProductById
+  getAdminProductById,
+  getImageKitAuth,
+  deleteProductImage
 } from '../../controllers/admin/admin.product.controller.js';
 import { 
   validateRequest, 
@@ -13,7 +15,6 @@ import {
 } from '../../middleware/admin/product.validation.js';
 
 import { isAdmin, isValidUser } from "../../middleware/common/auth/auth.middleware.js";
-
 
 const router = express.Router();
 
@@ -24,16 +25,23 @@ router.use(isValidUser, isAdmin); // All routes below require authentication
 // Fetch all products for the dashboard table
 router.get('/', getAdminProducts);
 
-// Fetch a single product to populate the Edit Form
-router.get('/:id', getAdminProductById);
-
 // Create a new product
 router.post('/', validateRequest(createProductSchema), createProduct);
+
+// Fetch signature for secure frontend direct-upload
+router.get('/imagekit-auth', getImageKitAuth);
+
+// Delete a specific image from the cloud
+router.delete('/image/:fileId', deleteProductImage);
+
+// Fetch a single product to populate the Edit Form
+router.get('/:id', getAdminProductById);
 
 // Update an existing product
 router.patch('/:id', validateRequest(updateProductSchema), updateProduct);
 
 // Update only the status (Active, Draft, Archived)
 router.patch('/:id/status', changeProductStatus);
+
 
 export default router;

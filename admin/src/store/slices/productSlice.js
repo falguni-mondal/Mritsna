@@ -87,6 +87,35 @@ export const changeStatus = createAsyncThunk(
   }
 );
 
+// 6. Fetch ImageKit Auth Signature (For direct frontend uploads)
+export const fetchImageKitAuth = createAsyncThunk(
+  'products/fetchImageKitAuth',
+  async (_, thunkAPI) => {
+    try {
+      // Make sure the route matches where you mounted your product routes in your backend
+      const response = await axiosInstance.get('/products/imagekit-auth');
+      return response.data; // Returns { token, expire, signature }
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to authenticate with ImageKit';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// 7. Delete Image from ImageKit
+export const deleteProductImage = createAsyncThunk(
+  'products/deleteImage',
+  async (fileId, thunkAPI) => {
+    try {
+      const response = await axiosInstance.delete(`/products/image/${fileId}`);
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to delete image from cloud storage';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
 // --- SLICE CONFIGURATION ---
 
 const productSlice = createSlice({
@@ -144,7 +173,6 @@ const productSlice = createSlice({
       .addCase(createNewProduct.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
-        // Optional: Instantly add the new product to the table without refetching
         state.products.unshift(action.payload.data); 
       })
       .addCase(createNewProduct.rejected, (state, action) => {
@@ -175,7 +203,6 @@ const productSlice = createSlice({
       .addCase(changeStatus.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
-        // Instantly update the status of the specific product in the table array
         const index = state.products.findIndex(p => p._id === action.payload.id);
         if (index !== -1) {
           state.products[index].status = action.payload.status;
@@ -185,7 +212,17 @@ const productSlice = createSlice({
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
+      })
+
+      // --- ImageKit Delete (Optional Tracking) ---
+      // We don't necessarily want to set global isLoading for background deletions, 
+      // but we do want to catch errors to display in a Toast.
+      .addCase(deleteProductImage.rejected, (state, action) => {
+        state.isError = true;
+        state.message = action.payload;
       });
+      // Note: We intentionally ignore pending/fulfilled for image fetching/deleting 
+      // so it doesn't trigger full-page loading spinners while images upload in the background.
   },
 });
 

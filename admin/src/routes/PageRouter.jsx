@@ -12,7 +12,8 @@ import Verification from "../pages/auth/Verification";
 // Panel Pages
 import Dashboard from "../pages/panel/Dashboard";
 import Products from "../pages/panel/Products";
-// import Products from "../pages/panel/Products";
+import AddProduct from "../pages/services/product/AddProduct";
+// import EditProduct from "../pages/services/product/EditProduct"; // <-- Placeholder for later
 // import Orders from "../pages/panel/Orders";
 // import Carts from "../pages/panel/Carts";
 // import Wishlists from "../pages/panel/Wishlists";
@@ -55,7 +56,12 @@ const PageRouter = () => {
       >
         {/* Child routes injected seamlessly into the AdminLayout Outlet */}
         <Route path="dashboard" element={<Dashboard />} />
+        
+        {/* Product Routes */}
         <Route path="products" element={<Products />} />
+        <Route path="products/new" element={<AddProduct />} />
+        {/* <Route path="products/edit/:id" element={<EditProduct />} /> */}
+
         {/* <Route path="orders" element={<Orders />} /> */}
         {/* <Route path="carts" element={<Carts />} /> */}
         {/* <Route path="wishlists" element={<Wishlists />} /> */}

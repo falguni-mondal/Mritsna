@@ -31,7 +31,7 @@ const Products = () => {
         title="Products" 
         description="Manage your inventory and catalog."
         actionLabel="Add Product"
-        actionLink="/panel/products/new"
+        actionLink="/admin/products/new"
         actionIcon="lucide:plus"
       />
 

@@ -1,6 +1,6 @@
 import Product from '../../models/product.model.js';
 import slugify from 'slugify';
-import { deleteImageKitFile } from '../../utils/imagekit.js';
+import imagekit, { deleteImageKitFile } from '../../utils/imagekit.js';
 
 /**
  * Generate a unique slug for SEO
@@ -187,5 +187,34 @@ export const getAdminProductById = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const getImageKitAuth = (req, res) => {
+  try {
+    // Generate the signature required for direct frontend uploads
+    const result = imagekit.getAuthenticationParameters();
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("ImageKit Auth Error:", error);
+    res.status(500).json({ success: false, message: "Failed to generate ImageKit signature" });
+  }
+};
+
+export const deleteProductImage = async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    if (!fileId) {
+      return res.status(400).json({ success: false, message: "File ID is required" });
+    }
+
+    // Delegate to the utility function you already built
+    await deleteImageKitFile(fileId);
+    
+    res.status(200).json({ success: true, message: "Image deletion process completed" });
+  } catch (error) {
+    console.error("ImageKit Delete Route Error:", error);
+    res.status(500).json({ success: false, message: "Server error during image deletion" });
   }
 };

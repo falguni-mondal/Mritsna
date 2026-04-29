@@ -65,7 +65,7 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
       <td className="px-6 py-4 text-right">
         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <Link 
-            to={`/panel/products/edit/${product._id}`}
+            to={`/admin/products/edit/${product._id}`}
             className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors inline-flex"
           >
             <Icon icon="lucide:edit-2" width="16" />
