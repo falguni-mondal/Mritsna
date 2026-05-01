@@ -6,7 +6,9 @@ import {
   getAdminProducts,
   getAdminProductById,
   getImageKitAuth,
-  deleteProductImage
+  deleteProductImage,
+  getInventoryList,
+  updateVariantStock
 } from '../../controllers/admin/admin.product.controller.js';
 import { 
   validateRequest, 
@@ -19,6 +21,10 @@ import { isAdmin, isValidUser } from "../../middleware/common/auth/auth.middlewa
 const router = express.Router();
 
 router.use(isValidUser, isAdmin); // All routes below require authentication
+
+// --- Inventory Management Routes ---
+router.get('/inventory', getInventoryList);
+router.patch('/inventory/stock', updateVariantStock);
 
 // --- Product Management Routes ---
 
@@ -42,6 +48,5 @@ router.patch('/:id', validateRequest(updateProductSchema), updateProduct);
 
 // Update only the status (Active, Draft, Archived)
 router.patch('/:id/status', changeProductStatus);
-
 
 export default router;

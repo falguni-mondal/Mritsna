@@ -54,7 +54,7 @@ const variantSchema = new mongoose.Schema({
     },
     lowStockThreshold: {
       type: Number,
-      default: 5
+      default: 3
     },
     allowBackorder: {
       type: Boolean,

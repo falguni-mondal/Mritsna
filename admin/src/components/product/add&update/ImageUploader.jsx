@@ -4,6 +4,7 @@ import { useFormContext } from 'react-hook-form';
 import { useDispatch } from 'react-redux';
 import { Icon } from '@iconify/react';
 import axios from 'axios'; // We need standard axios for the external ImageKit API call
+import toast from 'react-hot-toast'; // Imported the toaster
 
 // Import the thunks we just added to your slice
 import { fetchImageKitAuth, deleteProductImage } from '../../../store/slices/productSlice';
@@ -28,7 +29,7 @@ const ImageUploader = ({ variantIndex }) => {
   const onDrop = useCallback(async (acceptedFiles) => {
     // Check limits
     if (currentImages.length + acceptedFiles.length > maxImages) {
-      alert(`You can only upload up to ${maxImages} images per variant.`);
+      toast.error(`Limit reached: Maximum ${maxImages} images per variant.`);
       return;
     }
 
@@ -85,15 +86,21 @@ const ImageUploader = ({ variantIndex }) => {
 
     } catch (error) {
       console.error("ImageKit Upload Process Failed:", error);
-      alert("Failed to upload one or more images. Please check your connection and try again.");
+      toast.error("Upload failed. Please check your connection.");
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
     }
   }, [currentImages, setValue, fieldName, dispatch, currentCategory]);
 
+  // Handle explicit rejections from react-dropzone (e.g., dragging 6 files when max is 5)
+  const onDropRejected = useCallback((fileRejections) => {
+    toast.error(`Limit reached: You can only upload up to ${maxImages} images in total.`);
+  }, [maxImages]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: {
       'image/jpeg': ['.jpeg', '.jpg'],
       'image/png': ['.png'],
@@ -112,7 +119,7 @@ const ImageUploader = ({ variantIndex }) => {
         await dispatch(deleteProductImage(imageToDelete.imagekitFileId)).unwrap();
       } catch (error) {
         console.error("Failed to delete from cloud:", error);
-        alert("Failed to delete image from cloud storage.");
+        toast.error("Failed to delete image from cloud storage.");
         return; // Stop the UI removal if the cloud deletion failed
       }
     }

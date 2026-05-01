@@ -4,6 +4,7 @@ import axiosInstance from '../../configs/axiosInstance'; // Adjust path to your 
 const initialState = {
   products: [],          // For the Admin Table
   productDetails: null,  // For the Edit Form
+  inventory: [],         // NEW: For the Flattened Inventory Table
   isLoading: false,
   isError: false,
   isSuccess: false,
@@ -12,13 +13,13 @@ const initialState = {
 
 // --- ASYNC THUNKS ---
 
-// 1. Fetch All Products (Table Data)
+// Fetch All Products (Table Data)
 export const fetchAdminProducts = createAsyncThunk(
   'products/fetchAll',
   async (_, thunkAPI) => {
     try {
       const response = await axiosInstance.get('/products');
-      return response.data.data; // Our backend sends { success, count, data }
+      return response.data.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch products';
       return thunkAPI.rejectWithValue(message);
@@ -26,7 +27,7 @@ export const fetchAdminProducts = createAsyncThunk(
   }
 );
 
-// 2. Fetch Single Product (For Edit Form)
+// Fetch Single Product (For Edit Form)
 export const fetchProductById = createAsyncThunk(
   'products/fetchById',
   async (id, thunkAPI) => {
@@ -40,24 +41,23 @@ export const fetchProductById = createAsyncThunk(
   }
 );
 
-// 3. Create New Product
+// Create New Product
 export const createNewProduct = createAsyncThunk(
   'products/create',
   async (productData, thunkAPI) => {
     try {
       const response = await axiosInstance.post('/products', productData);
-      return response.data; // Contains { success, message, data }
+      return response.data;
     } catch (error) {
-      // Pass along the Zod validation errors if they exist
       const message = error.response?.data?.errors 
-        ? error.response.data.errors // Array of Zod errors
+        ? error.response.data.errors
         : error.response?.data?.message || error.message || 'Failed to create product';
       return thunkAPI.rejectWithValue(message);
     }
   }
 );
 
-// 4. Update Existing Product
+// Update Existing Product
 export const updateExistingProduct = createAsyncThunk(
   'products/update',
   async ({ id, updateData }, thunkAPI) => {
@@ -73,13 +73,13 @@ export const updateExistingProduct = createAsyncThunk(
   }
 );
 
-// 5. Change Product Status (Active, Draft, Archived)
+// Change Product Status (Active, Draft, Archived)
 export const changeStatus = createAsyncThunk(
   'products/changeStatus',
   async ({ id, status }, thunkAPI) => {
     try {
       const response = await axiosInstance.patch(`/products/${id}/status`, { status });
-      return response.data.data; // Contains { id, status }
+      return response.data.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to change status';
       return thunkAPI.rejectWithValue(message);
@@ -87,14 +87,14 @@ export const changeStatus = createAsyncThunk(
   }
 );
 
-// 6. Fetch ImageKit Auth Signature (For direct frontend uploads)
+// Fetch ImageKit Auth Signature (For direct frontend uploads)
 export const fetchImageKitAuth = createAsyncThunk(
   'products/fetchImageKitAuth',
   async (_, thunkAPI) => {
     try {
       // Make sure the route matches where you mounted your product routes in your backend
       const response = await axiosInstance.get('/products/imagekit-auth');
-      return response.data; // Returns { token, expire, signature }
+      return response.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to authenticate with ImageKit';
       return thunkAPI.rejectWithValue(message);
@@ -102,7 +102,7 @@ export const fetchImageKitAuth = createAsyncThunk(
   }
 );
 
-// 7. Delete Image from ImageKit
+// Delete Image from ImageKit
 export const deleteProductImage = createAsyncThunk(
   'products/deleteImage',
   async (fileId, thunkAPI) => {
@@ -111,6 +111,34 @@ export const deleteProductImage = createAsyncThunk(
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to delete image from cloud storage';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Fetch Flattened Inventory List
+export const fetchInventoryList = createAsyncThunk(
+  'products/fetchInventoryList',
+  async (_, thunkAPI) => {
+    try {
+      const response = await axiosInstance.get('/products/inventory');
+      return response.data.data; 
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch inventory list';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Quick Update Stock for a Specific Variant
+export const updateVariantStock = createAsyncThunk(
+  'products/updateVariantStock',
+  async ({ productId, variantId, newStock }, thunkAPI) => {
+    try {
+      const response = await axiosInstance.patch('/products/inventory/stock', { productId, variantId, newStock });
+      return response.data.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to update stock';
       return thunkAPI.rejectWithValue(message);
     }
   }
@@ -142,8 +170,7 @@ const productSlice = createSlice({
       })
       .addCase(fetchAdminProducts.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.isSuccess = true;
-        state.products = action.payload;
+        state.products = action.payload; // Fixed phantom toast by removing isSuccess = true
       })
       .addCase(fetchAdminProducts.rejected, (state, action) => {
         state.isLoading = false;
@@ -157,8 +184,7 @@ const productSlice = createSlice({
       })
       .addCase(fetchProductById.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.isSuccess = true;
-        state.productDetails = action.payload;
+        state.productDetails = action.payload; // Fixed phantom toast
       })
       .addCase(fetchProductById.rejected, (state, action) => {
         state.isLoading = false;
@@ -202,7 +228,7 @@ const productSlice = createSlice({
       })
       .addCase(changeStatus.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.isSuccess = true;
+        // Don't set global isSuccess if we are using the .unwrap() toast method locally
         const index = state.products.findIndex(p => p._id === action.payload.id);
         if (index !== -1) {
           state.products[index].status = action.payload.status;
@@ -214,15 +240,45 @@ const productSlice = createSlice({
         state.message = action.payload;
       })
 
+      // --- Fetch Inventory List ---
+      .addCase(fetchInventoryList.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(fetchInventoryList.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.inventory = action.payload; // Just populate the data, no phantom toasts
+      })
+      .addCase(fetchInventoryList.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+
+      // --- Update Variant Stock ---
+      // We don't set global isLoading=true here so the UI doesn't flicker/block on fast clicks
+      .addCase(updateVariantStock.fulfilled, (state, action) => {
+        const { productId, variantId, newStock } = action.payload;
+        // Optimistically update the specific row in the inventory array
+        const itemIndex = state.inventory.findIndex(
+          item => item.productId === productId && item.variantId === variantId
+        );
+        if (itemIndex !== -1) {
+          state.inventory[itemIndex].stock = newStock;
+          // Re-evaluate low stock based on threshold (defaulting to 5 if not set)
+          const threshold = state.inventory[itemIndex].lowStockThreshold || 5;
+          state.inventory[itemIndex].isLowStock = newStock <= threshold;
+        }
+      })
+      .addCase(updateVariantStock.rejected, (state, action) => {
+        state.isError = true;
+        state.message = action.payload;
+      })
+
       // --- ImageKit Delete (Optional Tracking) ---
-      // We don't necessarily want to set global isLoading for background deletions, 
-      // but we do want to catch errors to display in a Toast.
       .addCase(deleteProductImage.rejected, (state, action) => {
         state.isError = true;
         state.message = action.payload;
       });
-      // Note: We intentionally ignore pending/fulfilled for image fetching/deleting 
-      // so it doesn't trigger full-page loading spinners while images upload in the background.
   },
 });
 

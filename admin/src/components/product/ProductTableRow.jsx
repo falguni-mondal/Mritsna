@@ -28,11 +28,12 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
         </div>
       </td>
 
-      {/* Status Badge */}
+      {/* Status Toggle Pill */}
       <td className="px-6 py-4">
         <button 
           onClick={() => onStatusToggle(product._id, product.status)}
-          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize transition-colors border ${
+          // Added group/btn to control hover states specifically for this button
+          className={`group/btn inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize transition-colors border ${
             product.status === 'active' 
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
               : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
@@ -40,6 +41,13 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
         >
           <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${product.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
           {product.status}
+          
+          {/* The new swap/refresh indicator icon */}
+          <Icon 
+            icon="lucide:refresh-cw" 
+            className="ml-1.5 opacity-50 group-hover/btn:opacity-100 group-hover/btn:rotate-180 transition-all duration-300" 
+            width="10" 
+          />
         </button>
       </td>
 
@@ -63,14 +71,14 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
 
       {/* Actions */}
       <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center justify-end gap-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
           <Link 
             to={`/admin/products/edit/${product._id}`}
-            className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors inline-flex"
+            className="p-2 text-blue-500 lg:text-gray-400 lg:hover:text-blue-500 bg-blue-50 lg:bg-transparent lg:hover:bg-blue-50 rounded-lg transition-colors inline-flex"
           >
             <Icon icon="lucide:edit-2" width="16" />
           </Link>
-          <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex">
+          <button className="p-2 text-red-600 lg:text-gray-400 lg:hover:text-red-600 bg-red-50 lg:bg-transparent lg:hover:bg-red-50 rounded-lg transition-colors inline-flex">
             <Icon icon="lucide:trash-2" width="16" />
           </button>
         </div>

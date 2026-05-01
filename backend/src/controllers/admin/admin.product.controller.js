@@ -218,3 +218,90 @@ export const deleteProductImage = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error during image deletion" });
   }
 };
+
+export const getInventoryList = async (req, res, next) => {
+  try {
+    // We use the Aggregation Pipeline to let MongoDB "flatten" the variants
+    const inventory = await Product.aggregate([
+      // $unwind breaks down the array. preserveNullAndEmptyArrays ensures products 
+      // with no variants don't accidentally disappear from the inventory view.
+      { $unwind: { path: "$variants", preserveNullAndEmptyArrays: true } },
+      
+      // Select only the exact data the frontend needs
+      {
+        $project: {
+          productId: "$_id",
+          variantId: "$variants._id",
+          title: "$title",
+          sku: "$variants.sku",
+          stock: "$variants.inventory.quantity",
+          lowStockThreshold: "$variants.inventory.lowStockThreshold",
+          // Grab the very first image of this specific variant
+          image: { $arrayElemAt: ["$variants.images", 0] }
+        }
+      },
+      // Sort alphabetically by title
+      { $sort: { title: 1, sku: 1 } }
+    ]);
+
+    // Format the response for the frontend
+    const formattedInventory = inventory.map(item => {
+      return {
+        productId: item.productId,
+        variantId: item.variantId || 'no-variant',
+        // Combine Title and SKU so the admin knows EXACTLY what they are editing
+        title: item.sku ? `${item.title} - ${item.sku}` : item.title,
+        sku: item.sku || 'N/A',
+        stock: item.stock || 0,
+        isLowStock: (item.stock || 0) <= (item.lowStockThreshold || 5),
+        image: item.image ? { baseUrl: item.image.baseUrl, altText: item.image.altText } : null
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: formattedInventory.length,
+      data: formattedInventory
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateVariantStock = async (req, res, next) => {
+  try {
+    const { productId, variantId, newStock } = req.body;
+
+    // Strict validation to prevent setting stock to NaN or negative numbers
+    if (newStock === undefined || typeof newStock !== 'number' || newStock < 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'A valid non-negative stock quantity is required' 
+      });
+    }
+
+    // Find the specific product AND the specific variant inside it, then update its stock
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, "variants._id": variantId },
+      { $set: { "variants.$.inventory.quantity": newStock } },
+      { new: true } // Returns the updated document
+    );
+
+    if (!product) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Product or specific variant could not be found' 
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Stock updated successfully',
+      data: { productId, variantId, newStock }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};

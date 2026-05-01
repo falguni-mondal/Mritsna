@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -24,6 +24,7 @@
     "react-dom": "^19.2.5",
     "react-dropzone": "^15.0.0",
     "react-hook-form": "^7.74.0",
+    "react-hot-toast": "^2.6.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.14.1",
     "tailwindcss": "^4.2.3",

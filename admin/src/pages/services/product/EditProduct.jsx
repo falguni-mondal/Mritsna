@@ -1,15 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 
 // Form Data & Redux
 import { productValidationSchema } from '../../../utils/validations/productSchema';
-import { createNewProduct } from '../../../store/slices/productSlice'; 
+import { 
+  fetchProductById, 
+  updateExistingProduct, 
+  resetProductState, 
+  clearProductDetails 
+} from '../../../store/slices/productSlice'; 
 
+// Reusable Components
 import ProductPageHeader from '../../../components/product/ProductPageHeader';
 import BasicInfoSection from '../../../components/product/add&update/BasicInfoSection';
 import PricingSection from '../../../components/product/add&update/PricingSection';
@@ -17,48 +23,87 @@ import ShippingSection from '../../../components/product/add&update/ShippingSect
 import AttributesSection from '../../../components/product/add&update/AttributesSection';
 import VariantManager from '../../../components/product/add&update/VariantManager';
 
-const AddProduct = () => {
+const EditProduct = () => {
+  const { id } = useParams(); // Grab the product ID from the URL
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  // Ensure this selector matches what you named the slice in your store.js
-  const { isLoading } = useSelector((state) => state.adminProduct || state.product || {}); 
+  
+  // Pull the exact variables from your shared Redux slice
+  const { productDetails, isLoading, isError, message } = useSelector(
+    (state) => state.adminProduct || state.product || {}
+  ); 
 
-  // Initialize the Form Engine
+  // Initialize the Form Engine without default values (we wait for the API)
   const methods = useForm({
     resolver: zodResolver(productValidationSchema),
-    defaultValues: {
-      status: 'draft',
-      category: 'Vases',
-      pricing: { baseCurrency: 'INR', taxClass: 'standard', discountPercentage: 0 },
-      shipping: { isFragile: true, weightGrams: 0, dimensions: { lengthCm: 0, widthCm: 0, heightCm: 0 } },
-      attributes: { material: '', finish: '' },
-      variants: [] 
-    }
   });
 
-  // Form Submission Handler
+  // 1. Fetch the product data when the page loads
+  useEffect(() => {
+    if (id) {
+      dispatch(fetchProductById(id));
+    }
+    
+    // Cleanup function: Clear the product details and state when leaving the page
+    return () => {
+      dispatch(clearProductDetails());
+      dispatch(resetProductState());
+    };
+  }, [id, dispatch]);
+
+  // 2. Auto-fill the form once the data arrives from the backend
+  useEffect(() => {
+    if (productDetails) {
+      // The reset() function takes the DB object and pushes it into all your child components!
+      methods.reset(productDetails);
+    }
+  }, [productDetails, methods]);
+
+  // 3. Form Submission Handler (Updating instead of Creating)
   const onSubmit = async (data) => {
     try {
-      await dispatch(createNewProduct(data)).unwrap();
+      // Pass the ID and data using the exact keys your thunk expects: { id, updateData }
+      await dispatch(updateExistingProduct({ id, updateData: data })).unwrap();
       
-      // Fire the success toast right before navigating away
-      toast.success("Product created successfully!");
-      
-      navigate('/admin/products'); // Redirects back to your list page on success
+      toast.success("Product updated successfully!");
+      navigate('/admin/products');
     } catch (error) {
-      console.error("Failed to create product:", error);
-      
-      // Fire the error toast if the backend rejects the submission
-      toast.error(error?.message || "Failed to create product. Please try again.");
+      console.error("Failed to update product:", error);
+      toast.error(error?.message || error || "Failed to update product. Please try again.");
     }
   };
 
+  // If the page is loading the initial data, show a spinner so the form doesn't flicker empty
+  if (isLoading && !productDetails) {
+    return (
+      <div className="min-h-screen bg-gray-50/50 flex flex-col items-center justify-center w-full">
+        <Icon icon="lucide:loader-2" className="animate-spin text-gray-400 mb-4" width="32" />
+        <p className="text-sm text-gray-500 font-medium">Loading product data...</p>
+      </div>
+    );
+  }
+
+  // If the product wasn't found (e.g., bad ID in URL), show an error state
+  if (isError && !productDetails) {
+    return (
+      <div className="min-h-screen bg-gray-50/50 flex flex-col items-center justify-center w-full">
+        <Icon icon="lucide:alert-circle" className="text-red-400 mb-4" width="32" />
+        <p className="text-sm text-gray-600 font-medium">{message || "Product not found"}</p>
+        <button 
+          onClick={() => navigate('/admin/products')}
+          className="mt-4 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50 w-full max-w-7xl mx-auto pb-24">
-      {/* The reusable header gives us a consistent title and a "Cancel" button */}
       <ProductPageHeader 
-        title="Add New Product" 
-        description="Create a new product listing with variants and images."
+        title="Edit Product" 
+        description="Update inventory, variants, and product details."
         actionLabel="Cancel"
         actionLink="/admin/products"
       />
@@ -66,16 +111,15 @@ const AddProduct = () => {
       <FormProvider {...methods}>
         <form onSubmit={methods.handleSubmit(onSubmit)} className="grid grid-cols-1 xl:grid-cols-3 gap-6 relative">
           
-          {/* Main Left Column (Takes up 2/3 of the screen) */}
+          {/* Main Left Column */}
           <div className="xl:col-span-2 space-y-6">
             <BasicInfoSection />
             <VariantManager />
           </div>
 
-          {/* Right Sidebar Column (Takes up 1/3 of the screen) */}
+          {/* Right Sidebar Column */}
           <div className="space-y-6">
             
-            {/* Status & Category Card */}
             <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
               <h3 className="text-sm font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <Icon icon="lucide:settings" className="text-gray-400" width="18" />
@@ -125,7 +169,7 @@ const AddProduct = () => {
               onClick={() => navigate('/admin/products')}
               className="px-5 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors"
             >
-              Discard
+              Discard Changes
             </button>
             <button 
               type="submit"
@@ -137,7 +181,7 @@ const AddProduct = () => {
               ) : (
                 <Icon icon="lucide:save" width="18" />
               )}
-              {isLoading ? 'Saving...' : 'Save Product'}
+              {isLoading ? 'Updating...' : 'Update Product'}
             </button>
           </div>
         </form>
@@ -146,4 +190,4 @@ const AddProduct = () => {
   );
 };
 
-export default AddProduct;
+export default EditProduct;
