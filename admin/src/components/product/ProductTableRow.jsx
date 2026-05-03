@@ -33,7 +33,7 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
         <button 
           onClick={() => onStatusToggle(product._id, product.status)}
           // Added group/btn to control hover states specifically for this button
-          className={`group/btn inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize transition-colors border ${
+          className={`group/btn inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize transition-colors border cursor-pointer ${
             product.status === 'active' 
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
               : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
@@ -78,9 +78,9 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
           >
             <Icon icon="lucide:edit-2" width="16" />
           </Link>
-          <button className="p-2 text-red-600 lg:text-gray-400 lg:hover:text-red-600 bg-red-50 lg:bg-transparent lg:hover:bg-red-50 rounded-lg transition-colors inline-flex">
+          {/* <button className="p-2 text-red-600 lg:text-gray-400 lg:hover:text-red-600 bg-red-50 lg:bg-transparent lg:hover:bg-red-50 rounded-lg transition-colors inline-flex">
             <Icon icon="lucide:trash-2" width="16" />
-          </button>
+          </button> */}
         </div>
       </td>
     </tr>

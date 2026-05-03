@@ -151,10 +151,10 @@ const About = () => {
               01 — The Origin
             </span>
             <h2 className="split-words-scroll head-font text-4xl lg:text-5xl mb-8">
-              Fragrant Clay.
+              Our Story.
             </h2>
             <p className="split-lines text-base font-light opacity-80 leading-relaxed mb-6">
-              The name "Mritsna" is derived from ancient Sanskrit, translating directly to "good earth" or "fragrant clay." It represents our foundational belief that true luxury is not synthetic, but deeply rooted in the natural world.
+              Rooted in the raw beauty of the elements, Mritsna creates premium, handcrafted artefacts. Each piece is a soulful tribute to nature’s quiet elegance, designed to bring the rejuvenating warmth of Mother Earth into your life.
             </p>
             <p className="split-lines text-base font-light opacity-80 leading-relaxed">
               We source our materials with a reverence for the ground they came from, ensuring that every vessel carries the tactile memory of the soil.
@@ -209,13 +209,13 @@ const About = () => {
           
           <div className="lg:col-span-5 flex flex-col items-start lg:pl-12">
             <span className="text-[0.6rem] font-bold tracking-[0.2em] uppercase opacity-50 mb-6 block border-b border-black/20 pb-2">
-              03 — The Texture
+              03 — The Vision
             </span>
             <h2 className="split-words-scroll head-font text-4xl lg:text-5xl mb-8">
-              Uncompromising Purity.
+              Our Vision.
             </h2>
             <p className="split-lines text-base font-light opacity-80 leading-relaxed">
-              We contrast raw, unglazed stoneware with custom-mixed, matte glazes. By refusing to use artificial smoothing agents, we preserve the microscopic imperfections that give our ceramics their signature tactile weight. It is luxury you can feel in the dark.
+              Mritsna wishes pure joy in your life with every piece you own being your deliberate choice—a small yet meaningful celebration of exquisite elegance and timeless design.
             </p>
           </div>
 

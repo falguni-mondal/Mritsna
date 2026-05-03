@@ -3,15 +3,99 @@ import { useDropzone } from 'react-dropzone';
 import { useFormContext } from 'react-hook-form';
 import { useDispatch } from 'react-redux';
 import { Icon } from '@iconify/react';
-import axios from 'axios'; // We need standard axios for the external ImageKit API call
-import toast from 'react-hot-toast'; // Imported the toaster
+import axios from 'axios';
+import toast from 'react-hot-toast';
 
-// Import the thunks we just added to your slice
+// dnd-kit imports for buttery smooth drag-and-drop
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors 
+} from '@dnd-kit/core';
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  rectSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 import { fetchImageKitAuth, deleteProductImage } from '../../../store/slices/productSlice';
 
 const IMAGEKIT_PUBLIC_KEY = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY;
 const IMAGEKIT_UPLOAD_URL = import.meta.env.VITE_IMAGEKIT_UPLOAD_URL;
 
+// --- NEW SUB-COMPONENT: The Draggable Image Card ---
+const SortableImageCard = ({ id, image, index, onRemove }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 1,
+    opacity: isDragging ? 0.8 : 1,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      {...attributes} 
+      {...listeners}
+      className={`relative group rounded-lg overflow-hidden border aspect-square bg-gray-50 cursor-grab active:cursor-grabbing
+        ${isDragging ? 'border-black shadow-xl scale-105' : 'border-gray-200'}
+      `}
+    >
+      <img 
+        src={`${image.baseUrl}?tr=w-200,h-200,q-80,c-at_max`} 
+        alt={image.altText || "Preview"} 
+        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+      />
+      
+      {/* Overlay Actions */}
+      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+        <div className="flex justify-end">
+          <button 
+            type="button"
+            // onPointerDown stops the drag event so the click can register cleanly
+            onPointerDown={(e) => e.stopPropagation()} 
+            onClick={(e) => { e.stopPropagation(); onRemove(index); }}
+            className="p-1.5 bg-white/90 text-red-600 rounded-md hover:bg-white transition-colors shadow-sm"
+          >
+            <Icon icon="lucide:trash-2" width="14" />
+          </button>
+        </div>
+        
+        {/* Visual Drag Indicator (Not a functional button) */}
+        <div className="w-full py-1.5 bg-white/90 text-gray-700 text-xs font-medium rounded flex items-center justify-center gap-1.5 shadow-sm pointer-events-none">
+          <Icon icon="lucide:move" width="14" />
+          Drag to move
+        </div>
+      </div>
+
+      {/* Primary Badge */}
+      {image.isPrimary && (
+        <div className="absolute top-2 left-2 px-2 py-1 bg-black text-white text-[10px] font-bold tracking-wider uppercase rounded shadow-sm">
+          Cover
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+// --- MAIN COMPONENT ---
 const ImageUploader = ({ variantIndex }) => {
   const dispatch = useDispatch();
   const { watch, setValue, formState: { errors } } = useFormContext();
@@ -21,13 +105,21 @@ const ImageUploader = ({ variantIndex }) => {
 
   const currentCategory = watch('category') || 'uncategorized';
   
-  // Watch the current images for this specific variant
   const fieldName = `variants.${variantIndex}.images`;
   const currentImages = watch(fieldName) || [];
   const maxImages = 5;
 
+  // Set up smart sensors. A 5px drag distance prevents accidental drags when clicking buttons.
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const onDrop = useCallback(async (acceptedFiles) => {
-    // Check limits
     if (currentImages.length + acceptedFiles.length > maxImages) {
       toast.error(`Limit reached: Maximum ${maxImages} images per variant.`);
       return;
@@ -41,11 +133,9 @@ const ImageUploader = ({ variantIndex }) => {
       for (let i = 0; i < acceptedFiles.length; i++) {
         const file = acceptedFiles[i];
 
-        // Get the "Permission Slip" (Signature, Token, Expire) from our Node Backend via Redux
         const authData = await dispatch(fetchImageKitAuth()).unwrap();
         const { token, expire, signature } = authData;
 
-        // Prepare the payload for ImageKit
         const formData = new FormData();
         formData.append('file', file);
         formData.append('fileName', file.name);
@@ -54,11 +144,9 @@ const ImageUploader = ({ variantIndex }) => {
         formData.append('expire', expire);
         formData.append('token', token);
         
-        // Dynamically organize the folder based on the chosen category
         const folderPath = `/products/${currentCategory.toLowerCase()}`;
         formData.append('folder', folderPath); 
 
-        // Upload DIRECTLY to ImageKit's servers (Bypassing our Node server)
         const uploadResponse = await axios.post(IMAGEKIT_UPLOAD_URL, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           onUploadProgress: (progressEvent) => {
@@ -67,19 +155,17 @@ const ImageUploader = ({ variantIndex }) => {
           }
         });
 
-        // Extract the permanent URL and File ID from ImageKit's response
         const { url, fileId } = uploadResponse.data;
 
         successfullyUploadedImages.push({
           imagekitFileId: fileId,
           baseUrl: url,
-          altText: file.name.split('.')[0], // Default alt text to filename
+          altText: file.name.split('.')[0],
           isPrimary: currentImages.length === 0 && successfullyUploadedImages.length === 0,
           displayOrder: currentImages.length + successfullyUploadedImages.length
         });
       }
 
-      // Safely update the react-hook-form state with the new cloud URLs
       if (successfullyUploadedImages.length > 0) {
         setValue(fieldName, [...currentImages, ...successfullyUploadedImages], { shouldValidate: true });
       }
@@ -93,7 +179,6 @@ const ImageUploader = ({ variantIndex }) => {
     }
   }, [currentImages, setValue, fieldName, dispatch, currentCategory]);
 
-  // Handle explicit rejections from react-dropzone (e.g., dragging 6 files when max is 5)
   const onDropRejected = useCallback((fileRejections) => {
     toast.error(`Limit reached: You can only upload up to ${maxImages} images in total.`);
   }, [maxImages]);
@@ -113,21 +198,18 @@ const ImageUploader = ({ variantIndex }) => {
   const removeImage = async (indexToRemove) => {
     const imageToDelete = currentImages[indexToRemove];
 
-    // If this image actually exists in ImageKit, delete it from the cloud first
     if (imageToDelete.imagekitFileId && !imageToDelete.imagekitFileId.startsWith('temp_')) {
       try {
         await dispatch(deleteProductImage(imageToDelete.imagekitFileId)).unwrap();
       } catch (error) {
         console.error("Failed to delete from cloud:", error);
         toast.error("Failed to delete image from cloud storage.");
-        return; // Stop the UI removal if the cloud deletion failed
+        return; 
       }
     }
 
-    // Filter it out of the UI state
     const updatedImages = currentImages.filter((_, idx) => idx !== indexToRemove);
     
-    // If we removed the primary image and there are others left, make the first one primary
     if (currentImages[indexToRemove].isPrimary && updatedImages.length > 0) {
       updatedImages[0].isPrimary = true;
     }
@@ -135,15 +217,29 @@ const ImageUploader = ({ variantIndex }) => {
     setValue(fieldName, updatedImages, { shouldValidate: true });
   };
 
-  const setPrimary = (indexToPrimary) => {
-    const updatedImages = currentImages.map((img, idx) => ({
-      ...img,
-      isPrimary: idx === indexToPrimary
-    }));
-    setValue(fieldName, updatedImages, { shouldValidate: true });
+  // --- THE NEW DRAG HANDLER ---
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    
+    // If they dropped it in a new spot
+    if (over && active.id !== over.id) {
+      const oldIndex = currentImages.findIndex(img => img.imagekitFileId === active.id);
+      const newIndex = currentImages.findIndex(img => img.imagekitFileId === over.id);
+
+      // Instantly swap the array order
+      const reorderedArray = arrayMove(currentImages, oldIndex, newIndex);
+
+      // Recalculate the primary badge based on whatever is now at index 0
+      const finalArray = reorderedArray.map((img, idx) => ({
+        ...img,
+        isPrimary: idx === 0
+      }));
+
+      // Save it back to react-hook-form
+      setValue(fieldName, finalArray, { shouldValidate: true });
+    }
   };
 
-  // Get specific Zod errors for this variant's image array
   const imageErrors = errors?.variants?.[variantIndex]?.images;
 
   return (
@@ -151,14 +247,13 @@ const ImageUploader = ({ variantIndex }) => {
       <div className="flex justify-between items-end mb-3">
         <div>
           <label className="block text-sm font-medium text-gray-700">Variant Images</label>
-          <p className="text-xs text-gray-500 mt-0.5">Upload up to 5 high-quality images. The first image acts as the cover.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Upload up to 5 images. Drag to reorder. The first image acts as the cover.</p>
         </div>
         <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded text-gray-600">
           {currentImages.length} / {maxImages}
         </span>
       </div>
 
-      {/* Drag & Drop Zone */}
       {currentImages.length < maxImages && (
         <div 
           {...getRootProps()} 
@@ -178,7 +273,6 @@ const ImageUploader = ({ variantIndex }) => {
           </p>
           <p className="text-xs text-gray-400 mt-1 relative z-10">JPEG, PNG, or WebP (Max 5MB per file)</p>
           
-          {/* Subtle Progress Bar Background */}
           {isUploading && (
              <div 
                className="absolute top-0 left-0 bottom-0 bg-gray-100/80 transition-all duration-300 ease-out z-0"
@@ -192,50 +286,30 @@ const ImageUploader = ({ variantIndex }) => {
         <p className="text-red-500 text-xs mt-2">{imageErrors.message}</p>
       )}
 
-      {/* Image Grid Preview */}
+      {/* --- THE DRAG-AND-DROP GRID --- */}
       {currentImages.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-4">
-          {currentImages.map((image, idx) => (
-            <div key={image.imagekitFileId || idx} className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square bg-gray-50">
-              <img 
-                // Using ImageKit's transformation parameters to request a small, optimized thumbnail for the admin panel
-                src={`${image.baseUrl}?tr=w-200,h-200,q-80,c-at_max`} 
-                alt={image.altText || "Preview"} 
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              />
-              
-              {/* Overlay Actions */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                <div className="flex justify-end">
-                  <button 
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); removeImage(idx); }}
-                    className="p-1.5 bg-white/90 text-red-600 rounded-md hover:bg-white transition-colors shadow-sm"
-                  >
-                    <Icon icon="lucide:trash-2" width="14" />
-                  </button>
-                </div>
-                
-                {!image.isPrimary && (
-                  <button 
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setPrimary(idx); }}
-                    className="w-full py-1.5 bg-white/90 text-gray-900 text-xs font-medium rounded hover:bg-white transition-colors shadow-sm"
-                  >
-                    Set Primary
-                  </button>
-                )}
-              </div>
-
-              {/* Primary Badge */}
-              {image.isPrimary && (
-                <div className="absolute top-2 left-2 px-2 py-1 bg-black text-white text-[10px] font-bold tracking-wider uppercase rounded shadow-sm">
-                  Cover
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <DndContext 
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-4">
+            <SortableContext 
+              items={currentImages.map(img => img.imagekitFileId)} 
+              strategy={rectSortingStrategy} 
+            >
+              {currentImages.map((image, idx) => (
+                <SortableImageCard
+                  key={image.imagekitFileId}
+                  id={image.imagekitFileId}
+                  image={image}
+                  index={idx}
+                  onRemove={removeImage}
+                />
+              ))}
+            </SortableContext>
+          </div>
+        </DndContext>
       )}
     </div>
   );
