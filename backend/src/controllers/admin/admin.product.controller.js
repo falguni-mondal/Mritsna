@@ -82,7 +82,7 @@ export const updateProduct = async (req, res, next) => {
     const updatedProduct = await Product.findByIdAndUpdate(
       id,
       { $set: updateData },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true } // FIXED
     );
 
     return res.status(200).json({
@@ -114,7 +114,7 @@ export const changeProductStatus = async (req, res, next) => {
     const product = await Product.findByIdAndUpdate(
       id,
       { status },
-      { new: true }
+      { returnDocument: 'after' } // FIXED
     );
 
     if (!product) {
@@ -135,7 +135,7 @@ export const changeProductStatus = async (req, res, next) => {
 export const getAdminProducts = async (req, res, next) => {
   try {
     const products = await Product.find({})
-      .select('title slug category pricing.basePrice status variants.sku variants.inventory variants.images')
+      .select('title slug category isPremium status variants.pricing variants.sku variants.inventory variants.images')
       .sort({ createdAt: -1 })
       .lean(); 
 
@@ -148,12 +148,14 @@ export const getAdminProducts = async (req, res, next) => {
         title: product.title,
         slug: product.slug,
         category: product.category,
-        price: product.pricing?.basePrice,
+        isPremium: product.isPremium || false,
         status: product.status,
+        
+        price: firstVariant?.pricing?.price,
         
         sku: firstVariant?.sku || 'N/A',
         stock: firstVariant?.inventory?.quantity || 0,
-        lowStock: firstVariant?.inventory?.quantity <= (firstVariant?.inventory?.lowStockThreshold || 5),
+        lowStock: firstVariant?.inventory?.quantity <= (firstVariant?.inventory?.lowStockThreshold || 3),
         
         // Return baseUrl instead of thumbnailUrl
         image: firstImage ? {
@@ -223,11 +225,9 @@ export const getInventoryList = async (req, res, next) => {
   try {
     // We use the Aggregation Pipeline to let MongoDB "flatten" the variants
     const inventory = await Product.aggregate([
-      // $unwind breaks down the array. preserveNullAndEmptyArrays ensures products 
-      // with no variants don't accidentally disappear from the inventory view.
+
       { $unwind: { path: "$variants", preserveNullAndEmptyArrays: true } },
-      
-      // Select only the exact data the frontend needs
+
       {
         $project: {
           productId: "$_id",
@@ -236,11 +236,10 @@ export const getInventoryList = async (req, res, next) => {
           sku: "$variants.sku",
           stock: "$variants.inventory.quantity",
           lowStockThreshold: "$variants.inventory.lowStockThreshold",
-          // Grab the very first image of this specific variant
-          image: { $arrayElemAt: ["$variants.images", 0] }
+          image: { $arrayElemAt: ["$variants.images", 0] },
+          isPremium: "$isPremium",
         }
       },
-      // Sort alphabetically by title
       { $sort: { title: 1, sku: 1 } }
     ]);
 
@@ -249,12 +248,15 @@ export const getInventoryList = async (req, res, next) => {
       return {
         productId: item.productId,
         variantId: item.variantId || 'no-variant',
-        // Combine Title and SKU so the admin knows EXACTLY what they are editing
         title: item.sku ? `${item.title} - ${item.sku}` : item.title,
         sku: item.sku || 'N/A',
         stock: item.stock || 0,
-        isLowStock: (item.stock || 0) <= (item.lowStockThreshold || 5),
-        image: item.image ? { baseUrl: item.image.baseUrl, altText: item.image.altText } : null
+        
+        lowStockThreshold: item.lowStockThreshold || 3,
+        
+        isLowStock: (item.stock || 0) <= (item.lowStockThreshold || 3),
+        image: item.image ? { baseUrl: item.image.baseUrl, altText: item.image.altText } : null,
+        isPremium: item.isPremium || false,
       };
     });
 
@@ -285,7 +287,7 @@ export const updateVariantStock = async (req, res, next) => {
     const product = await Product.findOneAndUpdate(
       { _id: productId, "variants._id": variantId },
       { $set: { "variants.$.inventory.quantity": newStock } },
-      { new: true } // Returns the updated document
+      { returnDocument: 'after' }
     );
 
     if (!product) {

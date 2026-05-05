@@ -45,6 +45,33 @@ const variantSchema = new mongoose.Schema({
     unique: true,
     uppercase: true 
   },
+  
+  // NEW: Variant-specific pricing
+  pricing: {
+    price: {
+      type: Number,
+      required: [true, 'Price is required for this variant'],
+      min: [0, 'Price cannot be negative']
+    },
+    discountPercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    }
+  },
+
+  // NEW: Variant-specific attributes (Material & Finish)
+  attributes: {
+    material: { 
+      type: String, 
+      required: [true, 'Material is required for this variant'] 
+    },
+    finish: { 
+      type: String 
+    }
+  },
+
   inventory: {
     quantity: {
       type: Number,
@@ -65,6 +92,18 @@ const variantSchema = new mongoose.Schema({
     type: [imageSchema],
     validate: [imageLimit, 'A color variant cannot exceed 5 images.']
   }
+}, {
+  // Required so the finalPrice virtual shows up in JSON responses
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// NEW: Virtual calculation for frontend discounts moved to the variant level
+variantSchema.virtual('finalPrice').get(function() {
+  if (this.pricing && this.pricing.discountPercentage > 0) {
+    return this.pricing.price - (this.pricing.price * (this.pricing.discountPercentage / 100));
+  }
+  return this.pricing?.price || 0;
 });
 
 // Main Product Schema ---
@@ -92,24 +131,17 @@ const productSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  isPremium: {
+    type: Boolean,
+    default: false
+  },
   
-  // Base Pricing & Tax (Assuming all colors of the same product cost the same)
+  // Shared Logistics & Tax (Applies to all variants)
   pricing: {
-    basePrice: {
-      type: Number,
-      required: true,
-      min: [0, 'Price cannot be negative']
-    },
     baseCurrency: {
       type: String,
       default: 'INR',
       required: true
-    },
-    discountPercentage: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100
     },
     taxClass: {
       type: String,
@@ -139,12 +171,6 @@ const productSchema = new mongoose.Schema({
     }
   },
 
-  // Base Attributes
-  attributes: {
-    material: { type: String, required: true },
-    finish: { type: String }
-  },
-
   // --- THE VARIANTS ARRAY ---
   variants: {
     type: [variantSchema],
@@ -166,14 +192,6 @@ const productSchema = new mongoose.Schema({
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
-});
-
-// Virtual calculation for frontend discounts
-productSchema.virtual('finalPrice').get(function() {
-  if (this.pricing.discountPercentage > 0) {
-    return this.pricing.basePrice - (this.pricing.basePrice * (this.pricing.discountPercentage / 100));
-  }
-  return this.pricing.basePrice;
 });
 
 const Product = mongoose.model('Product', productSchema);

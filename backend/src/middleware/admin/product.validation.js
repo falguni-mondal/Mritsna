@@ -15,11 +15,27 @@ const variantSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Must be a valid Hex code"),
   sku: z.string().min(3, "SKU is required and must be at least 3 characters"),
+  
+  // NEW: Variant-level pricing validation
+  pricing: z.object({
+    price: z
+      .number()
+      .min(0, "Price cannot be negative"),
+    discountPercentage: z.number().min(0).max(100).optional().default(0),
+  }),
+
+  // NEW: Variant-level attributes validation
+  attributes: z.object({
+    material: z.string().min(1, "Material is required for this variant"),
+    finish: z.string().optional(),
+  }),
+
   inventory: z.object({
     quantity: z.number().int().min(0, "Quantity cannot be negative"),
-    lowStockThreshold: z.number().int().min(0).optional().default(5),
+    lowStockThreshold: z.number().int().min(0).optional().default(3),
     allowBackorder: z.boolean().optional().default(false),
   }),
+  
   images: z.array(imageSchema).max(5, "A variant cannot exceed 5 images"),
 });
 
@@ -31,18 +47,17 @@ export const createProductSchema = z.object({
     .max(150, "Title too long"),
   description: z.string().min(10, "Description needs more detail"),
   category: z.enum(["Vases", "Lighting", "Dinnerware", "Decor", "Sculpture"]),
+  
+  // NEW: Premium flag validation
+  isPremium: z.boolean().optional().default(false),
 
+  // UPDATED: Now only contains shared global logic
   pricing: z.object({
-    basePrice: z
-      .number()
-      .int()
-      .min(0, "Price cannot be negative (must be in lowest currency unit)"),
     baseCurrency: z
       .string()
       .length(3, "Currency must be a 3-letter ISO code")
       .optional()
       .default("INR"),
-    discountPercentage: z.number().min(0).max(100).optional().default(0),
     taxClass: z.string().optional().default("standard"),
     hsnCode: z
       .string()
@@ -62,10 +77,7 @@ export const createProductSchema = z.object({
     isFragile: z.boolean().optional().default(true),
   }),
 
-  attributes: z.object({
-    material: z.string().min(1, "Material is required"),
-    finish: z.string().optional(),
-  }),
+  // NOTE: 'attributes' block has been completely removed from the root schema
 
   variants: z
     .array(variantSchema)

@@ -16,6 +16,8 @@ const InventoryTableRow = ({ item }) => {
     setLocalStock(item.stock);
   }, [item.stock]);
 
+  const isCurrentlyLowStock = localStock <= (item.lowStockThreshold || 3);
+
   // The Debounce Effect: Waits 500ms after the last click to send to DB
   useEffect(() => {
     // Don't sync if nothing changed
@@ -29,8 +31,6 @@ const InventoryTableRow = ({ item }) => {
           variantId: item.variantId,
           newStock: localStock
         })).unwrap();
-        // We don't need a success toast here; it would get annoying for rapid edits.
-        // The green UI state is enough feedback!
       } catch (error) {
         toast.error(error?.message || "Failed to update stock");
         setLocalStock(item.stock); // Revert UI on failure
@@ -71,9 +71,18 @@ const InventoryTableRow = ({ item }) => {
             )}
           </div>
           <div>
-            <p className="font-medium text-gray-900 group-hover:text-black transition-colors">
-              {item.title}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-gray-900 group-hover:text-black transition-colors">
+                {item.title}
+              </p>
+              {/* NEW: Premium Badge Integration */}
+              {item.isPremium && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 shadow-sm">
+                  <Icon icon="lucide:star" width="10" />
+                  Premium
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </td>
@@ -85,21 +94,25 @@ const InventoryTableRow = ({ item }) => {
 
       {/* Status Badge */}
       <td className="px-6 py-4">
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
-          item.isLowStock 
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+          isCurrentlyLowStock 
             ? 'bg-red-50 text-red-700 border-red-200' 
             : 'bg-emerald-50 text-emerald-700 border-emerald-200'
         }`}>
-          {item.isLowStock ? 'Low Stock' : 'In Stock'}
+          {isCurrentlyLowStock ? 'Low Stock' : 'In Stock'}
         </span>
       </td>
 
       {/* Quick Stock Editor */}
       <td className="px-6 py-4 text-right">
-        <div className="inline-flex items-center bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-black/5">
+        {/* Added styling to grey-out the entire input box while syncing */}
+        <div className={`inline-flex items-center bg-white border rounded-lg shadow-sm overflow-hidden transition-colors ${
+          isSyncing ? 'border-gray-100 bg-gray-50 opacity-70' : 'border-gray-200 focus-within:ring-2 focus-within:ring-black/5'
+        }`}>
           <button 
             onClick={handleDecrement}
-            className="px-3 py-1.5 text-gray-500 hover:bg-gray-50 hover:text-black transition-colors border-r border-gray-200"
+            disabled={isSyncing}
+            className="px-3 py-1.5 text-gray-500 hover:bg-gray-50 hover:text-black transition-colors border-r border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             <Icon icon="lucide:minus" width="14" />
           </button>
@@ -109,17 +122,19 @@ const InventoryTableRow = ({ item }) => {
               type="number" 
               value={localStock}
               onChange={handleManualInput}
-              className="w-16 text-center text-sm font-medium text-gray-900 py-1.5 focus:outline-none appearance-none"
+              disabled={isSyncing}
+              className="w-16 text-center text-sm font-medium text-gray-900 py-1.5 focus:outline-none appearance-none disabled:bg-transparent disabled:text-gray-500"
               style={{ MozAppearance: 'textfield' }} // Hides default arrows
             />
             {isSyncing && (
-              <Icon icon="lucide:loader-2" className="absolute right-1 top-2 animate-spin text-gray-300" width="12" />
+              <Icon icon="lucide:loader-2" className="absolute right-1 top-2 animate-spin text-gray-400" width="12" />
             )}
           </div>
 
           <button 
             onClick={handleIncrement}
-            className="px-3 py-1.5 text-gray-500 hover:bg-gray-50 hover:text-black transition-colors border-l border-gray-200"
+            disabled={isSyncing}
+            className="px-3 py-1.5 text-gray-500 hover:bg-gray-50 hover:text-black transition-colors border-l border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             <Icon icon="lucide:plus" width="14" />
           </button>

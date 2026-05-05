@@ -15,10 +15,22 @@ const variantSchema = z.object({
   colorHex: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Must be a valid Hex code (e.g., #1A1A1A)"),
   sku: z.string().min(3, "SKU is required and must be at least 3 characters"),
   
+  // NEW: Variant-level pricing validation (with coerce for HTML number inputs)
+  pricing: z.object({
+    price: z.coerce.number().min(0, "Price cannot be negative"),
+    discountPercentage: z.coerce.number().min(0).max(100).optional().default(0),
+  }),
+
+  // NEW: Variant-level attributes validation
+  attributes: z.object({
+    material: z.string().min(1, "Material is required (e.g., Ceramic)"),
+    finish: z.string().optional(),
+  }),
+
   inventory: z.object({
     // z.coerce instantly transforms form string inputs to actual numbers
     quantity: z.coerce.number().int().min(0, "Quantity cannot be negative"),
-    lowStockThreshold: z.coerce.number().int().min(0).optional().default(5),
+    lowStockThreshold: z.coerce.number().int().min(0).optional().default(3),
     allowBackorder: z.boolean().optional().default(false),
   }),
   
@@ -42,10 +54,12 @@ export const productValidationSchema = z.object({
     errorMap: () => ({ message: "Please select a valid category" })
   }),
 
+  // NEW: Premium flag validation
+  isPremium: z.boolean().optional().default(false),
+
+  // UPDATED: Now only contains shared global logic
   pricing: z.object({
-    basePrice: z.coerce.number().min(0, "Price cannot be negative"),
     baseCurrency: z.string().length(3, "Currency must be a 3-letter ISO code").optional().default("INR"),
-    discountPercentage: z.coerce.number().min(0).max(100).optional().default(0),
     taxClass: z.string().optional().default("standard"),
     hsnCode: z.string().min(4, "HSN Code is required for logistics"),
   }),
@@ -60,10 +74,7 @@ export const productValidationSchema = z.object({
     isFragile: z.boolean().optional().default(true),
   }),
 
-  attributes: z.object({
-    material: z.string().min(1, "Material is required (e.g., Ceramic)"),
-    finish: z.string().optional(),
-  }),
+  // NOTE: 'attributes' block has been completely removed from the root schema
 
   seo: z.object({
     metaTitle: z.string().optional(),

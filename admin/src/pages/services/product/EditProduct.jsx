@@ -20,51 +20,41 @@ import ProductPageHeader from '../../../components/product/ProductPageHeader';
 import BasicInfoSection from '../../../components/product/add&update/BasicInfoSection';
 import PricingSection from '../../../components/product/add&update/PricingSection';
 import ShippingSection from '../../../components/product/add&update/ShippingSection';
-import AttributesSection from '../../../components/product/add&update/AttributesSection';
 import VariantManager from '../../../components/product/add&update/VariantManager';
 
 const EditProduct = () => {
-  const { id } = useParams(); // Grab the product ID from the URL
+  const { id } = useParams(); 
   const dispatch = useDispatch();
   const navigate = useNavigate();
   
-  // Pull the exact variables from your shared Redux slice
   const { productDetails, isLoading, isError, message } = useSelector(
     (state) => state.adminProduct || state.product || {}
   ); 
 
-  // Initialize the Form Engine without default values (we wait for the API)
   const methods = useForm({
     resolver: zodResolver(productValidationSchema),
   });
 
-  // 1. Fetch the product data when the page loads
   useEffect(() => {
     if (id) {
       dispatch(fetchProductById(id));
     }
     
-    // Cleanup function: Clear the product details and state when leaving the page
     return () => {
       dispatch(clearProductDetails());
       dispatch(resetProductState());
     };
   }, [id, dispatch]);
 
-  // 2. Auto-fill the form once the data arrives from the backend
   useEffect(() => {
     if (productDetails) {
-      // The reset() function takes the DB object and pushes it into all your child components!
       methods.reset(productDetails);
     }
   }, [productDetails, methods]);
 
-  // 3. Form Submission Handler (Updating instead of Creating)
   const onSubmit = async (data) => {
     try {
-      // Pass the ID and data using the exact keys your thunk expects: { id, updateData }
       await dispatch(updateExistingProduct({ id, updateData: data })).unwrap();
-      
       toast.success("Product updated successfully!");
       navigate('/admin/products');
     } catch (error) {
@@ -73,7 +63,6 @@ const EditProduct = () => {
     }
   };
 
-  // If the page is loading the initial data, show a spinner so the form doesn't flicker empty
   if (isLoading && !productDetails) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex flex-col items-center justify-center w-full">
@@ -83,7 +72,6 @@ const EditProduct = () => {
     );
   }
 
-  // If the product wasn't found (e.g., bad ID in URL), show an error state
   if (isError && !productDetails) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex flex-col items-center justify-center w-full">
@@ -154,12 +142,31 @@ const EditProduct = () => {
                     <p className="text-red-500 text-xs mt-1">{methods.formState.errors.category.message}</p>
                   )}
                 </div>
+
+                {/* NEW: Premium Toggle Switch */}
+                <div className="pt-4 border-t border-gray-100 mt-4">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-gray-800 font-medium flex items-center gap-2">
+                      <Icon icon="lucide:star" className="text-amber-500" width="16" />
+                      Premium Product
+                    </span>
+                    <div className="relative inline-flex items-center">
+                      <input 
+                        type="checkbox" 
+                        {...methods.register('isPremium')}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                    </div>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1.5">Highlight this item with premium badges across the storefront.</p>
+                </div>
+
               </div>
             </div>
 
             <PricingSection />
             <ShippingSection />
-            <AttributesSection />
           </div>
 
           {/* Sticky Bottom Save Bar */}

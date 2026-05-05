@@ -13,11 +13,14 @@ const VariantManager = () => {
   });
 
   const addVariant = () => {
+    // UPDATED: Added the new nested pricing and attributes objects
     append({
       colorName: '',
       colorHex: '#000000',
       sku: '',
-      inventory: { quantity: 0, lowStockThreshold: 5, allowBackorder: false },
+      pricing: { price: 0, discountPercentage: 0 },
+      attributes: { material: '', finish: '' },
+      inventory: { quantity: 0, lowStockThreshold: 3, allowBackorder: false },
       images: []
     });
   };
@@ -64,7 +67,8 @@ const VariantManager = () => {
                 Variant {index + 1}
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {/* ROW 1: IDENTITY */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Color Name <span className="text-red-500">*</span></label>
                   <input 
@@ -109,15 +113,83 @@ const VariantManager = () => {
                 </div>
               </div>
 
+              <hr className="border-gray-200 mb-5" />
+
+              {/* ROW 2 & 3: PRICING AND ATTRIBUTES */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 mb-5">
+                
+                {/* Variant Price */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Price (INR) <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Icon icon="lucide:indian-rupee" width="14" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input 
+                      {...register(`variants.${index}.pricing.price`, { valueAsNumber: true })} 
+                      type="number" 
+                      min="0"
+                      placeholder="0.00"
+                      className="w-full pl-7 pr-2 py-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
+                    />
+                  </div>
+                  {errors.variants?.[index]?.pricing?.price && <p className="text-red-500 text-xs mt-1">{errors.variants[index].pricing.price.message}</p>}
+                </div>
+
+                {/* Variant Discount */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Discount (%)</label>
+                  <div className="relative">
+                    <Icon icon="lucide:percent" width="14" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input 
+                      {...register(`variants.${index}.pricing.discountPercentage`, { valueAsNumber: true })} 
+                      type="number" 
+                      min="0"
+                      max="100"
+                      placeholder="0"
+                      className="w-full pl-7 pr-2 py-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
+                    />
+                  </div>
+                  {errors.variants?.[index]?.pricing?.discountPercentage && <p className="text-red-500 text-xs mt-1">{errors.variants[index].pricing.discountPercentage.message}</p>}
+                </div>
+
+                {/* Variant Material */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Material <span className="text-red-500">*</span></label>
+                  <input 
+                    {...register(`variants.${index}.attributes.material`)} 
+                    type="text" 
+                    placeholder="e.g. Matte Ceramic"
+                    className="w-full p-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
+                  />
+                  {errors.variants?.[index]?.attributes?.material && <p className="text-red-500 text-xs mt-1">{errors.variants[index].attributes.material.message}</p>}
+                </div>
+
+                {/* Variant Finish */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Finish / Texture</label>
+                  <input 
+                    {...register(`variants.${index}.attributes.finish`)} 
+                    type="text" 
+                    placeholder="e.g. Unglazed"
+                    className="w-full p-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
+                  />
+                  {errors.variants?.[index]?.attributes?.finish && <p className="text-red-500 text-xs mt-1">{errors.variants[index].attributes.finish.message}</p>}
+                </div>
+
+              </div>
+
+              <hr className="border-gray-200 mb-5" />
+
+              {/* ROW 4: INVENTORY */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Stock Quantity <span className="text-red-500">*</span></label>
                   <input 
-                    {...register(`variants.${index}.inventory.quantity`)} 
+                    {...register(`variants.${index}.inventory.quantity`, { valueAsNumber: true })} 
                     type="number" 
                     min="0"
                     className="w-full p-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
                   />
+                  {errors.variants?.[index]?.inventory?.quantity && <p className="text-red-500 text-xs mt-1">{errors.variants[index].inventory.quantity.message}</p>}
                 </div>
                 <div className="flex items-center mt-5">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -131,6 +203,7 @@ const VariantManager = () => {
                 </div>
               </div>
 
+              {/* ROW 5: IMAGES */}
               <ImageUploader variantIndex={index} />
 
             </div>

@@ -12,7 +12,7 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
             {product.image ? (
               <img 
                 src={`${product.image.baseUrl}?tr=w-100,h-100,q-80`} 
-                alt={product.image.altText} 
+                alt={product.image.altText || product.title} 
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -20,9 +20,17 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
             )}
           </div>
           <div>
-            <p className="font-medium text-gray-900 group-hover:text-black transition-colors">
-              {product.title}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-gray-900 group-hover:text-black transition-colors">
+                {product.title}
+              </p>
+              {product.isPremium && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 shadow-sm">
+                  <Icon icon="lucide:star" width="10" />
+                  Premium
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mt-0.5">{product.category}</p>
           </div>
         </div>
@@ -32,7 +40,6 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
       <td className="px-6 py-4">
         <button 
           onClick={() => onStatusToggle(product._id, product.status)}
-          // Added group/btn to control hover states specifically for this button
           className={`group/btn inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize transition-colors border cursor-pointer ${
             product.status === 'active' 
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
@@ -41,8 +48,6 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
         >
           <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${product.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
           {product.status}
-          
-          {/* The new swap/refresh indicator icon */}
           <Icon 
             icon="lucide:refresh-cw" 
             className="ml-1.5 opacity-50 group-hover/btn:opacity-100 group-hover/btn:rotate-180 transition-all duration-300" 
@@ -51,21 +56,23 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
         </button>
       </td>
 
-      {/* Inventory */}
+      {/* Inventory & SKU */}
       <td className="px-6 py-4">
         <div className="flex items-center gap-2">
-          <span className="text-gray-900 font-medium">{product.stock} in stock</span>
+          <span className="text-gray-900 font-medium">
+            {product.stock || 0} in stock
+          </span>
           {product.lowStock && (
             <Icon icon="lucide:alert-circle" className="text-amber-500" width="14" />
           )}
         </div>
-        <p className="text-xs text-gray-500 mt-0.5">SKU: {product.sku}</p>
+        <p className="text-xs text-gray-500 mt-0.5 font-mono">SKU: {product.sku || 'N/A'}</p>
       </td>
 
       {/* Price */}
       <td className="px-6 py-4">
-        <span className="font-medium text-gray-900">
-          {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(product.price)}
+        <span className="font-bold text-gray-900 text-sm">
+          {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(product.price || 0)}
         </span>
       </td>
 
@@ -78,9 +85,6 @@ const ProductTableRow = ({ product, onStatusToggle }) => {
           >
             <Icon icon="lucide:edit-2" width="16" />
           </Link>
-          {/* <button className="p-2 text-red-600 lg:text-gray-400 lg:hover:text-red-600 bg-red-50 lg:bg-transparent lg:hover:bg-red-50 rounded-lg transition-colors inline-flex">
-            <Icon icon="lucide:trash-2" width="16" />
-          </button> */}
         </div>
       </td>
     </tr>

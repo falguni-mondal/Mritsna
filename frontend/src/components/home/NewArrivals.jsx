@@ -1,10 +1,13 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import { Icon } from "@iconify/react";
+
 // Swiper Imports
 import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay } from "swiper/modules"; // NEW: Import the Autoplay module
 import "swiper/css";
 
 // Register GSAP ScrollTrigger
@@ -31,6 +34,9 @@ const NewArrivals = () => {
   const sectionRef = useRef(null);
   const headingRef = useRef(null);
   const sliderWrapperRef = useRef(null);
+  
+  // State to hold the Swiper instance for custom navigation
+  const [swiperInstance, setSwiperInstance] = useState(null);
 
   // Dummy data
   const products = [
@@ -50,7 +56,6 @@ const NewArrivals = () => {
     // DESKTOP: Triggers optimized for wide screens
     // ==========================================
     mm.add("(min-width: 1024px)", () => {
-      // --- Reveal Animations ---
       gsap.fromTo(
         words,
         { opacity: 0, y: 40, filter: "blur(12px)", scale: 0.95 },
@@ -149,18 +154,27 @@ const NewArrivals = () => {
 
       <div ref={sliderWrapperRef} className="w-full pl-6 lg:pl-10">
         <Swiper
+          modules={[Autoplay]} // NEW: Inject the module
+          onSwiper={setSwiperInstance}
+          loop={true} 
+          speed={800} // Smooth transition speed between slides
+          autoplay={{
+            delay: 3000, // Wait 3 seconds between swipes
+            disableOnInteraction: false,
+            pauseOnMouseEnter: true,
+          }}
           breakpoints={{
             0: { slidesPerView: 1.2, spaceBetween: 16 },
             768: { slidesPerView: 2.5, spaceBetween: 24 },
             1024: { slidesPerView: 4.5, spaceBetween: 10 },
           }}
-          className="w-full pb-10" 
+          className="w-full pb-6" 
         >
           {products.map((product) => (
             <SwiperSlide key={`product-${product.id}`}>
               <Link
                 to={`/product/${product.id}`}
-                data-cursor="explore" // Connects to your Global CustomCursor
+                data-cursor="explore" 
                 className="group flex flex-col block w-full cursor-none lg:cursor-none"
               >
                 <div className="w-full aspect-[4/5] bg-[#eeeeee] flex items-center justify-center overflow-hidden transition-colors duration-500 group-hover:bg-[#e4e4e4]">
@@ -183,6 +197,24 @@ const NewArrivals = () => {
             </SwiperSlide>
           ))}
         </Swiper>
+
+        {/* Custom Navigation Arrows */}
+        <div className="flex justify-center gap-4 pr-6 lg:pr-10 mt-6 lg:mt-10">
+          <button 
+            onClick={() => swiperInstance?.slidePrev()}
+            className="w-12 h-12 flex items-center justify-center rounded-full border border-gray-300 text-[#1a1a1a] hover:bg-[#1a1a1a] hover:text-white transition-all duration-300"
+            aria-label="Previous slide"
+          >
+            <Icon icon="lucide:arrow-left" width="20" />
+          </button>
+          <button 
+            onClick={() => swiperInstance?.slideNext()}
+            className="w-12 h-12 flex items-center justify-center rounded-full border border-gray-300 text-[#1a1a1a] hover:bg-[#1a1a1a] hover:text-white transition-all duration-300"
+            aria-label="Next slide"
+          >
+            <Icon icon="lucide:arrow-right" width="20" />
+          </button>
+        </div>
       </div>
     </section>
   );
