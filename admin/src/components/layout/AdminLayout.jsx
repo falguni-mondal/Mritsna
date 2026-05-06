@@ -128,10 +128,10 @@ const AdminLayout = () => {
 
             <button
               onClick={handleLogout}
-              className="txt-light opacity-50 hover:opacity-100 hover:text-red-400 transition-all hover:scale-110 p-2"
+              className="txt-light opacity-50 hover:opacity-100 hover:text-red-400 transition-all hover:scale-110 p-2 cursor-pointer"
               title="Secure Logout"
             >
-              <Icon icon="solar:logout-2-outline" className="text-xl" />
+              <Icon icon="solar:logout-2-outline" className="text-xl cursor-pointer" />
             </button>
           </div>
         </div>

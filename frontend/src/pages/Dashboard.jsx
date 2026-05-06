@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useDispatch, useSelector } from "react-redux";
-import { logoutUser } from "../store/features/user/userSlice";
+import { logoutUser } from "../store/features/authSlice";
 
 const Dashboard = () => {
   const containerRef = useRef(null);
@@ -11,7 +11,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   
   // Pull the live user data and loading state from Redux
-  const { user, isLoading } = useSelector((state) => state.user);
+  const { user, isLoading } = useSelector((state) => state.auth);
 
   useGSAP(() => {
     gsap.fromTo(

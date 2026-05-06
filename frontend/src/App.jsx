@@ -5,11 +5,11 @@ import PageRouter from './routes/PageRouter';
 import PreFooterContact from './components/footer/PreFooterContact';
 import Footer from './components/footer/Footer';
 import CustomCursor from './components/global/CustomCursor';
-import { checkAuth } from "./store/features/user/userSlice";
+import { checkAuth } from "./store/features/authSlice";
 
 const App = () => {
   const dispatch = useDispatch();
-  const { isCheckingAuth } = useSelector((state) => state.user);
+  const { isCheckingAuth } = useSelector((state) => state.auth);
 
   useEffect(() => {
     dispatch(checkAuth());

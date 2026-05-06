@@ -5,7 +5,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
-import { registerUser, clearError } from "../store/features/user/userSlice";
+import { registerUser, clearError } from "../store/features/authSlice";
 
 // list of global dial codes
 const countryData = [
@@ -256,7 +256,7 @@ const SignUp = () => {
   
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isLoading, error: reduxError } = useSelector((state) => state.user);
+  const { isLoading, error: reduxError } = useSelector((state) => state.auth);
 
   // React Hook Form initialization
   const { register, handleSubmit, formState: { errors }, clearErrors } = useForm();

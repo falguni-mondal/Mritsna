@@ -5,7 +5,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
-import { loginUser, clearError } from "../store/features/user/userSlice";
+import { loginUser, clearError } from "../store/features/authSlice";
 
 const SignIn = () => {
   const containerRef = useRef(null);
@@ -13,7 +13,7 @@ const SignIn = () => {
   
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isLoading, error: reduxError } = useSelector((state) => state.user);
+  const { isLoading, error: reduxError } = useSelector((state) => state.auth);
 
   // React Hook Form initialization
   const { register, handleSubmit, formState: { errors } } = useForm();

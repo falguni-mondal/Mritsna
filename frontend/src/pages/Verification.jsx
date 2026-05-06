@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useDispatch, useSelector } from "react-redux";
-import { verifyOtp, sendVerificationOtp, changeEmail, clearError } from "../store/features/user/userSlice";
+import { verifyOtp, sendVerificationOtp, changeEmail, clearError } from "../store/features/authSlice";
 
 const Verification = () => {
   const containerRef = useRef(null);
@@ -12,7 +12,7 @@ const Verification = () => {
   const dispatch = useDispatch();
 
   // Pull global state
-  const { user, isLoading, error: reduxError } = useSelector((state) => state.user);
+  const { user, isLoading, error: reduxError } = useSelector((state) => state.auth);
   
   // ==========================================
   // STATES

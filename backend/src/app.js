@@ -8,9 +8,11 @@ import cors from "cors";
 // import UserLimiter from "./utils/user-limiter.js";
 
 // Routes
-import authRouter from "./routes/common/auth.routes.js";
 import adminAuthRoutes from "./routes/admin/admin.auth.routes.js";
 import adminProductRoutes from './routes/admin/admin.product.routes.js';
+
+import authRouter from "./routes/common/auth.routes.js";
+import storefrontProductRoutes from './routes/common/product.routes.js';
 
 const app = express();
 
@@ -65,9 +67,12 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ success: true, message: "Server is healthy." });
 });
 
-app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin/auth", adminAuthRoutes);
 app.use('/api/v1/admin/products', adminProductRoutes);
+
+//  public routes
+app.use("/api/v1/auth", authRouter);
+app.use('/api/v1/products', storefrontProductRoutes);
 
 
 // Global Catch-All Error Handler (MANDATORY for preventing server crashes)

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { userAxios } from "../../../configs/axiosInstance"; 
+import { userAxios } from "../../configs/axiosInstance"; 
 
 // --- 1. ASYNC THUNKS (API CALLS) ---
 
