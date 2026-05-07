@@ -21,7 +21,7 @@ const PageRouter = () => {
       <Route path="/" element={<Homepage />} />
       <Route path="/about" element={<About />} />
       <Route path="/shop" element={<Shop />} />
-      <Route path="/product/:id" element={<Product />} />
+      <Route path="/product/:slug" element={<Product />} />
 
       {/* ==========================================
           GUEST ROUTES (Only accessible if NOT logged in)

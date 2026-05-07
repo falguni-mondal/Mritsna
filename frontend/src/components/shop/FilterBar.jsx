@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
 
-const categories = ["All", "Vessels", "Tableware", "Sculpture", "Lighting"];
+// EXACT MATCH with backend product.model.js Schema to prevent API failures
+const categories = ["All", "Vases", "Lighting", "Dinnerware", "Decor", "Sculpture"];
 const sortOptions = ["Featured", "Price: Low to High", "Price: High to Low"];
 
 const FilterBar = ({ activeCategory, setActiveCategory, activeSort, setActiveSort }) => {
   const [isSortOpen, setIsSortOpen] = useState(false);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false); // New state for mobile categories
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false); 
   
   const dropdownRef = useRef(null);
-  const categoryDropdownRef = useRef(null); // New ref for mobile categories
+  const categoryDropdownRef = useRef(null); 
 
-  // Close the custom dropdowns if the user clicks anywhere outside of them
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -26,28 +26,20 @@ const FilterBar = ({ activeCategory, setActiveCategory, activeSort, setActiveSor
 
   return (
     <div className="sticky top-[53px] lg:top-[60px] z-40 w-full bg-[#f8f8f8]/80 backdrop-blur-md border-b border-black/5">
-      {/* Moved py-6 to the parent container so mobile and desktop heights match perfectly */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-12 py-6 flex justify-between items-center gap-8">
         
-        {/* ========================================= */}
-        {/* LEFT: DESKTOP CATEGORIES (Hidden on Mobile)*/}
-        {/* ========================================= */}
+        {/* LEFT: DESKTOP CATEGORIES */}
         <ul className="hidden lg:flex items-center gap-12 overflow-x-auto no-scrollbar flex-1">
           {categories.map((cat) => (
             <li key={cat} className="flex-shrink-0">
               <button
                 onClick={() => setActiveCategory(cat)}
-                className={`group text-[0.65rem] font-bold tracking-[0.2em] uppercase transition-all duration-300 relative pb-1
-                `}
+                className={`group text-[0.65rem] font-bold tracking-[0.2em] uppercase transition-all duration-300 relative pb-1`}
               >
                 {cat}
-                
-                {/* Active State Underline */}
                 {activeCategory === cat && (
                   <span className="absolute bottom-0 left-0 w-full h-[1px] bg-[#1a1a1a] animate-reveal-line" />
                 )}
-                
-                {/* Hover State Underline */}
                 {activeCategory !== cat && (
                   <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#1a1a1a] transition-all duration-300 ease-out group-hover:w-full" />
                 )}
@@ -56,9 +48,7 @@ const FilterBar = ({ activeCategory, setActiveCategory, activeSort, setActiveSor
           ))}
         </ul>
 
-        {/* ========================================= */}
-        {/* LEFT: MOBILE CATEGORY DROPDOWN (Hidden on Desktop) */}
-        {/* ========================================= */}
+        {/* LEFT: MOBILE CATEGORY DROPDOWN */}
         <div className="relative flex-shrink-0 z-50 lg:hidden flex-1" ref={categoryDropdownRef}>
           <button 
             onClick={() => setIsCategoryOpen(!isCategoryOpen)}
@@ -90,9 +80,7 @@ const FilterBar = ({ activeCategory, setActiveCategory, activeSort, setActiveSor
           </div>
         </div>
 
-        {/* ========================================= */}
-        {/* RIGHT: CUSTOM SORT DROPDOWN (Always Visible) */}
-        {/* ========================================= */}
+        {/* RIGHT: CUSTOM SORT DROPDOWN */}
         <div className="relative flex-shrink-0 z-50" ref={dropdownRef}>
           <button 
             onClick={() => setIsSortOpen(!isSortOpen)}

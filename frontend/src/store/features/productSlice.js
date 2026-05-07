@@ -5,7 +5,6 @@ export const fetchNewArrivals = createAsyncThunk(
   'product/fetchNewArrivals',
   async (_, thunkAPI) => {
     try {
-      // userAxios automatically prepends the baseURL and includes credentials
       const response = await userAxios.get('/products/new-arrivals');
       return response.data.data;
     } catch (error) {
@@ -22,7 +21,6 @@ export const fetchStoreProducts = createAsyncThunk(
       const response = await userAxios.get('/products', {
         params: queryParams
       });
-      
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch products';
@@ -31,10 +29,24 @@ export const fetchStoreProducts = createAsyncThunk(
   }
 );
 
+// NEW: Fetch a single product by its slug
+export const fetchSingleProduct = createAsyncThunk(
+  'product/fetchSingleProduct',
+  async (slug, thunkAPI) => {
+    try {
+      const response = await userAxios.get(`/products/${slug}`);
+      return response.data.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch product details';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
 
 const initialState = {
   newArrivals: [],
   products: [],
+  singleProduct: null,
   pagination: {
     totalItems: 0,
     totalPages: 1,
@@ -59,6 +71,9 @@ const productSlice = createSlice({
     clearProducts: (state) => {
       state.products = [];
       state.pagination = initialState.pagination;
+    },
+    clearSingleProduct: (state) => {
+      state.singleProduct = null;
     }
   },
   extraReducers: (builder) => {
@@ -94,10 +109,27 @@ const productSlice = createSlice({
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
+      })
+
+      // --- Fetch Single Product ---
+      .addCase(fetchSingleProduct.pending, (state) => {
+        state.isLoading = true;
+        state.isError = false;
+        state.message = '';
+        state.singleProduct = null;
+      })
+      .addCase(fetchSingleProduct.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.singleProduct = action.payload; 
+      })
+      .addCase(fetchSingleProduct.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
       });
   },
 });
 
-export const { clearProductErrors, clearProducts } = productSlice.actions;
+export const { clearProductErrors, clearProducts, clearSingleProduct } = productSlice.actions;
 
 export default productSlice.reducer;

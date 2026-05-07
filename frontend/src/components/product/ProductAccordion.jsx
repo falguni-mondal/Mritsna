@@ -1,0 +1,36 @@
+import React, { useState } from "react";
+import { Icon } from "@iconify/react";
+
+const ProductAccordion = ({ product, variant }) => {
+  const [openAccordion, setOpenAccordion] = useState("Dimensions");
+
+  const details = {
+    // FIX: Added the '?' so it safely falls back if 'product' is ever momentarily undefined
+    "Dimensions": product?.dimensions || "Dimensions unavailable",
+    ...(variant?.material && { "Material": variant.material }),
+    ...(variant?.finish && { "Finish": variant.finish }),
+    "Care": "Hand wash recommended. Do not microwave.",
+    "Shipping": "Free shipping on orders over ₹5,000. Ships within 3-5 business days."
+  };
+
+  return (
+    <div className="product-info-item w-full border-t border-black/10 flex flex-col">
+      {Object.entries(details).map(([key, value]) => (
+        <div key={key} className="w-full border-b border-black/10 overflow-hidden">
+          <button 
+            onClick={() => setOpenAccordion(openAccordion === key ? "" : key)} 
+            className="w-full py-5 flex items-center justify-between text-[0.65rem] font-bold tracking-[0.2em] uppercase opacity-80 hover:opacity-100 transition-opacity"
+          >
+            {key}
+            <Icon icon="ph:plus" className={`text-lg transition-transform duration-500 ${openAccordion === key ? "rotate-45" : ""}`} />
+          </button>
+          <div className={`text-sm font-light leading-relaxed opacity-70 transition-all duration-500 ease-in-out ${openAccordion === key ? "max-h-40 pb-5 opacity-70" : "max-h-0 opacity-0 pointer-events-none"}`}>
+            {value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default ProductAccordion;

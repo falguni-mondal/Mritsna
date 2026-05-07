@@ -1,25 +1,21 @@
-import Product from '../../models/product.model.js';
+import Product from '../../models/product.model.js'; // Adjust path if necessary
 
 export const getNewArrivals = async (req, res, next) => {
   try {
-    // Fetch the 10 most recently created ACTIVE and NON-PREMIUM products
     const newArrivals = await Product.find({ 
       status: 'active', 
-      isPremium: false // NEW: Strictly filter out premium products
+      isPremium: false
     })
       .select('title slug isPremium variants.pricing variants.images')
-      .sort({ createdAt: -1 }) // -1 gives us the newest products first (Descending date)
+      .sort({ createdAt: -1 })
       .limit(10)
       .lean(); 
 
-    // Format the data to send a clean, flat object to the frontend
     const formattedProducts = newArrivals.map((product) => {
-      // Safely grab the first variant and its first image
       const firstVariant = product.variants?.[0] || {};
       const firstImage = firstVariant.images?.[0] || {};
       const pricing = firstVariant.pricing || { price: 0, discountPercentage: 0 };
 
-      // Calculate final price manually since .lean() removes Mongoose virtuals
       const finalPrice = pricing.discountPercentage > 0 
         ? pricing.price - (pricing.price * (pricing.discountPercentage / 100))
         : pricing.price;
@@ -29,16 +25,13 @@ export const getNewArrivals = async (req, res, next) => {
         slug: product.slug,
         name: product.title,
         isPremium: product.isPremium || false,
-        // Sending raw numbers allows the frontend to format the currency locally (Intl.NumberFormat)
         originalPrice: pricing.price,
         finalPrice: finalPrice,
-        // Use ImageKit transformations here if you want to request smaller thumbnails!
         img: firstImage.baseUrl || null, 
         altText: firstImage.altText || product.title
       };
     });
 
-    // Send the optimized response
     return res.status(200).json({
       success: true,
       count: formattedProducts.length,
@@ -53,19 +46,15 @@ export const getNewArrivals = async (req, res, next) => {
 
 export const getPaginatedProducts = async (req, res, next) => {
   try {
-    // Extract and sanitize query parameters
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, parseInt(req.query.limit) || 12); // Default to 12 items (perfect for 3-col or 4-col grids)
+    const limit = Math.max(1, parseInt(req.query.limit) || 12);
     const search = req.query.search || '';
     const category = req.query.category || '';
     const isPremium = req.query.isPremium;
-    const sortParams = req.query.sort || 'newest'; // Options: newest, price_asc, price_desc, name_asc
+    const sortParams = req.query.sort || 'newest';
 
-    // Build the exact filter object
-    // CRITICAL: Force status to active so guests NEVER see drafts or archived products
     const filter = { status: 'active' };
 
-    // Regex search on title (case-insensitive)
     if (search) {
       filter.title = { $regex: search, $options: 'i' };
     }
@@ -74,11 +63,9 @@ export const getPaginatedProducts = async (req, res, next) => {
       filter.category = category;
     }
 
-    // Safely check for boolean string values
     if (isPremium === 'true') filter.isPremium = true;
     if (isPremium === 'false') filter.isPremium = false;
 
-    // Define the Sorting Strategy
     let sortStrategy = {};
     switch (sortParams) {
       case 'price_asc':
@@ -98,10 +85,8 @@ export const getPaginatedProducts = async (req, res, next) => {
 
     const skip = (page - 1) * limit;
 
-    // Execute Data Fetch and Count simultaneously for peak performance
     const [products, totalCount] = await Promise.all([
       Product.find(filter)
-        // Select only the data required to render a product catalog card
         .select('title slug category isPremium variants.pricing variants.images createdAt')
         .sort(sortStrategy)
         .skip(skip)
@@ -110,7 +95,6 @@ export const getPaginatedProducts = async (req, res, next) => {
       Product.countDocuments(filter)
     ]);
 
-    // Transform data into flat, clean UI components
     const formattedProducts = products.map((product) => {
       const firstVariant = product.variants?.[0] || {};
       const firstImage = firstVariant.images?.[0] || {};
@@ -134,7 +118,6 @@ export const getPaginatedProducts = async (req, res, next) => {
       };
     });
 
-    // Return Data with Pagination Metadata
     const totalPages = Math.ceil(totalCount / limit);
 
     return res.status(200).json({
@@ -152,6 +135,76 @@ export const getPaginatedProducts = async (req, res, next) => {
 
   } catch (error) {
     console.error("Error fetching paginated products:", error);
+    next(error);
+  }
+};
+
+export const getSingleProduct = async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const product = await Product.findOne({ slug, status: 'active' })
+      .select('-pricing.hsnCode -pricing.taxClass -shipping.weightGrams -variants.sku')
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found or is no longer available.'
+      });
+    }
+
+    let formattedDimensions = "Dimensions unavailable";
+    if (product.shipping && product.shipping.dimensions) {
+      const { lengthCm, widthCm, heightCm } = product.shipping.dimensions;
+      formattedDimensions = `L ${lengthCm}cm x W ${widthCm}cm x H ${heightCm}cm`;
+    }
+
+    const formattedVariants = product.variants.map(variant => {
+      const price = variant.pricing?.price || 0;
+      const discount = variant.pricing?.discountPercentage || 0;
+      const finalPrice = discount > 0 ? price - (price * (discount / 100)) : price;
+      
+      const stockQuantity = variant.inventory?.quantity || 0;
+      const threshold = variant.inventory?.lowStockThreshold || 3;
+
+      return {
+        variantId: variant._id,
+        colorName: variant.colorName,
+        colorHex: variant.colorHex,
+        originalPrice: price,
+        finalPrice: finalPrice,
+        discountPercentage: discount,
+        material: variant.attributes?.material,
+        finish: variant.attributes?.finish,
+        inStock: stockQuantity > 0 || (variant.inventory?.allowBackorder || false),
+        lowStockWarning: stockQuantity > 0 && stockQuantity <= threshold,
+        images: variant.images.map(img => ({
+          url: img.baseUrl,
+          alt: img.altText,
+          isPrimary: img.isPrimary
+        }))
+      };
+    });
+
+    const publicProductData = {
+      id: product._id,
+      slug: product.slug,
+      title: product.title,
+      description: product.description,
+      category: product.category,
+      isPremium: product.isPremium,
+      baseCurrency: product.pricing?.baseCurrency || 'INR',
+      dimensions: formattedDimensions,
+      variants: formattedVariants
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: publicProductData
+    });
+
+  } catch (error) {
+    console.error("Error fetching single product:", error);
     next(error);
   }
 };
