@@ -9,11 +9,17 @@ const ProductInfo = ({ product, activeVariant }) => {
         <span>/</span>
         <Link to="/shop" className="hover:opacity-100 transition-opacity">Shop</Link>
         <span>/</span>
-        <span>{product.category}</span>
+        <Link 
+          to={`/product/${product.slug}?variant=${activeVariant.variantId}`} 
+          className="hover:opacity-100 transition-opacity"
+        >
+          {product.title}
+        </Link>
       </div>
 
       <h1 className="product-info-item head-font text-4xl lg:text-5xl tracking-wide mb-4">
-        {product.title}
+        {/* Display Title - Variant Name */}
+        {product.title} - {activeVariant.colorName}
       </h1>
       
       <div className="product-info-item text-lg tracking-widest font-light mb-8 flex items-center gap-3">

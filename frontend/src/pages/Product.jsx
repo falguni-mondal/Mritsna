@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom"; // <-- Added useSearchParams
 import { useDispatch, useSelector } from "react-redux";
 import { fetchSingleProduct, clearSingleProduct } from "../store/features/productSlice";
 import gsap from "gsap";
@@ -9,16 +9,20 @@ import { Icon } from "@iconify/react";
 // Sub-components
 import ProductGallery from "../components/product/ProductGallery";
 import ProductInfo from "../components/product/ProductInfo";
+import ProductSwatches from "../components/product/ProductSwatches"; // <-- Added Swatches
 import ProductActions from "../components/product/ProductActions";
 import ProductAccordion from "../components/product/ProductAccordion";
 
 const Product = () => {
   const { slug } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams(); // <-- Initialize URL params hook
   const dispatch = useDispatch();
   const containerRef = useRef(null);
 
-  // Zoom State lifted to parent
   const [desktopZoom, setDesktopZoom] = useState({ show: false, img: "", x: 0, y: 0 });
+  
+  // NEW: Dynamic Active Variant State
+  const [activeVariant, setActiveVariant] = useState(null);
 
   const { singleProduct: product, isLoading, isError, message } = useSelector((state) => state.product);
 
@@ -27,8 +31,27 @@ const Product = () => {
     return () => { dispatch(clearSingleProduct()); };
   }, [dispatch, slug]);
 
+  // NEW: Sync the variant state with the URL and Product Data
+  useEffect(() => {
+    if (product && product.variants?.length > 0) {
+      const urlVariantId = searchParams.get("variant");
+      
+      // Look for the variant in the URL, otherwise default to the 0th variant
+      const matchedVariant = product.variants.find(v => v.variantId === urlVariantId);
+      setActiveVariant(matchedVariant || product.variants[0]);
+    }
+  }, [product, searchParams]);
+
+  // NEW: Function to handle when a user clicks a swatch
+  const handleVariantChange = (variant) => {
+    setActiveVariant(variant);
+    // Silently update the URL without refreshing the page
+    setSearchParams({ variant: variant.variantId }, { replace: true });
+  };
+
   useGSAP(() => {
-    if (product) {
+    // Only run the entrance animation once when the product initially loads
+    if (product && activeVariant) {
       const tl = gsap.timeline({ delay: 0.1 });
       tl.fromTo(".product-image", 
         { opacity: 0, y: 50, scale: 0.98 },
@@ -40,9 +63,9 @@ const Product = () => {
         "-=1.5" 
       );
     }
-  }, [product]);
+  }, [product]); // Removed activeVariant dependency so GSAP doesn't re-run on color change
 
-  if (isLoading || !product) {
+  if (isLoading || !product || !activeVariant) {
     return (
       <main className="w-full min-h-screen bg-[#f8f8f8] flex items-center justify-center">
          <Icon icon="lucide:loader-2" className="animate-spin text-gray-400" width="32" />
@@ -60,27 +83,29 @@ const Product = () => {
     );
   }
 
-  const activeVariant = product.variants[0];
-
   return (
     <main ref={containerRef} className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a] pt-[80px] lg:pt-[100px] pb-20">
       <div className="max-w-[1600px] mx-auto px-6 lg:px-12 flex flex-col lg:flex-row gap-12 lg:gap-20">
         
-        {/* LEFT COLUMN */}
         <ProductGallery images={activeVariant.images} setDesktopZoom={setDesktopZoom} />
 
-        {/* RIGHT COLUMN */}
         <div className="w-full lg:w-[45%] relative">
           <div className="lg:sticky lg:top-[120px] flex flex-col items-start w-full lg:max-w-[500px]">
             
-            {/* TEXT WRAPPER - Fades out when zooming */}
             <div className={`transition-opacity duration-300 w-full ${desktopZoom.show ? "lg:opacity-0 pointer-events-none" : "opacity-100"}`}>
               <ProductInfo product={product} activeVariant={activeVariant} />
+              
+              {/* Insert the Swatches here */}
+              <ProductSwatches 
+                variants={product.variants} 
+                activeVariant={activeVariant} 
+                onVariantChange={handleVariantChange} 
+              />
+              
               <ProductActions activeVariant={activeVariant} />
               <ProductAccordion product={product} variant={activeVariant} />
             </div>
 
-            {/* ZOOM LENS - Re-positioned securely inside the sticky column */}
             <div 
               className={`hidden lg:block absolute inset-0 w-full h-[600px] bg-[#f8f8f8] z-10 transition-opacity duration-300 pointer-events-none overflow-hidden rounded-[2px]
                 ${desktopZoom.show ? "opacity-100" : "opacity-0"}

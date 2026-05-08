@@ -176,6 +176,8 @@ export const getSingleProduct = async (req, res, next) => {
         discountPercentage: discount,
         material: variant.attributes?.material,
         finish: variant.attributes?.finish,
+        stockQuantity: stockQuantity, 
+        
         inStock: stockQuantity > 0 || (variant.inventory?.allowBackorder || false),
         lowStockWarning: stockQuantity > 0 && stockQuantity <= threshold,
         images: variant.images.map(img => ({
