@@ -102,7 +102,7 @@ const Product = () => {
                 onVariantChange={handleVariantChange} 
               />
               
-              <ProductActions activeVariant={activeVariant} />
+              <ProductActions product={product} activeVariant={activeVariant} />
               <ProductAccordion product={product} variant={activeVariant} />
             </div>
 

@@ -1,12 +1,17 @@
+import mongoose from 'mongoose';
 import Cart from '../../models/cart.model.js';
 import Product from '../../models/product.model.js';
 
 // ==========================================
-// 1. LIGHTWEIGHT INVENTORY PING (GUESTS & USERS)
+// LIGHTWEIGHT INVENTORY PING
 // ==========================================
 export const checkStock = async (req, res, next) => {
   try {
     const { productId, variantId, requestedQuantity } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(variantId)) {
+      return res.status(400).json({ success: false, message: 'Invalid Product or Variant ID format.' });
+    }
 
     const product = await Product.findOne(
       { _id: productId, status: 'active', 'variants._id': variantId },
@@ -36,32 +41,30 @@ export const checkStock = async (req, res, next) => {
 };
 
 // ==========================================
-// 2. GET USER CART
+// GET USER CART
 // ==========================================
 export const getCart = async (req, res, next) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user;
 
-    // Fetch cart and populate the parent product details
     let cart = await Cart.findOne({ user: userId }).populate({
       path: 'items.product',
       select: 'title slug category isPremium variants'
     });
 
     if (!cart) {
-      // Return a structural empty cart if they don't have one yet
       return res.status(200).json({ success: true, data: { items: [], subTotal: 0 } });
     }
 
-    // Filter and format the cart to send clean data to the UI
     let subTotal = 0;
     const formattedItems = cart.items.map(cartItem => {
-      // Find the specific variant details from the populated product
+      
+      if (!cartItem.product) return null;
+
       const activeVariant = cartItem.product.variants.find(
         v => v._id.toString() === cartItem.variantId.toString()
       );
 
-      // If the variant was deleted from the DB, we handle it gracefully
       if (!activeVariant) return null;
 
       const itemTotal = cartItem.quantity * cartItem.price;
@@ -78,17 +81,13 @@ export const getCart = async (req, res, next) => {
         price: cartItem.price,
         quantity: cartItem.quantity,
         itemTotal: itemTotal,
-        // Max limit is the lesser of 5 or actual stock
         maxLimit: Math.min(5, activeVariant.inventory.quantity)
       };
-    }).filter(item => item !== null); // Remove any nulls from deleted variants
+    }).filter(item => item !== null); 
 
     return res.status(200).json({
       success: true,
-      data: {
-        items: formattedItems,
-        subTotal
-      }
+      data: { items: formattedItems, subTotal }
     });
   } catch (error) {
     console.error("Error fetching cart:", error);
@@ -97,39 +96,35 @@ export const getCart = async (req, res, next) => {
 };
 
 // ==========================================
-// 3. ADD TO CART (PROTECTED BY INVENTORY MIDDLEWARE)
+// ADD TO CART
 // ==========================================
 export const addToCart = async (req, res, next) => {
   try {
-    const userId = req.user._id;
-    // req.verifiedItem comes entirely from our inventoryCheck middleware!
-    const { productId, variantId, quantity, price } = req.verifiedItem; 
+    const userId = req.user;
+    // req.verifiedItem includes `availableStock` passed down from inventoryCheck middleware
+    const { productId, variantId, quantity, price, availableStock } = req.verifiedItem; 
 
     let cart = await Cart.findOne({ user: userId });
 
-    // Create cart if it doesn't exist
     if (!cart) {
       cart = new Cart({ user: userId, items: [] });
     }
 
-    // Check if variant is already in cart
     const existingItemIndex = cart.items.findIndex(
       item => item.variantId.toString() === variantId.toString()
     );
 
     if (existingItemIndex > -1) {
-      // Increment quantity, but enforce the 5-item max limit
       const newQuantity = cart.items[existingItemIndex].quantity + quantity;
-      cart.items[existingItemIndex].quantity = Math.min(newQuantity, 5);
       
-      // Update price in case it changed since they last added it
+      // FIX 1: Enforce both the 5-item limit AND the actual warehouse stock limit
+      cart.items[existingItemIndex].quantity = Math.min(newQuantity, 5, availableStock);
       cart.items[existingItemIndex].price = price; 
     } else {
-      // Push new item
       cart.items.push({
         product: productId,
         variantId: variantId,
-        quantity: quantity,
+        quantity: quantity, // Middleware already verified this is <= stock
         price: price
       });
     }
@@ -144,12 +139,11 @@ export const addToCart = async (req, res, next) => {
 };
 
 // ==========================================
-// 4. UPDATE QUANTITY (PROTECTED BY INVENTORY MIDDLEWARE)
+// UPDATE QUANTITY
 // ==========================================
 export const updateCartItemQuantity = async (req, res, next) => {
   try {
-    const userId = req.user._id;
-    // The exact updated quantity verified by middleware
+    const userId = req.user;
     const { variantId, quantity, price } = req.verifiedItem; 
 
     const cart = await Cart.findOne({ user: userId });
@@ -158,8 +152,9 @@ export const updateCartItemQuantity = async (req, res, next) => {
     const itemIndex = cart.items.findIndex(item => item.variantId.toString() === variantId.toString());
     
     if (itemIndex > -1) {
+      // This is an absolute overwrite from the UI, so middleware check is sufficient
       cart.items[itemIndex].quantity = quantity;
-      cart.items[itemIndex].price = price; // Keep price synced
+      cart.items[itemIndex].price = price; 
       await cart.save();
       return res.status(200).json({ success: true, message: 'Cart updated.' });
     } else {
@@ -172,11 +167,11 @@ export const updateCartItemQuantity = async (req, res, next) => {
 };
 
 // ==========================================
-// 5. REMOVE FROM CART
+// REMOVE FROM CART
 // ==========================================
 export const removeFromCart = async (req, res, next) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user;
     const { variantId } = req.params;
 
     const cart = await Cart.findOne({ user: userId });
@@ -193,11 +188,11 @@ export const removeFromCart = async (req, res, next) => {
 };
 
 // ==========================================
-// 6. CLEAR CART (Used after checkout)
+// CLEAR CART
 // ==========================================
 export const clearCart = async (req, res, next) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user;
     const cart = await Cart.findOne({ user: userId });
     
     if (cart) {
@@ -213,12 +208,12 @@ export const clearCart = async (req, res, next) => {
 };
 
 // ==========================================
-// 7. GUEST TO USER MERGE (Runs on Login/Signup)
+// GUEST TO USER MERGE
 // ==========================================
 export const syncCart = async (req, res, next) => {
   try {
-    const userId = req.user._id;
-    const { localItems } = req.body; // Array of items from frontend LocalStorage
+    const userId = req.user;
+    const { localItems } = req.body; 
 
     if (!localItems || !localItems.length) {
       return res.status(200).json({ success: true, message: 'No local items to sync.' });
@@ -227,9 +222,11 @@ export const syncCart = async (req, res, next) => {
     let cart = await Cart.findOne({ user: userId });
     if (!cart) cart = new Cart({ user: userId, items: [] });
 
-    // Loop through LocalStorage items and intelligently merge
     for (const localItem of localItems) {
-      // 1. Verify the product and stock still exist in DB
+      if (!mongoose.Types.ObjectId.isValid(localItem.productId) || !mongoose.Types.ObjectId.isValid(localItem.variantId)) {
+        continue;
+      }
+
       const product = await Product.findOne(
         { _id: localItem.productId, status: 'active', 'variants._id': localItem.variantId },
         { 'variants.$': 1 }
@@ -248,12 +245,10 @@ export const syncCart = async (req, res, next) => {
           );
 
           if (existingItemIndex > -1) {
-            // Merge quantities, cap at min(5, dbStock)
             const combinedQty = cart.items[existingItemIndex].quantity + localItem.quantity;
             cart.items[existingItemIndex].quantity = Math.min(combinedQty, 5, dbStock);
             cart.items[existingItemIndex].price = currentPrice;
           } else {
-            // Add as new item
             cart.items.push({
               product: localItem.productId,
               variantId: localItem.variantId,

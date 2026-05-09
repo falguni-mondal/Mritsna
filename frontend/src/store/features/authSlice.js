@@ -122,8 +122,8 @@ const initialState = {
   otpSent: false,           
 };
 
-const userSlice = createSlice({
-  name: "user",
+const authSlice = createSlice({
+  name: "auth",
   initialState,
   reducers: {
     clearError: (state) => {
@@ -236,5 +236,5 @@ const userSlice = createSlice({
   },
 });
 
-export const { clearError, resetOtpState } = userSlice.actions;
-export default userSlice.reducer;
+export const { clearError, resetOtpState } = authSlice.actions;
+export default authSlice.reducer;

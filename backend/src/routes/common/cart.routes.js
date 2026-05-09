@@ -27,6 +27,7 @@ router.post('/check-stock', checkStock);
 // Your isValidUser middleware locks down everything below this line
 router.use(isValidUser); 
 
+router.post('/check-stock', checkStock);
 router.get('/', getCart);
 router.post('/sync', syncCart);
 router.post('/add', inventoryCheck, addToCart);
