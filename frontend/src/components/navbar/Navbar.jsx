@@ -5,14 +5,18 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navmenu from "./Navmenu";
-import { IntroContext } from "../../context/IntroContext"; // Adjust path if needed
+import { IntroContext } from "../../context/IntroContext"; 
+import { useSelector } from "react-redux"; // <-- 1. Import Redux Hook
 
 // Register the plugin
 gsap.registerPlugin(ScrollTrigger);
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
+  
+  // <-- 2. Replace local state with live Redux derived state
+  const cartItems = useSelector((state) => state.cart?.items || []);
+  const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   
   const [isScrolled, setIsScrolled] = useState(false);
   // Global Context & Routing
@@ -21,7 +25,6 @@ const Navbar = () => {
   
   // THE FIX (Part 1): Track the path to force a synchronous state reset
   const [currentPath, setCurrentPath] = useState(location.pathname);
-
 
   // Refs for Animations & Structure
   const navbarRef = useRef(null);
@@ -51,23 +54,16 @@ const Navbar = () => {
   const scrollBlendRoutes = ["/"]; 
   const isScrollBlendRoute = scrollBlendRoutes.includes(location.pathname);
 
-  // THE FIX (Part 1 Continued): Synchronous State Reset
-  // This intercepts the route change BEFORE the browser paints, 
-  // guaranteeing 'isScrolled' doesn't leak into the new page.
   if (location.pathname !== currentPath) {
     setCurrentPath(location.pathname);
     setIsScrolled(false);
   }
 
-  // Master style toggle. True on Shop pages permanently, or on Home page after scrolling.
   const isDarkTheme = !isScrollBlendRoute || isScrolled;
 
-  // --- 1. Initial Load Animation & Scroll Tracking ---
   const { contextSafe } = useGSAP(() => {
-    
     const entryDelay = (!introPlayed && location.pathname === "/") ? 2.4 : 0.2;
 
-    // Standard Entrance
     gsap.set(navbarRef.current, { yPercent: -30, opacity: 0 });
     gsap.to(navbarRef.current, {
       yPercent: 0,
@@ -94,7 +90,6 @@ const Navbar = () => {
     
   }, { scope: navbarRef, dependencies: [location.pathname] }); 
 
-  // --- 2. Left Nav Hover Animation ---
   const handleItemEnter = contextSafe((e) => {
     const item = e.currentTarget;
     const targetLeft = item.offsetLeft;
@@ -129,7 +124,6 @@ const Navbar = () => {
     });
   });
 
-  // --- 3. Right Nav Hover Animation ---
   const handleRightItemEnter = contextSafe((e) => {
     const item = e.currentTarget;
     const containerWidth = rightNavContainerRef.current.offsetWidth;
@@ -169,22 +163,19 @@ const Navbar = () => {
 
   return (
     <>
-      {/* OUTER WRAPPER */}
       <div 
-        key={location.pathname} // THE FIX (Part 2): Nuke the DOM node on route change to kill CSS transition memory
+        key={location.pathname} 
         ref={navbarRef} 
         className={`navbar w-full fixed top-0 left-0 z-[99999] transition-colors duration-500 border-b max-h-[80px]
           ${isDarkTheme ? "bg-[#f8f8f8]/80 backdrop-blur-md border-black/5" : "bg-transparent border-transparent"}
         `}
       >
-        {/* INNER WRAPPER */}
         <div
           className={`w-full py-4 px-6 lg:px-10 flex justify-between items-center transition-colors duration-500
             ${isDarkTheme ? "text-[#1a1a1a]" : "text-white"}
           `}
           id="navbar-content"
         >
-          {/* Desktop Left Navigation */}
           <nav className="w-1/3 hidden lg:block" id="desktop-first-nav">
             <ul 
               ref={navContainerRef}
@@ -216,7 +207,6 @@ const Navbar = () => {
             </ul>
           </nav>
 
-          {/* Logo */}
           <div className="logo lg:w-1/3 flex justify-start lg:justify-center items-center">
             <Link to="/">
               <img 
@@ -227,7 +217,6 @@ const Navbar = () => {
             </Link>
           </div>
 
-          {/* Desktop Right Navigation */}
           <nav className="w-1/3 hidden lg:block" id="desktop-second-nav">
             <ul 
               ref={rightNavContainerRef}
@@ -264,7 +253,7 @@ const Navbar = () => {
                     {name}
                     {name === "cart" && (
                       <span className="ml-1 tracking-widest font-medium opacity-80">
-                        [{cartCount}]
+                        [{cartCount > 0 ? cartCount : "0"}]
                       </span>
                     )}
                   </Link>
@@ -273,7 +262,6 @@ const Navbar = () => {
             </ul>
           </nav>
 
-          {/* Mobile Right Section: Search + Hamburger */}
           <div className="flex items-center gap-5 lg:hidden">
             <div className="cursor-pointer text-xl flex items-center justify-center hover:opacity-70 transition-opacity duration-300">
               <Icon icon="iconamoon:search" />

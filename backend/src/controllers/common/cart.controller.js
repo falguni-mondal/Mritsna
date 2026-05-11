@@ -67,7 +67,14 @@ export const getCart = async (req, res, next) => {
 
       if (!activeVariant) return null;
 
-      const itemTotal = cartItem.quantity * cartItem.price;
+      // Calculate Live Price instead of using historical cartItem.price
+      const basePrice = activeVariant.pricing.price;
+      const discount = activeVariant.pricing.discountPercentage || 0;
+      const livePrice = discount > 0 
+        ? basePrice - (basePrice * (discount / 100)) 
+        : basePrice;
+
+      const itemTotal = cartItem.quantity * livePrice;
       subTotal += itemTotal;
 
       return {
@@ -78,7 +85,7 @@ export const getCart = async (req, res, next) => {
         title: cartItem.product.title,
         colorName: activeVariant.colorName,
         img: activeVariant.images.find(img => img.isPrimary)?.baseUrl || activeVariant.images[0]?.baseUrl,
-        price: cartItem.price,
+        price: livePrice, // Sent live calculated price instead of cartItem.price
         quantity: cartItem.quantity,
         itemTotal: itemTotal,
         maxLimit: Math.min(5, activeVariant.inventory.quantity)

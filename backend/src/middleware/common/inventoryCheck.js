@@ -51,13 +51,20 @@ export const inventoryCheck = async (req, res, next) => {
       });
     }
 
+    // Calculate the LIVE discounted price
+    const basePrice = variant.pricing.price;
+    const discount = variant.pricing.discountPercentage || 0;
+    const liveFinalPrice = discount > 0 
+      ? basePrice - (basePrice * (discount / 100)) 
+      : basePrice;
+
     // Pass data forward
     req.verifiedItem = {
       productId,
       variantId,
       quantity,
-      price: variant.pricing.price,
-      discountPercentage: variant.pricing.discountPercentage,
+      price: liveFinalPrice, // <-- Now passing the correct discounted price
+      discountPercentage: discount,
       availableStock: stockAvailable
     };
 

@@ -1,33 +1,45 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom"; 
 import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useDispatch, useSelector } from "react-redux";
 
-// Import the actions from your newly created slice (Adjust path as needed)
 import {
   verifyStock,
   addToCartDB,
   addLocalItem,
 } from "../../store/features/cartSlice";
 
-// NOTE: Added `product` prop so we can extract the title and slug for guest carts!
+
 const ProductActions = ({ product, activeVariant }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate(); 
 
-  // 1. Get Auth State
+  // Get Auth State & Cart Items
   const isAuth = useSelector((state) => state.auth?.isAuthenticated);
+  const cartItems = useSelector((state) => state.cart?.items || []); 
+
+  // Check if the current variant is already in the cart
+  const isItemInCart = cartItems.some((item) => item.variantId === activeVariant.variantId);
 
   const [quantity, setQuantity] = useState(1);
   const [isCopied, setIsCopied] = useState(false);
-  const [isAdding, setIsAdding] = useState(false); // NEW: Loading state for the button
+  const [isAdding, setIsAdding] = useState(false);
+  
+  // NEW: Debounce Tracking States
+  const [isVerifyingQty, setIsVerifyingQty] = useState(false);
+  const qtyDebounceTimer = useRef(null);
 
   const { inStock, stockQuantity } = activeVariant;
   const maxLimit = stockQuantity !== undefined ? Math.min(5, stockQuantity) : 5;
 
-  // Reset quantity back to 1 if the user switches color variants
+  // Reset quantity back to 1 if the user switches color variants, and cleanup timers
   useEffect(() => {
     setQuantity(1);
+    return () => {
+      if (qtyDebounceTimer.current) clearTimeout(qtyDebounceTimer.current);
+    };
   }, [activeVariant.variantId]);
 
   const buyBtnRef = useRef(null);
@@ -35,13 +47,53 @@ const ProductActions = ({ product, activeVariant }) => {
   const buyTextDarkRef = useRef(null);
   const buyTextLightRef = useRef(null);
 
+  // Quantity Handler ---
   const handleQuantity = (type) => {
-    if (type === "dec" && quantity > 1) setQuantity(quantity - 1);
-    if (type === "inc" && quantity < maxLimit) setQuantity(quantity + 1);
+    let newQty = quantity;
+    if (type === "dec" && quantity > 1) newQty -= 1;
+    if (type === "inc" && quantity < maxLimit) newQty += 1;
+    if (newQty === quantity) return;
+
+    // 1. Optimistic UI Update (Instant feedback, keeps buttons clickable)
+    setQuantity(newQty);
+
+    // 2. Clear existing timer if user is clicking rapidly
+    if (qtyDebounceTimer.current) clearTimeout(qtyDebounceTimer.current);
+
+    // 3. Set the debounce timer (800ms delay)
+    qtyDebounceTimer.current = setTimeout(async () => {
+      // ONLY lock the Add to Cart button when the pause is over and the API call starts
+      setIsVerifyingQty(true); 
+      
+      try {
+        const pingPayload = {
+          productId: product.id,
+          variantId: activeVariant.variantId,
+          requestedQuantity: newQty,
+        };
+
+        const stockCheck = await dispatch(verifyStock(pingPayload)).unwrap();
+
+        if (!stockCheck.isAvailable) {
+          alert(stockCheck.message);
+          // If they requested too many, gracefully snap them back to the max available
+          setQuantity(stockCheck.availableStock);
+        }
+      } catch (error) {
+        console.error("Stock verification failed:", error);
+      } finally {
+        setIsVerifyingQty(false); // Unlock the buttons
+      }
+    }, 800); 
   };
 
-  const handleAddToCart = async () => {
-    // Loud Error Handling
+  // The Main Button Handler
+  const handleMainButtonClick = async () => {
+    if (isItemInCart) {
+      navigate("/cart");
+      return;
+    }
+
     if (!product) {
       alert("CRITICAL ERROR: 'product' prop is missing in ProductActions!");
       return;
@@ -52,6 +104,7 @@ const ProductActions = ({ product, activeVariant }) => {
     setIsAdding(true);
 
     try {
+      // Final safety check before actual add
       const pingPayload = {
         productId: product.id,
         variantId: activeVariant.variantId,
@@ -72,10 +125,12 @@ const ProductActions = ({ product, activeVariant }) => {
             productId: product.id,
             variantId: activeVariant.variantId,
             quantity,
-          }),
+          })
         ).unwrap();
-        console.log("Saved to DB!");
       } else {
+        // Extract raw image URL
+        const rawImageUrl = activeVariant.images?.find((img) => img.isPrimary)?.url || activeVariant.images?.[0]?.url;
+
         dispatch(
           addLocalItem({
             productId: product.id,
@@ -83,15 +138,13 @@ const ProductActions = ({ product, activeVariant }) => {
             slug: product.slug,
             title: product.title,
             colorName: activeVariant.colorName,
-            img:
-              activeVariant.images?.find((img) => img.isPrimary)?.url ||
-              activeVariant.images?.[0]?.url,
+            // Apply the optimized URL here
+            img: rawImageUrl,
             price: activeVariant.finalPrice || activeVariant.originalPrice,
             quantity: quantity,
             maxLimit: stockCheck.availableStock,
-          }),
+          })
         );
-        console.log("Saved to LocalStorage!");
       }
 
       setQuantity(1);
@@ -186,39 +239,43 @@ const ProductActions = ({ product, activeVariant }) => {
         <div className="flex items-center justify-between border border-black/10 px-4 w-[100px] lg:w-32 shrink-0">
           <button
             onClick={() => handleQuantity("dec")}
-            disabled={quantity <= 1 || !inStock || isAdding}
-            className={`p-2 cursor-pointer transition-opacity ${quantity <= 1 || !inStock || isAdding ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
+            // Disable if verifying to prevent buggy states
+            disabled={quantity <= 1 || !inStock || isAdding || isItemInCart || isVerifyingQty}
+            className={`p-2 cursor-pointer transition-opacity ${quantity <= 1 || !inStock || isAdding || isItemInCart || isVerifyingQty ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
           >
             <Icon icon="ph:minus" />
           </button>
 
-          <span className={`text-sm font-medium ${!inStock && "opacity-30"}`}>
+          <span className={`text-sm font-medium ${(!inStock || isItemInCart) && "opacity-30"}`}>
             {quantity}
           </span>
 
           <button
             onClick={() => handleQuantity("inc")}
-            disabled={quantity >= maxLimit || !inStock || isAdding}
-            className={`p-2 cursor-pointer transition-opacity ${quantity >= maxLimit || !inStock || isAdding ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
+            // Disable if verifying to prevent buggy states
+            disabled={quantity >= maxLimit || !inStock || isAdding || isItemInCart || isVerifyingQty}
+            className={`p-2 cursor-pointer transition-opacity ${quantity >= maxLimit || !inStock || isAdding || isItemInCart || isVerifyingQty ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
           >
             <Icon icon="ph:plus" />
           </button>
         </div>
 
-        {/* Updated Add to Cart Button */}
         <button
-          onClick={handleAddToCart}
-          disabled={!inStock || isAdding}
+          onClick={handleMainButtonClick}
+          // Button remains clickable if it's in the cart (to redirect), but disables if verifying or out of stock
+          disabled={(!inStock && !isItemInCart) || isAdding || isVerifyingQty}
           className="flex-1 flex justify-center items-center gap-2 bg-[#1a1a1a] text-white text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isAdding ? (
+          {isAdding || isVerifyingQty ? (
             <>
               <Icon
                 icon="ph:spinner-gap-bold"
                 className="animate-spin text-lg"
               />
-              ADDING...
+              {isVerifyingQty ? "VERIFYING..." : "ADDING..."}
             </>
+          ) : isItemInCart ? (
+            "Go to Cart"
           ) : inStock ? (
             "Add to Cart"
           ) : (
@@ -251,7 +308,7 @@ const ProductActions = ({ product, activeVariant }) => {
 
       <button
         ref={buyBtnRef}
-        disabled={!inStock || isAdding}
+        disabled={!inStock || isAdding || isVerifyingQty}
         onMouseEnter={handleBuyMouseEnter}
         onMouseLeave={handleBuyMouseLeave}
         className="relative overflow-hidden w-full h-14 border border-[#1a1a1a] flex items-center justify-center group disabled:border-black/20 disabled:cursor-not-allowed cursor-pointer"

@@ -1,13 +1,14 @@
 import React from "react";
 import { Route, Routes } from "react-router-dom";
+import SignIn from "../pages/Signin";
+import SignUp from "../pages/SignUp";
+import Verification from "../pages/Verification";
 import Homepage from "../pages/Homepage";
 import About from "../pages/About";
 import Shop from "../pages/Shop";
 import Product from "../pages/Product";
-import SignIn from "../pages/Signin";
-import SignUp from "../pages/SignUp";
-import Verification from "../pages/Verification";
 import Dashboard from "../pages/Dashboard";
+import Cart from "../pages/Cart";
 import GuestRoute from "../components/auth/GuestRoute";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import NotFound from "../pages/NotFound";
@@ -22,6 +23,7 @@ const PageRouter = () => {
       <Route path="/about" element={<About />} />
       <Route path="/shop" element={<Shop />} />
       <Route path="/product/:slug" element={<Product />} />
+      <Route path="/cart" element={<Cart />} />
 
       {/* ==========================================
           GUEST ROUTES (Only accessible if NOT logged in)

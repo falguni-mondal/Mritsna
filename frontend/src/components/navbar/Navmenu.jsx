@@ -1,11 +1,13 @@
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { useSelector } from "react-redux"; // <-- 1. Import Redux Hook
 
 const Navmenu = ({ isOpen, setIsOpen }) => {
-  // Dummy state for cart count. Replace this with your global state (Redux/Context) later!
-  const [cartCount, setCartCount] = useState(0);
+  // <-- 2. Read directly from the Redux store
+  const cartItems = useSelector((state) => state.cart?.items || []);
+  const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   const menuRef = useRef(null);
   const tl = useRef(null);
@@ -24,14 +26,12 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
     { name: "wishlist", path: "/wishlist" },
   ];
 
-  // Helper to add refs for staggered animations
   const addToRefs = (el) => {
     if (el && !linkRefs.current.includes(el)) {
       linkRefs.current.push(el);
     }
   };
 
-  // Build the timeline once on mount
   useGSAP(
     () => {
       gsap.set(menuRef.current, { yPercent: -100 });
@@ -53,13 +53,12 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
             stagger: 0.05,
             ease: "power3.out",
           },
-          "-=0.4", // Start link animation slightly before menu finishes dropping
+          "-=0.4", 
         );
     },
     { scope: menuRef },
   );
 
-  // Play or reverse animation based on isOpen state
   useGSAP(() => {
     if (tl.current) {
       if (isOpen) {
@@ -79,7 +78,6 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
       ref={menuRef}
       className="fixed top-0 left-0 w-full h-screen bg-dark text-[#f5f5f5] z-[99999] flex flex-col px-6 py-3 lg:hidden"
     >
-      {/* Header section inside the menu */}
       <div className="w-full flex justify-between items-center">
         <div className="logo w-20 lg:w-36 flex justify-center items-center">
           <Link to="/" onClick={handleClose}>
@@ -87,7 +85,6 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
           </Link>
         </div>
 
-        {/* Animated Cross Close Button */}
         <div
           onClick={handleClose}
           className="w-7 h-7 flex flex-col justify-center items-center cursor-pointer group"
@@ -97,7 +94,6 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
         </div>
       </div>
 
-      {/* Navigation Links */}
       <div className="flex-1 flex flex-col justify-center mt-10">
         <ul className="flex flex-col gap-6 lg:gap-10">
           {navigations.map(({ name, path }, index) => (
@@ -117,7 +113,6 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
           ))}
         </ul>
 
-        {/* Service Navs (Account, Cart, Wishlist) */}
         <div className="mt-16 border-t border-[#333333] pt-8" ref={addToRefs}>
           <ul className="flex flex-col gap-4">
             {serviceNavs.map(({ name, path }, index) => (
@@ -133,10 +128,9 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
 
                   <span className="inline-flex w-1 border-y border-r border-[#f8f8f8] rounded-[1px] h-[14px]"></span>
                   
-                  {/* Cart Counter Appended Safely Outside the Braces */}
                   {name === "cart" && (
                     <span className="ml-1 tracking-widest font-medium opacity-80">
-                      [{cartCount}]
+                      [{cartCount > 0 ? cartCount : "0"}]
                     </span>
                   )}
                 </Link>
