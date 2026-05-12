@@ -51,7 +51,7 @@ export const fetchUserCart = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const response = await userAxios.get('/cart');
-      return response.data.data; // { items, subTotal }
+      return response.data.data;
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to fetch cart');
     }
@@ -119,8 +119,7 @@ export const syncGuestCartToDB = createAsyncThunk(
 
         await userAxios.post('/cart/sync', { localItems });
         
-        // Wipe the local storage since the DB has taken over
-        localStorage.removeItem('guest_cart');
+        dispatch({ type: 'cart/clearLocalCart' });
       }
       
       // Fetch the newly merged DB cart

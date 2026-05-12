@@ -76,9 +76,9 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
   return (
     <div
       ref={menuRef}
-      className="fixed top-0 left-0 w-full h-screen bg-dark text-[#f5f5f5] z-[99999] flex flex-col px-6 py-3 lg:hidden"
+      className="fixed top-0 left-0 w-full h-screen bg-dark text-[#f5f5f5] z-[99998] flex flex-col px-6 py-3 lg:hidden"
     >
-      <div className="w-full flex justify-between items-center">
+      {/* <div className="w-full flex justify-between items-center">
         <div className="logo w-20 lg:w-36 flex justify-center items-center">
           <Link to="/" onClick={handleClose}>
             <img className="w-full" src="/logo_white.svg" alt="Mritsna Logo" />
@@ -92,7 +92,7 @@ const Navmenu = ({ isOpen, setIsOpen }) => {
           <span className="block w-6 h-[1.5px] bg-[#f5f5f5] rotate-45 translate-y-[1px] transition-transform duration-300 group-hover:rotate-180" />
           <span className="block w-6 h-[1.5px] bg-[#f5f5f5] -rotate-45 -translate-y-[0.5px] transition-transform duration-300 group-hover:-rotate-180" />
         </div>
-      </div>
+      </div> */}
 
       <div className="flex-1 flex flex-col justify-center mt-10">
         <ul className="flex flex-col gap-6 lg:gap-10">

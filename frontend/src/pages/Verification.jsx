@@ -6,6 +6,9 @@ import { useGSAP } from "@gsap/react";
 import { useDispatch, useSelector } from "react-redux";
 import { verifyOtp, sendVerificationOtp, changeEmail, clearError } from "../store/features/authSlice";
 
+// Import the cart sync thunk
+import { syncGuestCartToDB } from "../store/features/cartSlice";
+
 const Verification = () => {
   const containerRef = useRef(null);
   const navigate = useNavigate();
@@ -114,17 +117,23 @@ const Verification = () => {
     }
   };
 
+  // Sequential Verification, Sync, and Redirect
   const handleVerificationSubmit = async (e) => {
     e.preventDefault();
     const verificationCode = code.join("");
     
     if (verificationCode.length === 6) {
-      const resultAction = await dispatch(verifyOtp(verificationCode));
-      
-      if (verifyOtp.fulfilled.match(resultAction)) {
-        // Redux updates isVerified: true, so ProtectedRoute will automatically push them to "/" 
-        // But we can safely trigger navigate here as well to be explicit
+      try {
+        // 1. Wait for OTP Verification to completely succeed
+        await dispatch(verifyOtp(verificationCode)).unwrap();
+        
+        // 2. The exact moment they are fully verified and authenticated, merge the cart!
+        await dispatch(syncGuestCartToDB()).unwrap();
+        
+        // 3. Navigate safely to the homepage
         navigate("/"); 
+      } catch (error) {
+        console.error("Verification or Sync sequence failed.", error);
       }
     }
   };

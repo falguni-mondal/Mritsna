@@ -6,7 +6,7 @@ import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navmenu from "./Navmenu";
 import { IntroContext } from "../../context/IntroContext"; 
-import { useSelector } from "react-redux"; // <-- 1. Import Redux Hook
+import { useSelector } from "react-redux";
 
 // Register the plugin
 gsap.registerPlugin(ScrollTrigger);
@@ -14,7 +14,7 @@ gsap.registerPlugin(ScrollTrigger);
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   
-  // <-- 2. Replace local state with live Redux derived state
+  // Replace local state with live Redux derived state
   const cartItems = useSelector((state) => state.cart?.items || []);
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   
@@ -23,7 +23,7 @@ const Navbar = () => {
   const location = useLocation();
   const { introPlayed } = useContext(IntroContext);
   
-  // THE FIX (Part 1): Track the path to force a synchronous state reset
+  // Track the path to force a synchronous state reset
   const [currentPath, setCurrentPath] = useState(location.pathname);
 
   // Refs for Animations & Structure
@@ -269,7 +269,7 @@ const Navbar = () => {
 
             <div
               onClick={() => setIsOpen((prev) => !prev)}
-              className="nav-icon w-7 h-2 flex flex-col justify-between cursor-pointer"
+              className="nav-icon w-6 h-2 flex flex-col justify-between cursor-pointer"
             >
               <span
                 className={`block h-[1.5px] transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] 

@@ -13,19 +13,14 @@ import {
   verifyStock 
 } from '../store/features/cartSlice';
 
-// Helper function to optimize the image URL
+// --- NEW: Helper function to optimize ImageKit URLs ---
 const getOptimizedImgUrl = (url) => {
   if (!url) return "";
   
   // Prevent double-appending if it already has ImageKit transformations
-  if (url.includes("tr=w-")) return url;
-
-  // If using Cloudinary, inject the transformation parameters directly into the path
-  if (url.includes("cloudinary.com") && url.includes("/upload/")) {
-    return url.replace("/upload/", "/upload/w_400,q_80/");
-  }
+  if (url.includes("tr=")) return url;
   
-  // For standard CDNs or framework image optimizers (like ImageKit), append query parameters
+  // Safely append query parameters whether a query string already exists or not
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}tr=w-400,q-80`;
 };
@@ -41,7 +36,7 @@ const Cart = () => {
   const { items: cartItems, subTotal, isLoading } = useSelector((state) => state.cart);
   const isAuth = useSelector((state) => state.auth?.isAuthenticated);
 
-  // NEW: Debounce Tracking States (Dictionary approach per item)
+  // Debounce Tracking States (Dictionary approach per item)
   const [stagedQty, setStagedQty] = useState({});
   const [isVerifying, setIsVerifying] = useState({});
   const debounceTimers = useRef({});
@@ -63,9 +58,8 @@ const Cart = () => {
 
   // --- ACTIONS ---
 
-  // NEW: Debounced Quantity Handler
+  // Debounced Quantity Handler
   const handleQuantityChange = (item, type) => {
-    // Read from staged quantity if it's currently being edited, otherwise read from Redux truth
     const currentQty = stagedQty[item.variantId] ?? item.quantity;
     let newQty = currentQty;
     
@@ -83,7 +77,6 @@ const Cart = () => {
 
     // 3. Set new Debounce Timer (800ms delay)
     debounceTimers.current[item.variantId] = setTimeout(async () => {
-      // ONLY lock the item row when the 800ms pause is over and the API call actually starts
       setIsVerifying(prev => ({ ...prev, [item.variantId]: true }));
       
       try {
@@ -100,20 +93,27 @@ const Cart = () => {
 
         // Apply final verified amount to DB or LocalStorage
         if (isAuth) {
-          await dispatch(updateCartQuantityDB({ variantId: item.variantId, quantity: newQty })).unwrap();
+          await dispatch(updateCartQuantityDB({ 
+            productId: item.productId, // <-- THE FIX: Added productId here
+            variantId: item.variantId, 
+            quantity: newQty 
+          })).unwrap();
         } else {
-          dispatch(updateLocalQuantity({ variantId: item.variantId, quantity: newQty }));
+          dispatch(updateLocalQuantity({ 
+            productId: item.productId, // <-- THE FIX: Added productId here
+            variantId: item.variantId, 
+            quantity: newQty 
+          }));
         }
       } catch (error) {
         alert("Failed to verify stock.");
       } finally {
-        // Clear local UI overrides so it reads from Redux truth again
         setStagedQty(prev => {
           const newState = { ...prev };
           delete newState[item.variantId];
           return newState;
         });
-        setIsVerifying(prev => ({ ...prev, [item.variantId]: false })); // Unlock row
+        setIsVerifying(prev => ({ ...prev, [item.variantId]: false }));
       }
     }, 800); 
   };
@@ -141,7 +141,6 @@ const Cart = () => {
 
   // --- GSAP CONTEXT ---
   const { contextSafe } = useGSAP(() => {
-    // Entrance Animations for Populated Cart
     if (cartItems.length > 0) {
       gsap.fromTo(
         ".cart-item-row",
@@ -155,7 +154,6 @@ const Cart = () => {
       );
     }
 
-    // Gentle floating for the empty bag body
     if (cartItems.length === 0 && emptyBagRef.current) {
       gsap.to(".bag-body-group", {
         y: -8,
@@ -167,9 +165,7 @@ const Cart = () => {
     }
   }, [cartItems.length]);
 
-  // --- NEW INTERACTIVE ANIMATIONS ---
-
-  // 1. Interactive Eyes (Empty Cart)
+  // --- INTERACTIVE ANIMATIONS ---
   const handleMouseMove = contextSafe((e) => {
     if (cartItems.length > 0 || !emptyBagRef.current) return;
     
@@ -180,7 +176,6 @@ const Cart = () => {
     const deltaX = e.clientX - bagCenterX;
     const deltaY = e.clientY - bagCenterY;
     
-    // Adjusted clamp to account for the new, bigger eyes so pupils don't spill out
     const maxMove = 3.5; 
     const moveX = Math.max(-maxMove, Math.min(maxMove, deltaX * 0.01));
     const moveY = Math.max(-maxMove, Math.min(maxMove, deltaY * 0.01));
@@ -188,7 +183,6 @@ const Cart = () => {
     gsap.to(".bag-pupil", { x: moveX, y: moveY, duration: 0.2, ease: "power1.out" });
   });
 
-  // 2. Click to Squish (Empty Cart)
   const handleBagClick = contextSafe(() => {
     const tl = gsap.timeline();
     tl.to(".bag-body-group", { scaleY: 0.7, scaleX: 1.1, transformOrigin: "bottom center", duration: 0.15, ease: "power2.in" })
@@ -196,22 +190,18 @@ const Cart = () => {
       .to(".bag-body-group", { scaleY: 1, scaleX: 1, y: 0, duration: 0.4, ease: "bounce.out" });
   });
 
-  // 3. Shop Button Hover: Sad to Happy! (Empty Cart)
   const handleButtonHover = contextSafe((isHovering) => {
     if (!emptyBagRef.current) return;
     
     if (isHovering) {
-      // Morph path to a big wide smile and raise eyes slightly (cheek lift effect)
       gsap.to(".bag-mouth", { attr: { d: "M 42 66 Q 50 78 58 66" }, duration: 0.4, ease: "back.out(1.5)" });
       gsap.to(".bag-eye-group", { y: -3, duration: 0.3, ease: "power2.out" });
     } else {
-      // Morph path back to sad curve and lower eyes
       gsap.to(".bag-mouth", { attr: { d: "M 45 70 Q 50 64 55 70" }, duration: 0.4, ease: "power2.out" });
       gsap.to(".bag-eye-group", { y: 0, duration: 0.3, ease: "power2.out" });
     }
   });
 
-  // 4. Pop-Top Trash Can Hover (Populated Cart)
   const handleRemoveHover = contextSafe((e, isEnter) => {
     const lid = e.currentTarget.querySelector('.trash-lid');
     const body = e.currentTarget.querySelector('.trash-body');
@@ -244,17 +234,13 @@ const Cart = () => {
               <path d="M35 35 V25 A 15 15 0 0 1 65 25 V35" />
               <path d="M20 35 H80 L75 85 H25 Z" fill="#f8f8f8" />
               
-              {/* Grouped eyes so they can move up together on smile */}
               <g className="bag-eye-group">
-                {/* Left Eye (Bigger!) */}
                 <circle cx="40" cy="55" r="6.5" stroke="currentColor" fill="#f8f8f8" />
                 <circle cx="40" cy="55" r="3" fill="currentColor" stroke="none" className="bag-pupil" />
-                {/* Right Eye (Bigger!) */}
                 <circle cx="60" cy="55" r="6.5" stroke="currentColor" fill="#f8f8f8" />
                 <circle cx="60" cy="55" r="3" fill="currentColor" stroke="none" className="bag-pupil" />
               </g>
 
-              {/* The dynamic morphing mouth */}
               <path className="bag-mouth" d="M 45 70 Q 50 64 55 70" />
             </g>
           </svg>
@@ -265,7 +251,6 @@ const Cart = () => {
           Looks like you haven't added anything to your cart yet. Discover our latest collections.
         </p>
         
-        {/* Attached the hover events to the button */}
         <Link 
           to="/shop" 
           onMouseEnter={() => handleButtonHover(true)}
@@ -292,7 +277,6 @@ const Cart = () => {
           
           <div className="w-full lg:w-[65%] flex flex-col gap-8">
             {cartItems.map((item, index) => {
-              // Determine UI Quantity: Use staged if editing, otherwise Redux truth
               const displayQty = stagedQty[item.variantId] ?? item.quantity;
               const isItemVerifying = isVerifying[item.variantId];
 
@@ -303,7 +287,6 @@ const Cart = () => {
                   className="cart-item-row flex gap-6 pb-8 border-b border-black/5 group"
                 >
                   <Link to={`/product/${item.slug}`} className="w-24 h-32 lg:w-32 lg:h-40 shrink-0 overflow-hidden bg-[#f0f0f0]">
-                    {/* APPLIED THE OPTIMIZED URL HELPER HERE */}
                     <img 
                       src={getOptimizedImgUrl(item.img)} 
                       alt={item.title} 
@@ -324,7 +307,6 @@ const Cart = () => {
 
                     <div className="flex items-center justify-between mt-4">
                       
-                      {/* Interactive Quantity UI */}
                       <div className={`flex items-center border border-black/10 w-24 lg:w-28 h-10 transition-opacity ${isItemVerifying ? 'opacity-50 pointer-events-none' : ''}`}>
                         <button 
                           onClick={() => handleQuantityChange(item, 'dec')}
