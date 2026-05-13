@@ -41,9 +41,14 @@ export const loginUser = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   "user/logoutUser",
-  async (_, { rejectWithValue }) => {
+  async (_, { dispatch, rejectWithValue }) => {
     try {
       const response = await userAxios.post("/auth/logout");
+      
+      // --- THE FIX: Clear both global states on logout ---
+      dispatch({ type: 'cart/clearLocalCart' });
+      dispatch({ type: 'wishlist/clearLocalWishlist' });
+      
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || "Logout failed.");

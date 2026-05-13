@@ -14,6 +14,7 @@ import adminProductRoutes from './routes/admin/admin.product.routes.js';
 import authRouter from "./routes/common/auth.routes.js";
 import productRoutes from './routes/common/product.routes.js';
 import cartRoutes from './routes/common/cart.routes.js';
+import wishlistRoutes from './routes/common/wishlist.routes.js';
 
 const app = express();
 
@@ -75,6 +76,7 @@ app.use('/api/v1/admin/products', adminProductRoutes);
 app.use("/api/v1/auth", authRouter);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/cart', cartRoutes);
+app.use('/api/v1/wishlist', wishlistRoutes);
 
 
 // Global Catch-All Error Handler (MANDATORY for preventing server crashes)

@@ -11,6 +11,11 @@ import {
   addLocalItem,
 } from "../../store/features/cartSlice";
 
+// --- NEW: Import Wishlist Actions ---
+import {
+  toggleWishlistDB,
+  toggleLocalItem,
+} from "../../store/features/wishlistSlice";
 
 const ProductActions = ({ product, activeVariant }) => {
   const dispatch = useDispatch();
@@ -19,15 +24,22 @@ const ProductActions = ({ product, activeVariant }) => {
   // Get Auth State & Cart Items
   const isAuth = useSelector((state) => state.auth?.isAuthenticated);
   const cartItems = useSelector((state) => state.cart?.items || []); 
+  
+  // --- NEW: Get Wishlist State ---
+  const wishlistItems = useSelector((state) => state.wishlist?.items || []);
 
-  // Check if the current variant is already in the cart
+  // Check if the current variant is already in the cart or wishlist
   const isItemInCart = cartItems.some((item) => item.variantId === activeVariant.variantId);
+  const isInWishlist = wishlistItems.some(
+    (item) => item.productId === product.id && item.variantId === activeVariant.variantId
+  );
 
   const [quantity, setQuantity] = useState(1);
   const [isCopied, setIsCopied] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   
-  // NEW: Debounce Tracking States
+  // Debounce Tracking States
   const [isVerifyingQty, setIsVerifyingQty] = useState(false);
   const qtyDebounceTimer = useRef(null);
 
@@ -87,7 +99,7 @@ const ProductActions = ({ product, activeVariant }) => {
     }, 800); 
   };
 
-  // The Main Button Handler
+  // The Main Cart Button Handler
   const handleMainButtonClick = async () => {
     if (isItemInCart) {
       navigate("/cart");
@@ -152,6 +164,39 @@ const ProductActions = ({ product, activeVariant }) => {
       alert(error || "An error occurred while adding to cart.");
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  // --- NEW: The Wishlist Toggle Handler ---
+  const handleWishlistToggle = async () => {
+    if (isTogglingWishlist) return; // Prevent spam clicking
+
+    if (isAuth) {
+      setIsTogglingWishlist(true);
+      try {
+        await dispatch(toggleWishlistDB({ 
+          productId: product.id, 
+          variantId: activeVariant.variantId 
+        })).unwrap();
+      } catch (error) {
+        console.error("Failed to update wishlist", error);
+      } finally {
+        setIsTogglingWishlist(false);
+      }
+    } else {
+      // For guests, we save the rich data so the Wishlist Page can render it immediately
+      const rawImageUrl = activeVariant.images?.find((img) => img.isPrimary)?.url || activeVariant.images?.[0]?.url;
+      
+      dispatch(toggleLocalItem({
+        productId: product.id,
+        variantId: activeVariant.variantId,
+        title: product.title,
+        slug: product.slug,
+        colorName: activeVariant.colorName,
+        img: rawImageUrl,
+        price: activeVariant.finalPrice || activeVariant.pricing?.price, // Check pricing object safely
+        status: product.status || 'active'
+      }));
     }
   };
 
@@ -283,8 +328,18 @@ const ProductActions = ({ product, activeVariant }) => {
           )}
         </button>
 
-        <button className="w-[45px] lg:w-14 border border-black/10 flex items-center justify-center text-xl hover:bg-black/5 transition-colors shrink-0 cursor-pointer">
-          <Icon icon="ph:heart-light" />
+        {/* --- WISHLIST BUTTON --- */}
+        <button 
+          onClick={handleWishlistToggle}
+          disabled={isTogglingWishlist}
+          className={`w-[45px] lg:w-14 border border-black/10 flex items-center justify-center text-xl hover:bg-black/5 transition-colors shrink-0 cursor-pointer disabled:opacity-50 ${isInWishlist ? 'text-[#7e7053] border-[#171410]' : 'text-[#1a1a1a]'}`}
+          title={isInWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
+        >
+          {isTogglingWishlist ? (
+            <Icon icon="ph:spinner-gap-bold" className="animate-spin" />
+          ) : (
+            <Icon icon={isInWishlist ? "ph:heart-fill" : "ph:heart-light"} />
+          )}
         </button>
 
         <button

@@ -7,8 +7,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
 import { loginUser, clearError } from "../store/features/authSlice";
 
-// --- THE FIX: Import the cart sync thunk ---
+// --- Imports for Syncing Guest Data ---
 import { syncGuestCartToDB } from "../store/features/cartSlice";
+import { syncGuestWishlistToDB } from "../store/features/wishlistSlice";
 
 const SignIn = () => {
   const containerRef = useRef(null);
@@ -52,14 +53,15 @@ const SignIn = () => {
   const hookFormError = Object.values(errors)[0]?.message;
   const displayError = hookFormError || reduxError;
 
-  // --- THE FIX: Sequential Login, Sync, and Redirect ---
+  // --- Sequential Login, Sync, and Redirect ---
   const onSubmitForm = async (data) => {
     try {
       // Wait for the login to succeed
       await dispatch(loginUser(data)).unwrap();
       
-      // The exact moment they are authenticated, merge the guest cart!
+      // The exact moment they are authenticated, merge the guest cart and wishlist!
       await dispatch(syncGuestCartToDB()).unwrap();
+      await dispatch(syncGuestWishlistToDB()).unwrap();
       
       // Redirect to the homepage (or '/cart')
       navigate("/");

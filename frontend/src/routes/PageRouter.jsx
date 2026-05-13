@@ -9,6 +9,7 @@ import Shop from "../pages/Shop";
 import Product from "../pages/Product";
 import Dashboard from "../pages/Dashboard";
 import Cart from "../pages/Cart";
+import Wishlist from "../pages/Wishlist";
 import GuestRoute from "../components/auth/GuestRoute";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import NotFound from "../pages/NotFound";
@@ -24,6 +25,7 @@ const PageRouter = () => {
       <Route path="/shop" element={<Shop />} />
       <Route path="/product/:slug" element={<Product />} />
       <Route path="/cart" element={<Cart />} />
+      <Route path="/wishlist" element={<Wishlist />} />
 
       {/* ==========================================
           GUEST ROUTES (Only accessible if NOT logged in)

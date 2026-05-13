@@ -8,6 +8,7 @@ import CustomCursor from './components/global/CustomCursor';
 
 import { checkAuth } from "./store/features/authSlice";
 import { fetchUserCart } from './store/features/cartSlice';
+import { fetchUserWishlist } from './store/features/wishlistSlice';
 
 const App = () => {
   const dispatch = useDispatch();
@@ -26,12 +27,13 @@ const App = () => {
     });
   }, [dispatch]);
 
-  // 2. Listen for Authentication Success to Fetch the Cart
+  // 2. Listen for Authentication Success to Fetch User Data
   useEffect(() => {
     if (isAuthenticated) {
       dispatch(fetchUserCart());
+      dispatch(fetchUserWishlist());
     }
-  }, [isAuthenticated, dispatch]); // This runs automatically whenever `isAuthenticated` flips to true!
+  }, [isAuthenticated, dispatch]);
 
   // Block the UI if Auth is still checking, OR if the app hasn't finished its first cycle
   if (isCheckingAuth || !isAppReady) {

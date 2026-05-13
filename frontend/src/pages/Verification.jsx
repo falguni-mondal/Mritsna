@@ -6,8 +6,9 @@ import { useGSAP } from "@gsap/react";
 import { useDispatch, useSelector } from "react-redux";
 import { verifyOtp, sendVerificationOtp, changeEmail, clearError } from "../store/features/authSlice";
 
-// Import the cart sync thunk
+// --- Imports for Syncing Guest Data ---
 import { syncGuestCartToDB } from "../store/features/cartSlice";
+import { syncGuestWishlistToDB } from "../store/features/wishlistSlice";
 
 const Verification = () => {
   const containerRef = useRef(null);
@@ -117,7 +118,7 @@ const Verification = () => {
     }
   };
 
-  // Sequential Verification, Sync, and Redirect
+  // --- Sequential Verification, Sync, and Redirect ---
   const handleVerificationSubmit = async (e) => {
     e.preventDefault();
     const verificationCode = code.join("");
@@ -127,8 +128,9 @@ const Verification = () => {
         // 1. Wait for OTP Verification to completely succeed
         await dispatch(verifyOtp(verificationCode)).unwrap();
         
-        // 2. The exact moment they are fully verified and authenticated, merge the cart!
+        // 2. The exact moment they are fully verified and authenticated, merge the cart and wishlist!
         await dispatch(syncGuestCartToDB()).unwrap();
+        await dispatch(syncGuestWishlistToDB()).unwrap();
         
         // 3. Navigate safely to the homepage
         navigate("/"); 
