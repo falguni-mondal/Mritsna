@@ -2,6 +2,11 @@ import Product from '../../models/product.model.js'; // Adjust path if necessary
 
 export const getNewArrivals = async (req, res, next) => {
   try {
+    // --- Extract the region data from the middleware ---
+    const rate = req.region?.rate || 1;
+    const symbol = req.region?.symbol || '₹';
+    const currencyCode = req.region?.currencyCode || 'INR';
+
     const newArrivals = await Product.find({ 
       status: 'active', 
       isPremium: false
@@ -16,17 +21,23 @@ export const getNewArrivals = async (req, res, next) => {
       const firstImage = firstVariant.images?.[0] || {};
       const pricing = firstVariant.pricing || { price: 0, discountPercentage: 0 };
 
-      const finalPrice = pricing.discountPercentage > 0 
-        ? pricing.price - (pricing.price * (pricing.discountPercentage / 100))
-        : pricing.price;
+      // 1. Calculate Base Prices in INR
+      const basePriceINR = pricing.price;
+      const finalPriceINR = pricing.discountPercentage > 0 
+        ? basePriceINR - (basePriceINR * (pricing.discountPercentage / 100))
+        : basePriceINR;
+
+      // 2. Convert to Regional Price dynamically
+      const originalPriceConverted = Math.round(basePriceINR * rate);
+      const finalPriceConverted = Math.round(finalPriceINR * rate);
 
       return {
         _id: product._id,
         slug: product.slug,
         name: product.title,
         isPremium: product.isPremium || false,
-        originalPrice: pricing.price,
-        finalPrice: finalPrice,
+        originalPrice: originalPriceConverted, // Send the converted price
+        finalPrice: finalPriceConverted,       // Send the converted price
         img: firstImage.baseUrl || null, 
         altText: firstImage.altText || product.title
       };
@@ -35,7 +46,9 @@ export const getNewArrivals = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       count: formattedProducts.length,
-      data: formattedProducts
+      data: formattedProducts,
+      currencySymbol: symbol,       // Pass the symbol for the UI
+      currencyCode: currencyCode 
     });
 
   } catch (error) {
@@ -46,6 +59,11 @@ export const getNewArrivals = async (req, res, next) => {
 
 export const getPaginatedProducts = async (req, res, next) => {
   try {
+    // --- Extract the region data from the middleware ---
+    const rate = req.region?.rate || 1;
+    const symbol = req.region?.symbol || '₹';
+    const currencyCode = req.region?.currencyCode || 'INR';
+
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, parseInt(req.query.limit) || 12);
     const search = req.query.search || '';
@@ -100,9 +118,15 @@ export const getPaginatedProducts = async (req, res, next) => {
       const firstImage = firstVariant.images?.[0] || {};
       const pricing = firstVariant.pricing || { price: 0, discountPercentage: 0 };
 
-      const finalPrice = pricing.discountPercentage > 0 
-        ? pricing.price - (pricing.price * (pricing.discountPercentage / 100))
-        : pricing.price;
+      // 1. Calculate Base Prices in INR
+      const basePriceINR = pricing.price;
+      const finalPriceINR = pricing.discountPercentage > 0 
+        ? basePriceINR - (basePriceINR * (pricing.discountPercentage / 100))
+        : basePriceINR;
+
+      // 2. Convert to Regional Price dynamically
+      const originalPriceConverted = Math.round(basePriceINR * rate);
+      const finalPriceConverted = Math.round(finalPriceINR * rate);
 
       return {
         _id: product._id,
@@ -110,8 +134,8 @@ export const getPaginatedProducts = async (req, res, next) => {
         name: product.title,
         category: product.category,
         isPremium: product.isPremium || false,
-        originalPrice: pricing.price,
-        finalPrice: finalPrice,
+        originalPrice: originalPriceConverted, // Send the converted price
+        finalPrice: finalPriceConverted,       // Send the converted price
         discount: pricing.discountPercentage,
         img: firstImage.baseUrl || null,
         altText: firstImage.altText || product.title
@@ -123,6 +147,8 @@ export const getPaginatedProducts = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: formattedProducts,
+      currencySymbol: symbol,       // Pass the symbol for the UI
+      currencyCode: currencyCode,
       pagination: {
         totalItems: totalCount,
         totalPages: totalPages,
@@ -141,6 +167,11 @@ export const getPaginatedProducts = async (req, res, next) => {
 
 export const getSingleProduct = async (req, res, next) => {
   try {
+    // --- Extract the region data from the middleware ---
+    const rate = req.region?.rate || 1;
+    const symbol = req.region?.symbol || '₹';
+    const currencyCode = req.region?.currencyCode || 'INR';
+
     const { slug } = req.params;
     const product = await Product.findOne({ slug, status: 'active' })
       .select('-pricing.hsnCode -pricing.taxClass -shipping.weightGrams -variants.sku')
@@ -160,10 +191,15 @@ export const getSingleProduct = async (req, res, next) => {
     }
 
     const formattedVariants = product.variants.map(variant => {
-      const price = variant.pricing?.price || 0;
+      // 1. Calculate Base Prices in INR
+      const basePriceINR = variant.pricing?.price || 0;
       const discount = variant.pricing?.discountPercentage || 0;
-      const finalPrice = discount > 0 ? price - (price * (discount / 100)) : price;
+      const finalPriceINR = discount > 0 ? basePriceINR - (basePriceINR * (discount / 100)) : basePriceINR;
       
+      // 2. Convert to Regional Price dynamically
+      const originalPriceConverted = Math.round(basePriceINR * rate);
+      const finalPriceConverted = Math.round(finalPriceINR * rate);
+
       const stockQuantity = variant.inventory?.quantity || 0;
       const threshold = variant.inventory?.lowStockThreshold || 3;
 
@@ -171,8 +207,8 @@ export const getSingleProduct = async (req, res, next) => {
         variantId: variant._id,
         colorName: variant.colorName,
         colorHex: variant.colorHex,
-        originalPrice: price,
-        finalPrice: finalPrice,
+        originalPrice: originalPriceConverted, // Send the converted price
+        finalPrice: finalPriceConverted,       // Send the converted price
         discountPercentage: discount,
         material: variant.attributes?.material,
         finish: variant.attributes?.finish,
@@ -195,9 +231,10 @@ export const getSingleProduct = async (req, res, next) => {
       description: product.description,
       category: product.category,
       isPremium: product.isPremium,
-      baseCurrency: product.pricing?.baseCurrency || 'INR',
       dimensions: formattedDimensions,
-      variants: formattedVariants
+      variants: formattedVariants,
+      currencySymbol: symbol,
+      currencyCode: currencyCode
     };
 
     return res.status(200).json({

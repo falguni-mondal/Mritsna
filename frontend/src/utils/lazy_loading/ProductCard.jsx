@@ -2,7 +2,16 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import PremiumImage from './PremiumImage';
 
-const ProductCard = ({ product }) => {
+// --- RECEIVE currencySymbol PROP ---
+const ProductCard = ({ product, currencySymbol = "₹" }) => {
+  
+  // Helper function to handle commas cleanly based on the active currency
+  const formatPrice = (price) => {
+    // Use en-IN for Rupee so lakhs/crores are formatted correctly, otherwise standard US (thousands)
+    const locale = currencySymbol === '₹' ? 'en-IN' : 'en-US';
+    return `${currencySymbol} ${price.toLocaleString(locale)}`;
+  };
+
   return (
     <Link
       to={`/product/${product.slug}`}
@@ -26,14 +35,18 @@ const ProductCard = ({ product }) => {
       <div className="flex flex-col items-start mt-4 lg:mt-5 text-sm lg:text-base tracking-wide font-medium pointer-events-none">
         <h3 className="line-clamp-1">{product.name}</h3>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-xs lg:text-sm font-medium">
-            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(product.finalPrice)}
+          
+          {/* --- DYNAMIC PRICING DISPLAY --- */}
+          <span className="text-xs lg:text-sm font-medium text-[#1a1a1a]">
+            {formatPrice(product.finalPrice)}.00
           </span>
+          
           {product.discount > 0 && (
             <span className="text-[10px] lg:text-xs text-gray-400 line-through">
-              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(product.originalPrice)}
+              {formatPrice(product.originalPrice)}.00
             </span>
           )}
+
         </div>
       </div>
     </Link>

@@ -1,5 +1,6 @@
 import Wishlist from "../../models/wishlist.model.js";
 
+
 export const getWishlist = async (req, res) => {
   try {
     const userId = req.user;
@@ -10,10 +11,20 @@ export const getWishlist = async (req, res) => {
       select: "title slug category isPremium status variants",
     });
 
+    // Extract the region data from the middleware (fallback to INR if missing)
+    const rate = req.region?.rate || 1;
+    const symbol = req.region?.symbol || "₹";
+    const currencyCode = req.region?.currencyCode || "INR";
+
+    // If empty wishlist, still send back the currency info so the UI knows what to render
     if (!wishlist) {
       return res.status(200).json({
         success: true,
-        data: { items: [] },
+        data: { 
+          items: [],
+          currencySymbol: symbol,
+          currencyCode: currencyCode
+        },
       });
     }
 
@@ -46,6 +57,12 @@ export const getWishlist = async (req, res) => {
         imgUrl = primaryImg.baseUrl || primaryImg.url || "";
       }
 
+      // Calculate Base Price in INR
+      const basePriceINR = variant.finalPrice || variant.pricing?.price || 0;
+      
+      // Convert to Regional Price dynamically
+      const livePriceConverted = Math.round(basePriceINR * rate);
+
       return {
         productId: product._id || product.id,
         variantId: variant._id || variant.id,
@@ -53,7 +70,7 @@ export const getWishlist = async (req, res) => {
         slug: product.slug || "#",
         img: imgUrl,
         colorName: variant.colorName || "Unknown Color",
-        price: variant.finalPrice || variant.pricing?.price || 0,
+        price: livePriceConverted, // Send the converted regional price
         status: product.status ? product.status.toLowerCase() : "active",
         inStock: variant.inventory?.quantity > 0,
         stockQuantity: variant.inventory?.quantity || 0,
@@ -61,10 +78,14 @@ export const getWishlist = async (req, res) => {
       };
     }).filter((item) => item !== null); // Strip out any nulls from deleted variants
 
-    // Send the flattened, lightweight array to the frontend
+    // Send the flattened array and currency metadata to the frontend
     return res.status(200).json({
       success: true,
-      data: { items: formattedItems },
+      data: { 
+        items: formattedItems,
+        currencySymbol: symbol,
+        currencyCode: currencyCode
+      },
     });
   } catch (error) {
     console.error("[Wishlist Controller - getWishlist Error]:", error);
@@ -73,6 +94,7 @@ export const getWishlist = async (req, res) => {
       .json({ success: false, message: "Failed to fetch wishlist." });
   }
 };
+
 
 export const toggleWishlistItem = async (req, res) => {
   try {
@@ -143,6 +165,7 @@ export const toggleWishlistItem = async (req, res) => {
   }
 };
 
+
 export const syncWishlist = async (req, res) => {
   try {
     const userId = req.user;
@@ -209,6 +232,7 @@ export const syncWishlist = async (req, res) => {
       .json({ success: false, message: "Failed to sync wishlist." });
   }
 };
+
 
 export const clearWishlist = async (req, res) => {
   try {

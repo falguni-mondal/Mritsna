@@ -12,35 +12,28 @@ import {
 import { inventoryCheck } from '../../middleware/common/inventoryCheck.js';
 import { isValidUser } from '../../middleware/common/auth/auth.middleware.js'; 
 
+// --- NEW: Import our Region Middleware ---
+import { regionMiddleware } from '../../middleware/common/regionMiddleware.js';
+
 const router = express.Router();
 
 // ==========================================
-// PUBLIC ROUTES (Guests & Users)
+// PUBLIC ROUTES
 // ==========================================
-// Anyone can check if an item is in stock before attempting to add it
 router.post('/check-stock', checkStock);
 
 // ==========================================
-// PROTECTED ROUTES (Logged-in Users Only)
+// PROTECTED ROUTES
 // ==========================================
-// Explicitly applying isValidUser to prevent global middleware layout traps
 
-// Fetch the user's populated cart from the database
-router.get('/', isValidUser, getCart);
+// Attaching regionMiddleware only to the GET route
+// This ensures the frontend receives the converted prices, but the DB stays in INR.
+router.get('/', isValidUser, regionMiddleware, getCart);
 
-// Merge Guest LocalStorage cart into the Database upon login
 router.post('/sync', isValidUser, syncCart);
-
-// Add item to DB Cart (Passes through Auth -> Inventory limits -> Controller)
 router.post('/add', isValidUser, inventoryCheck, addToCart);
-
-// Update existing item quantity in DB Cart
 router.put('/update', isValidUser, inventoryCheck, updateCartItemQuantity);
-
-// Remove specific item from DB Cart
 router.delete('/remove/:variantId', isValidUser, removeFromCart);
-
-// Wipe the entire DB Cart (e.g., after successful checkout)
 router.delete('/clear', isValidUser, clearCart);
 
 export default router;

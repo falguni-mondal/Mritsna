@@ -6,7 +6,7 @@ export const fetchNewArrivals = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const response = await userAxios.get('/products/new-arrivals');
-      return response.data.data;
+      return response.data; 
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch new arrivals';
       return thunkAPI.rejectWithValue(message);
@@ -29,13 +29,12 @@ export const fetchStoreProducts = createAsyncThunk(
   }
 );
 
-// NEW: Fetch a single product by its slug
 export const fetchSingleProduct = createAsyncThunk(
   'product/fetchSingleProduct',
   async (slug, thunkAPI) => {
     try {
       const response = await userAxios.get(`/products/${slug}`);
-      return response.data.data;
+      return response.data.data; 
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch product details';
       return thunkAPI.rejectWithValue(message);
@@ -58,6 +57,8 @@ const initialState = {
   isLoading: false,
   isError: false,
   message: '',
+  currencySymbol: '₹', 
+  currencyCode: 'INR',
 };
 
 const productSlice = createSlice({
@@ -86,7 +87,9 @@ const productSlice = createSlice({
       })
       .addCase(fetchNewArrivals.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.newArrivals = action.payload; 
+        state.newArrivals = action.payload.data; 
+        state.currencySymbol = action.payload.currencySymbol || '₹';
+        state.currencyCode = action.payload.currencyCode || 'INR';
       })
       .addCase(fetchNewArrivals.rejected, (state, action) => {
         state.isLoading = false;
@@ -104,6 +107,8 @@ const productSlice = createSlice({
         state.isLoading = false;
         state.products = action.payload.data; 
         state.pagination = action.payload.pagination; 
+        state.currencySymbol = action.payload.currencySymbol || '₹';
+        state.currencyCode = action.payload.currencyCode || 'INR';
       })
       .addCase(fetchStoreProducts.rejected, (state, action) => {
         state.isLoading = false;
@@ -121,6 +126,8 @@ const productSlice = createSlice({
       .addCase(fetchSingleProduct.fulfilled, (state, action) => {
         state.isLoading = false;
         state.singleProduct = action.payload; 
+        state.currencySymbol = action.payload.currencySymbol || '₹';
+        state.currencyCode = action.payload.currencyCode || 'INR';
       })
       .addCase(fetchSingleProduct.rejected, (state, action) => {
         state.isLoading = false;

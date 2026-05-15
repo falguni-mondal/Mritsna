@@ -41,7 +41,7 @@ export const checkStock = async (req, res, next) => {
 };
 
 // ==========================================
-// GET USER CART
+// GET USER CART (UPDATED FOR DYNAMIC CURRENCY)
 // ==========================================
 export const getCart = async (req, res, next) => {
   try {
@@ -52,8 +52,22 @@ export const getCart = async (req, res, next) => {
       select: 'title slug category isPremium variants'
     });
 
+    // Extract the region data from the middleware (fallback to INR if missing)
+    const rate = req.region?.rate || 1;
+    const symbol = req.region?.symbol || '₹';
+    const currencyCode = req.region?.currencyCode || 'INR';
+
+    // If cart is empty, still send back the currency info so the UI knows what to render
     if (!cart) {
-      return res.status(200).json({ success: true, data: { items: [], subTotal: 0 } });
+      return res.status(200).json({ 
+        success: true, 
+        data: { 
+          items: [], 
+          subTotal: 0,
+          currencySymbol: symbol,
+          currencyCode: currencyCode
+        } 
+      });
     }
 
     let subTotal = 0;
@@ -67,15 +81,17 @@ export const getCart = async (req, res, next) => {
 
       if (!activeVariant) return null;
 
-      // Calculate Live Price instead of using historical cartItem.price
       const basePrice = activeVariant.pricing.price;
       const discount = activeVariant.pricing.discountPercentage || 0;
-      const livePrice = discount > 0 
+      const livePriceINR = discount > 0 
         ? basePrice - (basePrice * (discount / 100)) 
         : basePrice;
 
-      const itemTotal = cartItem.quantity * livePrice;
-      subTotal += itemTotal;
+      // Convert to Regional Price dynamically
+      const livePriceConverted = Math.round(livePriceINR * rate);
+      const itemTotalConverted = cartItem.quantity * livePriceConverted;
+      
+      subTotal += itemTotalConverted;
 
       return {
         cartItemId: cartItem._id,
@@ -85,16 +101,21 @@ export const getCart = async (req, res, next) => {
         title: cartItem.product.title,
         colorName: activeVariant.colorName,
         img: activeVariant.images.find(img => img.isPrimary)?.baseUrl || activeVariant.images[0]?.baseUrl,
-        price: livePrice, // Sent live calculated price instead of cartItem.price
+        price: livePriceConverted, // Send the converted regional price
         quantity: cartItem.quantity,
-        itemTotal: itemTotal,
+        itemTotal: itemTotalConverted, // Send the converted total
         maxLimit: Math.min(5, activeVariant.inventory.quantity)
       };
     }).filter(item => item !== null); 
 
     return res.status(200).json({
       success: true,
-      data: { items: formattedItems, subTotal }
+      data: { 
+        items: formattedItems, 
+        subTotal,
+        currencySymbol: symbol,       // Pass the symbol so React can render it
+        currencyCode: currencyCode    // Pass the code (e.g. 'USD') just in case
+      }
     });
   } catch (error) {
     console.error("Error fetching cart:", error);
@@ -124,14 +145,14 @@ export const addToCart = async (req, res, next) => {
     if (existingItemIndex > -1) {
       const newQuantity = cart.items[existingItemIndex].quantity + quantity;
       
-      // FIX 1: Enforce both the 5-item limit AND the actual warehouse stock limit
+      // Enforce both the 5-item limit AND the actual warehouse stock limit
       cart.items[existingItemIndex].quantity = Math.min(newQuantity, 5, availableStock);
-      cart.items[existingItemIndex].price = price; 
+      cart.items[existingItemIndex].price = price; // This is the base INR price
     } else {
       cart.items.push({
         product: productId,
         variantId: variantId,
-        quantity: quantity, // Middleware already verified this is <= stock
+        quantity: quantity,
         price: price
       });
     }
@@ -161,7 +182,7 @@ export const updateCartItemQuantity = async (req, res, next) => {
     if (itemIndex > -1) {
       // This is an absolute overwrite from the UI, so middleware check is sufficient
       cart.items[itemIndex].quantity = quantity;
-      cart.items[itemIndex].price = price; 
+      cart.items[itemIndex].price = price;
       await cart.save();
       return res.status(200).json({ success: true, message: 'Cart updated.' });
     } else {
@@ -242,7 +263,7 @@ export const syncCart = async (req, res, next) => {
       if (product && product.variants.length > 0) {
         const variant = product.variants[0];
         const dbStock = variant.inventory.quantity;
-        const currentPrice = variant.pricing.discountPercentage > 0 
+        const currentPriceINR = variant.pricing.discountPercentage > 0 
           ? variant.pricing.price - (variant.pricing.price * (variant.pricing.discountPercentage / 100))
           : variant.pricing.price;
 
@@ -254,13 +275,13 @@ export const syncCart = async (req, res, next) => {
           if (existingItemIndex > -1) {
             const combinedQty = cart.items[existingItemIndex].quantity + localItem.quantity;
             cart.items[existingItemIndex].quantity = Math.min(combinedQty, 5, dbStock);
-            cart.items[existingItemIndex].price = currentPrice;
+            cart.items[existingItemIndex].price = currentPriceINR;
           } else {
             cart.items.push({
               product: localItem.productId,
               variantId: localItem.variantId,
               quantity: Math.min(localItem.quantity, 5, dbStock),
-              price: currentPrice
+              price: currentPriceINR,
             });
           }
         }

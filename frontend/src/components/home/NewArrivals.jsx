@@ -31,7 +31,9 @@ const SplitText = ({ children, className = "" }) => {
 
 const NewArrivals = () => {
   const dispatch = useDispatch();
-  const { newArrivals, isLoading } = useSelector((state) => state.product);
+  
+  // --- FIX 1: Extract currencySymbol from the Redux store ---
+  const { newArrivals, isLoading, currencySymbol } = useSelector((state) => state.product);
 
   const sectionRef = useRef(null);
   const headingRef = useRef(null);
@@ -129,7 +131,11 @@ const NewArrivals = () => {
             /* CONDITION 2: DATA LOADED -> Render Real Cards */
             newArrivals.map((product) => (
               <SwiperSlide key={product._id || product.id}>
-                <ProductCard product={product} />
+                {/* --- FIX 2: Pass currencySymbol down to ProductCard --- */}
+                <ProductCard 
+                  product={product} 
+                  currencySymbol={currencySymbol || '₹'} 
+                />
               </SwiperSlide>
             ))
           )}

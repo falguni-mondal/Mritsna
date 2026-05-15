@@ -13,14 +13,9 @@ import {
   verifyStock 
 } from '../store/features/cartSlice';
 
-// --- NEW: Helper function to optimize ImageKit URLs ---
 const getOptimizedImgUrl = (url) => {
   if (!url) return "";
-  
-  // Prevent double-appending if it already has ImageKit transformations
   if (url.includes("tr=")) return url;
-  
-  // Safely append query parameters whether a query string already exists or not
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}tr=w-400,q-80`;
 };
@@ -30,35 +25,37 @@ const Cart = () => {
   const containerRef = useRef(null);
   const itemsRef = useRef([]);
   
-  // Refs for the Empty Bag animations
   const emptyBagRef = useRef(null);
 
-  const { items: cartItems, subTotal, isLoading } = useSelector((state) => state.cart);
+  // --- FIX 1: Extract currencySymbol and currencyCode from Redux ---
+  const { 
+    items: cartItems, 
+    subTotal, 
+    isLoading,
+    currencySymbol,
+    currencyCode
+  } = useSelector((state) => state.cart);
+  
   const isAuth = useSelector((state) => state.auth?.isAuthenticated);
 
-  // Debounce Tracking States (Dictionary approach per item)
   const [stagedQty, setStagedQty] = useState({});
   const [isVerifying, setIsVerifying] = useState({});
   const debounceTimers = useRef({});
 
-  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       Object.values(debounceTimers.current).forEach(clearTimeout);
     };
   }, []);
 
+  // --- FIX 2: Dynamic formatPrice Function ---
   const formatPrice = (price) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(price);
+    // Falls back to en-IN (Lakhs) for INR, uses standard en-US (Thousands) for foreign currency
+    const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+    return `${currencySymbol || '₹'} ${Number(price).toLocaleString(locale, { maximumFractionDigits: 0 })}`;
   };
 
   // --- ACTIONS ---
-
-  // Debounced Quantity Handler
   const handleQuantityChange = (item, type) => {
     const currentQty = stagedQty[item.variantId] ?? item.quantity;
     let newQty = currentQty;
@@ -67,15 +64,12 @@ const Cart = () => {
     if (type === 'dec' && currentQty > 1) newQty -= 1;
     if (newQty === currentQty) return; 
 
-    // 1. Optimistic UI Update (keeps buttons clickable instantly)
     setStagedQty(prev => ({ ...prev, [item.variantId]: newQty }));
 
-    // 2. Clear existing timer for this specific item
     if (debounceTimers.current[item.variantId]) {
       clearTimeout(debounceTimers.current[item.variantId]);
     }
 
-    // 3. Set new Debounce Timer (800ms delay)
     debounceTimers.current[item.variantId] = setTimeout(async () => {
       setIsVerifying(prev => ({ ...prev, [item.variantId]: true }));
       
@@ -88,19 +82,18 @@ const Cart = () => {
 
         if (!stockCheck.isAvailable) {
           alert(stockCheck.message);
-          newQty = stockCheck.availableStock; // Snap back to max allowed
+          newQty = stockCheck.availableStock; 
         }
 
-        // Apply final verified amount to DB or LocalStorage
         if (isAuth) {
           await dispatch(updateCartQuantityDB({ 
-            productId: item.productId, // <-- THE FIX: Added productId here
+            productId: item.productId, 
             variantId: item.variantId, 
             quantity: newQty 
           })).unwrap();
         } else {
           dispatch(updateLocalQuantity({ 
-            productId: item.productId, // <-- THE FIX: Added productId here
+            productId: item.productId, 
             variantId: item.variantId, 
             quantity: newQty 
           }));
