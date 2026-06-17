@@ -48,17 +48,17 @@ const PreFooterContact = () => {
       .fromTo(".fade-up-text",
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 1, stagger: 0.1, ease: "power3.out" },
-        "-=0.7"
+        "-=1.1"
       )
       .fromTo(".divider-line",
         { scaleX: 0 },
         { scaleX: 1, duration: 1, stagger: 0.15, ease: "power3.inOut", transformOrigin: "left center" },
-        "-=0.8"
+        "-=1.1"
       )
       .fromTo(".contact-item",
         { opacity: 0, y: 15 },
         { opacity: 1, y: 0, duration: 0.8, stagger: 0.15, ease: "power3.out" },
-        "-=0.8"
+        "-=1.1"
       );
     });
 

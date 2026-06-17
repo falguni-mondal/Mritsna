@@ -31,13 +31,26 @@ function imageLimit(val) {
 
 // Sub-Schema: Color Variants ---
 const variantSchema = new mongoose.Schema({
+  // Boolean toggle for multicolor variants
+  isMulticolor: {
+    type: Boolean,
+    default: false
+  },
   colorName: { 
     type: String, 
-    required: [true, 'Color name is required (e.g., Obsidian)'] 
+    // Kept required so it displays textually (e.g., "Assorted", "Rainbow", or "Multicolor")
+    required: [true, 'Color name is required (e.g., Obsidian or Multicolor)'] 
   },
   colorHex: { 
     type: String, 
-    required: [true, 'Hex code is required for UI color swatches (e.g., #1A1A1A)'] 
+    // Conditionally required based on the isMulticolor flag
+    required: [
+      function() { 
+        // 'this' refers to the current variant subdocument
+        return !this.isMulticolor; 
+      }, 
+      'Hex code is required for UI color swatches unless Multicolor is selected'
+    ] 
   },
   sku: { 
     type: String, 
@@ -46,7 +59,7 @@ const variantSchema = new mongoose.Schema({
     uppercase: true 
   },
   
-  // NEW: Variant-specific pricing
+  // Variant-specific pricing
   pricing: {
     price: {
       type: Number,
@@ -61,7 +74,7 @@ const variantSchema = new mongoose.Schema({
     }
   },
 
-  // NEW: Variant-specific attributes (Material & Finish)
+  // Variant-specific attributes (Material & Finish)
   attributes: {
     material: { 
       type: String, 
@@ -98,7 +111,7 @@ const variantSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// NEW: Virtual calculation for frontend discounts moved to the variant level
+// Virtual calculation for frontend discounts moved to the variant level
 variantSchema.virtual('finalPrice').get(function() {
   if (this.pricing && this.pricing.discountPercentage > 0) {
     return this.pricing.price - (this.pricing.price * (this.pricing.discountPercentage / 100));

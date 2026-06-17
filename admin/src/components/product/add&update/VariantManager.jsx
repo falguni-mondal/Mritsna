@@ -4,7 +4,7 @@ import { Icon } from '@iconify/react';
 import ImageUploader from './ImageUploader';
 
 const VariantManager = () => {
-  // 1. We bring in 'watch' and 'setValue' to handle the bi-directional color sync
+  // We bring in 'watch' and 'setValue' to handle the bi-directional color sync and auto-fills
   const { control, register, watch, setValue, formState: { errors } } = useFormContext();
   
   const { fields, append, remove } = useFieldArray({
@@ -13,8 +13,8 @@ const VariantManager = () => {
   });
 
   const addVariant = () => {
-    // UPDATED: Added the new nested pricing and attributes objects
     append({
+      isMulticolor: false, // <-- NEW: Default to false
       colorName: '',
       colorHex: '#000000',
       sku: '',
@@ -49,8 +49,9 @@ const VariantManager = () => {
 
       <div className="space-y-6">
         {fields.map((field, index) => {
-          // 2. We watch the specific hex code for THIS variant
+          // Watch the specific hex code AND the multicolor flag for THIS variant
           const currentColorHex = watch(`variants.${index}.colorHex`);
+          const isMulticolor = watch(`variants.${index}.isMulticolor`);
 
           return (
             <div key={field.id} className="p-5 border border-gray-200 rounded-lg bg-gray-50 relative group transition-all hover:border-gray-300">
@@ -63,9 +64,33 @@ const VariantManager = () => {
                 <Icon icon="lucide:trash-2" width="18" />
               </button>
 
-              <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wider">
-                Variant {index + 1}
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                  Variant {index + 1}
+                </h3>
+                
+                {/* --- NEW: THE MULTICOLOR TOGGLE --- */}
+                <label className="flex items-center gap-2 cursor-pointer mr-8 bg-white px-3 py-1.5 rounded border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    {...register(`variants.${index}.isMulticolor`, {
+                      onChange: (e) => {
+                        // When toggled ON, automatically fill "Multicolor" and clear the hex
+                        if (e.target.checked) {
+                          setValue(`variants.${index}.colorName`, 'Multicolor', { shouldValidate: true });
+                          setValue(`variants.${index}.colorHex`, '', { shouldValidate: true });
+                        } else {
+                          // When toggled OFF, clear the name so they can type a new one
+                          setValue(`variants.${index}.colorName`, '', { shouldValidate: true });
+                          setValue(`variants.${index}.colorHex`, '#000000', { shouldValidate: true });
+                        }
+                      }
+                    })}
+                    className="rounded border-gray-300 text-black focus:ring-black w-4 h-4 cursor-pointer" 
+                  />
+                  <span className="text-sm font-medium text-gray-700">Multicolor / Assorted</span>
+                </label>
+              </div>
 
               {/* ROW 1: IDENTITY */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
@@ -75,27 +100,35 @@ const VariantManager = () => {
                     {...register(`variants.${index}.colorName`)} 
                     type="text" 
                     placeholder="e.g. Obsidian"
-                    className="w-full p-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
+                    disabled={isMulticolor}
+                    className={`w-full p-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black/5 ${isMulticolor ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'}`}
                   />
                   {errors.variants?.[index]?.colorName && <p className="text-red-500 text-xs mt-1">{errors.variants[index].colorName.message}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Hex Code</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Hex Code {!isMulticolor && <span className="text-red-500">*</span>}</label>
                   <div className="flex gap-2">
-                    {/* 3. The Color Box reads from 'watch', and writes via 'setValue' */}
-                    <input 
-                      type="color" 
-                      value={currentColorHex || '#000000'}
-                      onChange={(e) => setValue(`variants.${index}.colorHex`, e.target.value, { shouldValidate: true })}
-                      className="h-9 w-12 p-0.5 bg-white border border-gray-200 rounded-md cursor-pointer flex-shrink-0"
-                    />
-                    {/* 4. The Text Box maintains the official 'register' */}
+                    {/* Visual Color Box or Rainbow Swatch */}
+                    {isMulticolor ? (
+                      <div className="h-9 w-12 rounded-md flex-shrink-0 bg-gradient-to-r from-red-500 via-yellow-400 to-blue-500 border border-gray-200 shadow-inner" title="Multicolor"></div>
+                    ) : (
+                      <input 
+                        type="color" 
+                        value={currentColorHex || '#000000'}
+                        onChange={(e) => setValue(`variants.${index}.colorHex`, e.target.value, { shouldValidate: true })}
+                        className="h-9 w-12 p-0.5 bg-white border border-gray-200 rounded-md cursor-pointer flex-shrink-0"
+                      />
+                    )}
+                    
+                    {/* Text Input */}
                     <input 
                       {...register(`variants.${index}.colorHex`)} 
                       type="text" 
                       maxLength={7}
-                      className="w-full p-2 bg-white border border-gray-200 rounded-md text-sm uppercase focus:outline-none focus:ring-2 focus:ring-black/5"
+                      disabled={isMulticolor}
+                      placeholder={isMulticolor ? "N/A" : "#000000"}
+                      className={`w-full p-2 border border-gray-200 rounded-md text-sm uppercase focus:outline-none focus:ring-2 focus:ring-black/5 ${isMulticolor ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'}`}
                     />
                   </div>
                   {errors.variants?.[index]?.colorHex && <p className="text-red-500 text-xs mt-1">{errors.variants[index].colorHex.message}</p>}

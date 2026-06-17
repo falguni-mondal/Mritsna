@@ -182,9 +182,9 @@ export const adminVerifyOTP = async (req, res) => {
       30 * 24 * 60 * 60 // 30 days in seconds
     );
 
-    // 7. Plant the Cookies
-    res.cookie("accessToken", accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 }); // 15 mins
-    res.cookie("refreshToken", refreshToken, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 }); // 30 days
+    // 7. Plant the Cookies (Using Admin-specific names)
+    res.cookie("admin_accessToken", accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 }); // 15 mins
+    res.cookie("admin_refreshToken", refreshToken, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 }); // 30 days
     res.cookie("device_id", deviceId, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 }); // 1 year
 
     return res.status(200).json({
@@ -217,8 +217,9 @@ export const adminLogout = async (req, res) => {
       );
     }
 
-    res.clearCookie("accessToken", clearCookieOptions);
-    res.clearCookie("refreshToken", clearCookieOptions);
+    // Explicitly clearing the admin-specific cookies
+    res.clearCookie("admin_accessToken", clearCookieOptions);
+    res.clearCookie("admin_refreshToken", clearCookieOptions);
     res.clearCookie("device_id", clearCookieOptions);
 
     return res.status(200).json({ success: true, message: "Admin logged out successfully." });

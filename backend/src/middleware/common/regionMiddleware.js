@@ -17,7 +17,7 @@ export const regionMiddleware = async (req, res, next) => {
     // Guess via Geo-IP if no cookie exists
     else {
       // req.ip usually works, but x-forwarded-for is needed if you are behind a proxy/load balancer (like Vercel or Render)
-    //   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress || req.ip;
+      // const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress || req.ip;
     const ip = "8.8.8.8"; // Placeholder for testing (Google's Public DNS IP, located in the US)
       
       if (ip) {

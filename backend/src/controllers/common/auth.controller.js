@@ -121,8 +121,9 @@ export const register = async (req, res) => {
     const accessToken = tokenizer.createAccessToken(user._id, user.role);
     const refreshToken = tokenizer.createRefreshToken(session._id, user._id, user.role, remainingSeconds);
 
-    res.cookie("accessToken", accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
-    res.cookie("refreshToken", refreshToken, { ...cookieOptions, maxAge: remainingSeconds * 1000 });
+    // --- NEW: Using user-specific cookie names ---
+    res.cookie("user_accessToken", accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+    res.cookie("user_refreshToken", refreshToken, { ...cookieOptions, maxAge: remainingSeconds * 1000 });
     res.cookie("device_id", deviceId, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
 
     return res.status(201).json({
@@ -217,8 +218,9 @@ export const login = async (req, res) => {
     const accessToken = tokenizer.createAccessToken(user._id, user.role);
     const refreshToken = tokenizer.createRefreshToken(session._id, user._id, user.role, remainingSeconds);
 
-    res.cookie("accessToken", accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
-    res.cookie("refreshToken", refreshToken, { ...cookieOptions, maxAge: remainingSeconds * 1000 });
+    // --- NEW: Using user-specific cookie names ---
+    res.cookie("user_accessToken", accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+    res.cookie("user_refreshToken", refreshToken, { ...cookieOptions, maxAge: remainingSeconds * 1000 });
     res.cookie("device_id", deviceId, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
 
     return res.status(200).json({
@@ -251,8 +253,9 @@ export const logout = async (req, res) => {
       await Session.deleteMany({ user: req.user, device_id: deviceId });
     }
 
-    res.clearCookie("accessToken", clearCookieOptions);
-    res.clearCookie("refreshToken", clearCookieOptions);
+    // --- NEW: Clearing user-specific cookie names ---
+    res.clearCookie("user_accessToken", clearCookieOptions);
+    res.clearCookie("user_refreshToken", clearCookieOptions);
 
     return res.status(200).json({
       success: true,
@@ -306,8 +309,9 @@ export const deactivateAccount = async (req, res) => {
 
     await Session.deleteMany({ user: userId });
 
-    res.clearCookie("accessToken", clearCookieOptions);
-    res.clearCookie("refreshToken", clearCookieOptions);
+    // --- NEW: Clearing user-specific cookie names ---
+    res.clearCookie("user_accessToken", clearCookieOptions);
+    res.clearCookie("user_refreshToken", clearCookieOptions);
 
     return res.status(200).json({
       success: true,

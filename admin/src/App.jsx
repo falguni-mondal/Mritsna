@@ -11,7 +11,6 @@ const App = () => {
   const { isInitializing } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    // Fire the Redux thunk to validate httpOnly cookies the moment the app loads
     dispatch(validateAdminSession());
   }, [dispatch]);
 

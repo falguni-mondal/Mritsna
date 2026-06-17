@@ -5,19 +5,28 @@ import { userAxios } from '../../configs/axiosInstance';
 // LOCAL STORAGE HELPERS (GUEST CART)
 // ==========================================
 const loadGuestCart = () => {
-  if (typeof window === 'undefined') return { items: [], subTotal: 0 };
+  if (typeof window === 'undefined') return { items: [], subTotal: 0, currencySymbol: '₹', currencyCode: 'INR' };
   try {
     const saved = localStorage.getItem('guest_cart');
-    return saved ? JSON.parse(saved) : { items: [], subTotal: 0 };
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        items: parsed.items || [],
+        subTotal: parsed.subTotal || 0,
+        currencySymbol: parsed.currencySymbol || '₹',
+        currencyCode: parsed.currencyCode || 'INR'
+      };
+    }
+    return { items: [], subTotal: 0, currencySymbol: '₹', currencyCode: 'INR' };
   } catch (error) {
     console.error("Failed to parse guest cart:", error);
-    return { items: [], subTotal: 0 };
+    return { items: [], subTotal: 0, currencySymbol: '₹', currencyCode: 'INR' };
   }
 };
 
-const saveGuestCart = (items, subTotal) => {
+const saveGuestCart = (items, subTotal, currencySymbol, currencyCode) => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('guest_cart', JSON.stringify({ items, subTotal }));
+    localStorage.setItem('guest_cart', JSON.stringify({ items, subTotal, currencySymbol, currencyCode }));
   }
 };
 
@@ -49,7 +58,6 @@ export const fetchUserCart = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const response = await userAxios.get('/cart');
-      // --- FIX 1: Return the full response data to ensure we grab the currency info ---
       return response.data;
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to fetch cart');
@@ -133,9 +141,8 @@ const initialState = {
   isLoading: false,
   isError: false,
   message: '',
-  // --- FIX 2: Add default currency states ---
-  currencySymbol: '₹',
-  currencyCode: 'INR',
+  currencySymbol: initialGuestCart.currencySymbol,
+  currencyCode: initialGuestCart.currencyCode,
 };
 
 const cartSlice = createSlice({
@@ -144,6 +151,12 @@ const cartSlice = createSlice({
   reducers: {
     addLocalItem: (state, action) => {
       const newItem = action.payload;
+
+      if (newItem.currencySymbol && newItem.currencyCode) {
+        state.currencySymbol = newItem.currencySymbol;
+        state.currencyCode = newItem.currencyCode;
+      }
+
       const existingIndex = state.items.findIndex(item => item.variantId === newItem.variantId);
 
       if (existingIndex > -1) {
@@ -156,7 +169,7 @@ const cartSlice = createSlice({
       }
 
       state.subTotal = calculateSubTotal(state.items);
-      saveGuestCart(state.items, state.subTotal);
+      saveGuestCart(state.items, state.subTotal, state.currencySymbol, state.currencyCode);
     },
 
     updateLocalQuantity: (state, action) => {
@@ -167,7 +180,7 @@ const cartSlice = createSlice({
         existingItem.quantity = quantity;
         existingItem.itemTotal = quantity * existingItem.price;
         state.subTotal = calculateSubTotal(state.items);
-        saveGuestCart(state.items, state.subTotal);
+        saveGuestCart(state.items, state.subTotal, state.currencySymbol, state.currencyCode);
       }
     },
 
@@ -175,7 +188,7 @@ const cartSlice = createSlice({
       const variantId = action.payload;
       state.items = state.items.filter(item => item.variantId !== variantId);
       state.subTotal = calculateSubTotal(state.items);
-      saveGuestCart(state.items, state.subTotal);
+      saveGuestCart(state.items, state.subTotal, state.currencySymbol, state.currencyCode);
     },
 
     clearLocalCart: (state) => {
@@ -204,7 +217,6 @@ const cartSlice = createSlice({
         state.items = payloadData.items || [];
         state.subTotal = payloadData.subTotal || 0;
         
-        // --- FIX 3: Save the currency info from the backend response ---
         state.currencySymbol = action.payload.currencySymbol || payloadData.currencySymbol || '₹';
         state.currencyCode = action.payload.currencyCode || payloadData.currencyCode || 'INR';
       })

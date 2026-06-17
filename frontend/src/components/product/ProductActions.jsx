@@ -28,6 +28,9 @@ const ProductActions = ({ product, activeVariant }) => {
   // --- NEW: Get Wishlist State ---
   const wishlistItems = useSelector((state) => state.wishlist?.items || []);
 
+  // --- FIX 1: Grab the active currency from the Product slice ---
+  const { currencySymbol, currencyCode } = useSelector((state) => state.product);
+
   // Check if the current variant is already in the cart or wishlist
   const isItemInCart = cartItems.some((item) => item.variantId === activeVariant.variantId);
   const isInWishlist = wishlistItems.some(
@@ -150,11 +153,13 @@ const ProductActions = ({ product, activeVariant }) => {
             slug: product.slug,
             title: product.title,
             colorName: activeVariant.colorName,
-            // Apply the optimized URL here
             img: rawImageUrl,
             price: activeVariant.finalPrice || activeVariant.originalPrice,
             quantity: quantity,
             maxLimit: stockCheck.availableStock,
+            // --- FIX 2: Attach the currency so cartSlice can save it to localStorage ---
+            currencySymbol: currencySymbol,
+            currencyCode: currencyCode
           })
         );
       }
@@ -195,7 +200,10 @@ const ProductActions = ({ product, activeVariant }) => {
         colorName: activeVariant.colorName,
         img: rawImageUrl,
         price: activeVariant.finalPrice || activeVariant.pricing?.price, // Check pricing object safely
-        status: product.status || 'active'
+        status: product.status || 'active',
+        // --- FIX 3: Also attach currency here just in case wishlist needs it locally ---
+        currencySymbol: currencySymbol,
+        currencyCode: currencyCode
       }));
     }
   };

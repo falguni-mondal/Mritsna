@@ -10,13 +10,17 @@ const imageSchema = z.object({
 });
 
 const variantSchema = z.object({
+  // Boolean flag for multicolor
+  isMulticolor: z.boolean().optional().default(false),
+  
   colorName: z.string().min(1, "Color name is required"),
-  colorHex: z
-    .string()
-    .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Must be a valid Hex code"),
+  
+  // UPDATED: Relaxed base validation to allow empty/missing values 
+  // before the superRefine cross-check runs.
+  colorHex: z.string().optional().or(z.literal('')),
+  
   sku: z.string().min(3, "SKU is required and must be at least 3 characters"),
   
-  // NEW: Variant-level pricing validation
   pricing: z.object({
     price: z
       .number()
@@ -24,7 +28,6 @@ const variantSchema = z.object({
     discountPercentage: z.number().min(0).max(100).optional().default(0),
   }),
 
-  // NEW: Variant-level attributes validation
   attributes: z.object({
     material: z.string().min(1, "Material is required for this variant"),
     finish: z.string().optional(),
@@ -37,6 +40,25 @@ const variantSchema = z.object({
   }),
   
   images: z.array(imageSchema).max(5, "A variant cannot exceed 5 images"),
+}).superRefine((data, ctx) => {
+  // The Cross-Field Validation Logic
+  if (!data.isMulticolor) {
+    // If it is a solid color, hex is strictly required
+    if (!data.colorHex || data.colorHex.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Hex code is required unless Multicolor is selected",
+        path: ["colorHex"], 
+      });
+    } else if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.colorHex)) {
+      // If a hex is provided, it must be mathematically valid
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Must be a valid Hex code (e.g., #1A1A1A)",
+        path: ["colorHex"],
+      });
+    }
+  }
 });
 
 // --- Exported Schemas ---
@@ -48,10 +70,8 @@ export const createProductSchema = z.object({
   description: z.string().min(10, "Description needs more detail"),
   category: z.enum(["Vases", "Lighting", "Dinnerware", "Decor", "Sculpture"]),
   
-  // NEW: Premium flag validation
   isPremium: z.boolean().optional().default(false),
 
-  // UPDATED: Now only contains shared global logic
   pricing: z.object({
     baseCurrency: z
       .string()
@@ -76,8 +96,6 @@ export const createProductSchema = z.object({
     }),
     isFragile: z.boolean().optional().default(true),
   }),
-
-  // NOTE: 'attributes' block has been completely removed from the root schema
 
   variants: z
     .array(variantSchema)
