@@ -107,7 +107,7 @@ const ImageUploader = ({ variantIndex }) => {
   
   const fieldName = `variants.${variantIndex}.images`;
   const currentImages = watch(fieldName) || [];
-  const maxImages = 5;
+  const maxImages = 4;
 
   // Set up smart sensors. A 5px drag distance prevents accidental drags when clicking buttons.
   const sensors = useSensors(

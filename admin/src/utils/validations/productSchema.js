@@ -41,10 +41,10 @@ const variantSchema = z.object({
     allowBackorder: z.boolean().optional().default(false),
   }),
   
-  // Enforce the 5-image limit just like the backend
+  // Enforce the 4-image limit just like the backend
   images: z.array(imageSchema)
     .min(1, "At least one image is required for this variant")
-    .max(5, "A variant cannot exceed 5 images"),
+    .max(4, "A variant cannot exceed 4 images"),
 }).superRefine((data, ctx) => {
   // The Cross-Field Validation Logic for the Frontend Form
   if (!data.isMulticolor) {

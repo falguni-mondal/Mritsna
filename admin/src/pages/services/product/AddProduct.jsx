@@ -25,7 +25,7 @@ const AddProduct = () => {
   const methods = useForm({
     resolver: zodResolver(productValidationSchema),
     defaultValues: {
-      status: 'draft',
+      status: 'active',
       category: 'Vases',
       isPremium: false, // NEW: Default to false
       pricing: { baseCurrency: 'INR', taxClass: 'standard', hsnCode: '' },

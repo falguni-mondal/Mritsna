@@ -20,7 +20,7 @@ import { isAdmin, isValidUser } from "../../middleware/common/auth/auth.middlewa
 
 const router = express.Router();
 
-router.use(isValidUser, isAdmin); // All routes below require authentication
+router.use(isAdmin); // All routes below require authentication
 
 // --- Inventory Management Routes ---
 router.get('/inventory', getInventoryList);

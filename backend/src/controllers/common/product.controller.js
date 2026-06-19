@@ -205,6 +205,7 @@ export const getSingleProduct = async (req, res, next) => {
 
       return {
         variantId: variant._id,
+        isMulticolor: variant.isMulticolor,
         colorName: variant.colorName,
         colorHex: variant.colorHex,
         originalPrice: originalPriceConverted, // Send the converted price

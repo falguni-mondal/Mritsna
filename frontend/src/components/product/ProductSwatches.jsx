@@ -1,7 +1,6 @@
 import React from "react";
 
 const ProductSwatches = ({ variants, activeVariant, onVariantChange }) => {
-  // If the product only has 1 variant (or none), don't bother showing the swatch selector
   if (!variants || variants.length <= 1) return null;
 
   return (
@@ -12,12 +11,14 @@ const ProductSwatches = ({ variants, activeVariant, onVariantChange }) => {
       
       <div className="flex flex-wrap gap-3">
         {variants.map((variant) => {
-          const isActive = activeVariant.variantId === variant.variantId;
-          const isOutOfStock = !variant.inStock;
+          const isActive = activeVariant.variantId === variant.variantId || activeVariant._id === variant._id;
+          
+          // FIXED: Reverted back to checking the boolean, with a fallback just in case
+          const isOutOfStock = !variant.inStock || (variant.inventory && variant.inventory.quantity <= 0);
 
           return (
             <button
-              key={variant.variantId}
+              key={variant.variantId || variant._id}
               onClick={() => onVariantChange(variant)}
               className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300
                 ${isActive ? "border border-[#1a1a1a] p-[2px]" : "border border-transparent hover:scale-110"}
@@ -26,10 +27,18 @@ const ProductSwatches = ({ variants, activeVariant, onVariantChange }) => {
               aria-label={`Select ${variant.colorName}`}
               title={isOutOfStock ? `${variant.colorName} - Out of Stock` : variant.colorName}
             >
-              {/* Inner Color Circle */}
+              {/* Inner Color Circle / Multicolor Swatch */}
               <div 
                 className="w-full h-full rounded-full border border-black/10 relative overflow-hidden"
-                style={{ backgroundColor: variant.colorHex }}
+                style={
+                  variant.isMulticolor 
+                    ? { 
+                        backgroundImage: `url('/swatch/multicolor_swatch.webp')`, 
+                        backgroundSize: 'cover', 
+                        backgroundPosition: 'center',
+                      }
+                    : { backgroundColor: variant.colorHex }
+                }
               >
                 {/* Diagonal line for Out of Stock variants */}
                 {isOutOfStock && (
