@@ -32,6 +32,10 @@ const userSchema = new mongoose.Schema(
       type: String, // e.g., "9876543210"
       default: null
     },
+    addresses: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Address' 
+  }],
     // -------------------------
     isClaimed: { 
       type: Boolean, 
