@@ -1,32 +1,33 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const exchangeRateSchema = new mongoose.Schema(
   {
-    // The currency all rates are compared against (e.g., "INR")
+    // The currency that all rates are calculated against
     baseCurrency: {
       type: String,
       required: true,
-      default: "INR",
-      unique: true, // We only ever need one document for INR
+      default: 'INR',
+      unique: true, // Ensures we only ever have ONE document for INR in the collection
+      uppercase: true,
+      trim: true,
+      index: true,
     },
-    
-    // A flexible map to store all the currency codes and their multipliers
-    // Example: { "USD": 0.012, "EUR": 0.011, "AED": 0.044 }
     rates: {
       type: Map,
       of: Number,
       required: true,
     },
-    
-    // Tracks exactly when the API was last called
     lastUpdated: {
       type: Date,
       default: Date.now,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-const ExchangeRate = mongoose.model("ExchangeRate", exchangeRateSchema);
+// We export it as default to match your standard architecture
+const ExchangeRate = mongoose.model('ExchangeRate', exchangeRateSchema);
 
 export default ExchangeRate;

@@ -11,7 +11,7 @@ import {
   changeEmailAndResendOtp
 } from "../../controllers/common/auth.controller.js";
 import { isValidUser } from "../../middleware/common/auth/auth.middleware.js";
-import { validateLogin, validateRegister } from "../../middleware/user/auth.middleware.js";
+import { validateLogin, validateRegister } from "../../middleware/user/auth.validation.js";
 
 const router = express.Router();
 
