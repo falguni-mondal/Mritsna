@@ -42,6 +42,9 @@ export const calculateTotalsSchema = z.object({
     
     // Allows the frontend to request a preview of the Partial COD split
     paymentOption: paymentOptionEnum.optional().default('FULL_ONLINE'), 
+
+    // If the user explicitly removes an auto-applied coupon, the frontend sends true
+    skipAutoApply: z.boolean().optional().default(false),
   }),
 });
 
@@ -62,6 +65,8 @@ export const createOrderSchema = z.object({
     // For guest checkouts, these help track coupon usage
     guestEmail: z.string().email("Invalid guest email format").trim().toLowerCase().optional().nullable(),
     deviceId: z.string().min(10, "Device ID is required for security checks").optional().nullable(),
+
+    skipAutoApply: z.boolean().optional().default(false),
   })
   // SuperRefine: Ensure guest checkout has an email
   .superRefine((data, ctx) => {

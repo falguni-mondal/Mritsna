@@ -113,7 +113,6 @@ orderSchema.pre('save', function (next) {
     const randomHex = Math.floor(Math.random() * 16777215).toString(16).toUpperCase().padStart(4, '0');
     this.orderNumber = `ORD-${timestampHex}-${randomHex}`;
   }
-  next();
 });
 
 export default mongoose.model('Order', orderSchema);

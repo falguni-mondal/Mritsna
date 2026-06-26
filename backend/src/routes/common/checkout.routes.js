@@ -16,11 +16,7 @@ import { validateRequest } from "../../middleware/common/checkout/validate.reque
 
 const router = express.Router();
 
-/**
- * @route   POST /api/checkout/calculate
- * @desc    Live calculation of cart totals, taxes, and coupon discounts
- * @access  Public / Optional Auth 
- */
+
 router.post(
   "/calculate",
   optionalAuth,
@@ -28,11 +24,7 @@ router.post(
   calculateCheckoutTotals
 );
 
-/**
- * @route   POST /api/checkout/create-order
- * @desc    Initialize a Razorpay order and save a pending order in the database
- * @access  Public / Optional Auth
- */
+
 router.post(
   "/create-order",
   optionalAuth,
@@ -40,11 +32,7 @@ router.post(
   createRazorpayOrder
 );
 
-/**
- * @route   POST /api/checkout/verify-payment
- * @desc    Verify the cryptographic signature from Razorpay and fulfill the order
- * @access  Public / Optional Auth
- */
+
 router.post(
   "/verify-payment",
   optionalAuth,

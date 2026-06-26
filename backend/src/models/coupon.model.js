@@ -72,6 +72,11 @@ const couponSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+    isAutoApply: {
+      type: Boolean,
+      default: false,
+      index: true, // Crucial for fast querying during checkout math
+    },
   },
   {
     timestamps: true,

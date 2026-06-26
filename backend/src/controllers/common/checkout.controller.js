@@ -1,9 +1,14 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import { createRequire } from "module"; // <-- Safely handles JSON imports in ES Modules
 import Order from "../../models/order.model.js";
 import Product from "../../models/product.model.js";
 import Coupon from "../../models/coupon.model.js";
 import { getCurrencyForCountry } from "../../config/currencyMap.js";
+
+// Safe JSON Import
+const require = createRequire(import.meta.url);
+const hsnMap = require("../../config/hsnRates.json");
 
 // Initialize Razorpay Instance
 const razorpay = new Razorpay({
@@ -11,15 +16,38 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
+// --- HELPER: Prefix-matching HSN Lookup Engine ---
+const getGSTRate = (hsnCode) => {
+  if (!hsnCode) return hsnMap["DEFAULT"].rate;
+  
+  const codeStr = hsnCode.toString().trim();
+  
+  // 1. Direct exact match (8 or 6 digits)
+  if (hsnMap[codeStr]) return hsnMap[codeStr].rate;
+  
+  // 2. Fallback to 6-digit sub-heading
+  if (codeStr.length > 6 && hsnMap[codeStr.substring(0, 6)]) {
+    return hsnMap[codeStr.substring(0, 6)].rate;
+  }
+  
+  // 3. Fallback to 4-digit chapter heading
+  if (codeStr.length >= 4 && hsnMap[codeStr.substring(0, 4)]) {
+    return hsnMap[codeStr.substring(0, 4)].rate;
+  }
+  
+  // 4. Default safety net
+  return hsnMap["DEFAULT"].rate;
+};
+
 /**
- * PRIVATE HELPER: Core Math & Validation Engine
- * Now includes dynamic splitting for Partial COD vs Full Online payments.
+ * Core Math & Validation Engine
+ * Dynamically handles inventory safety, coupon logic, and HSN item taxation.
  */
-const processCheckoutMath = async (items, country, state, couponCode, paymentOption, userContext) => {
+const processCheckoutMath = async (items, country, state, couponCode, paymentOption, skipAutoApply, userContext) => {
   let subTotal = 0;
   const validatedItems = [];
 
-  // 1. Validate Items & Calculate SubTotal (from DB, never trust frontend)
+  // Validate Items & Calculate SubTotal (from DB, never trust frontend)
   for (const item of items) {
     const product = await Product.findOne({ "variants._id": item.variantId });
     if (!product) throw new Error(`Product containing variant ${item.variantId} not found`);
@@ -30,137 +58,209 @@ const processCheckoutMath = async (items, country, state, couponCode, paymentOpt
       throw new Error(`Insufficient stock for ${product.title} - ${variant.colorName}`);
     }
 
-    const itemTotal = variant.pricing.price * item.quantity;
+    // Apply Admin Product/Variant Level Discount
+    const basePrice = variant.pricing.price; 
+    let sellingPrice = basePrice;
+    
+    const discountPercent = variant.pricing.discountPercentage || 0;
+
+    if (discountPercent > 0) {
+      sellingPrice = Math.round(basePrice - (basePrice * (discountPercent / 100)));
+    }
+
+    const itemTotal = sellingPrice * item.quantity;
     subTotal += itemTotal;
 
     validatedItems.push({
       product: product._id,
       variantId: variant._id,
+      hsnCode: product.pricing.hsnCode, // Captured for item-level tax lookup
       title: product.title,
       colorName: variant.colorName,
       slug: product.slug,
       img: variant.images[0]?.baseUrl,
       quantity: item.quantity,
-      priceAtPurchase: variant.pricing.price,
+      priceAtPurchase: sellingPrice, 
       itemTotal: itemTotal,
     });
   }
 
-  // 2. Coupon & Fingerprinting Logic
+  // Coupon & Fingerprinting Logic (Manual vs Auto-Apply)
   let discountAmount = 0;
   let appliedCouponId = null;
+  let appliedCouponCode = null;
+
+  // Reusable eligibility checker for both manual and auto-coupons
+  const evaluateCouponEligibility = async (coupon, currentSubTotal) => {
+    if (currentSubTotal < coupon.minOrderValue) {
+      return { eligible: false, reason: "Minimum order value not met." };
+    }
+
+    const fingerprintQuery = [];
+    if (userContext.userId) fingerprintQuery.push({ user: userContext.userId });
+    if (userContext.guestEmail) fingerprintQuery.push({ guestEmail: userContext.guestEmail.toLowerCase() });
+    if (userContext.deviceId) fingerprintQuery.push({ deviceId: userContext.deviceId });
+
+    if (fingerprintQuery.length > 0) {
+      const pastUsageCount = await Order.countDocuments({
+        couponApplied: coupon._id,
+        paymentStatus: { $ne: 'Failed' },
+        $or: fingerprintQuery
+      });
+
+      if (pastUsageCount >= coupon.usagePerUserLimit) {
+        return { eligible: false, reason: "Coupon usage limit reached." };
+      }
+    }
+
+    let calculatedDiscount = 0;
+    if (coupon.discountType === 'percentage') {
+      calculatedDiscount = Math.round((currentSubTotal * coupon.discountValue) / 100);
+      if (coupon.maxDiscountAmount) {
+        calculatedDiscount = Math.min(calculatedDiscount, coupon.maxDiscountAmount);
+      }
+    } else if (coupon.discountType === 'fixed_amount') {
+      calculatedDiscount = coupon.discountValue; 
+    }
+
+    return { eligible: true, discountAmount: calculatedDiscount };
+  };
 
   if (couponCode) {
-    const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
+    // User manually entered a code
+    const manualCoupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
+    if (!manualCoupon) throw new Error("Invalid or expired coupon.");
+
+    const evaluation = await evaluateCouponEligibility(manualCoupon, subTotal);
+    if (!evaluation.eligible) throw new Error(evaluation.reason);
+
+    discountAmount = evaluation.discountAmount;
+    appliedCouponId = manualCoupon._id;
+    appliedCouponCode = manualCoupon.code;
+
+  } else if (!skipAutoApply) {
+    // Auto-Apply Engine (Find the best active deal)
+    const autoCoupons = await Coupon.find({ isActive: true, isAutoApply: true });
     
-    if (coupon) {
-      // Dynamically build the $or query to avoid matching { user: null } for all guests
-      const fingerprintQuery = [];
-      if (userContext.userId) fingerprintQuery.push({ user: userContext.userId });
-      if (userContext.guestEmail) fingerprintQuery.push({ guestEmail: userContext.guestEmail.toLowerCase() });
-      if (userContext.deviceId) fingerprintQuery.push({ deviceId: userContext.deviceId });
+    let bestDiscount = 0;
+    let bestCoupon = null;
 
-      if (fingerprintQuery.length > 0) {
-        const pastUsageCount = await Order.countDocuments({
-          couponApplied: coupon._id,
-          paymentStatus: { $ne: 'Failed' },
-          $or: fingerprintQuery
-        });
-
-        if (pastUsageCount < coupon.usagePerUserLimit && subTotal >= coupon.minOrderValue) {
-          appliedCouponId = coupon._id;
-          
-          if (coupon.discountType === 'percentage') {
-            discountAmount = Math.round((subTotal * coupon.discountValue) / 100);
-            if (coupon.maxDiscountAmount) {
-              discountAmount = Math.min(discountAmount, coupon.maxDiscountAmount);
-            }
-          } else if (coupon.discountType === 'fixed_amount') {
-            discountAmount = coupon.discountValue; // Assuming this is also stored in paise
-          }
-        } else {
-          throw new Error("Coupon usage limit reached or minimum order value not met.");
-        }
+    for (const autoCoupon of autoCoupons) {
+      const evaluation = await evaluateCouponEligibility(autoCoupon, subTotal);
+      
+      if (evaluation.eligible && evaluation.discountAmount > bestDiscount) {
+        bestDiscount = evaluation.discountAmount;
+        bestCoupon = autoCoupon;
       }
-    } else {
-      throw new Error("Invalid or expired coupon.");
+    }
+
+    if (bestCoupon) {
+      discountAmount = bestDiscount;
+      appliedCouponId = bestCoupon._id;
+      appliedCouponCode = bestCoupon.code;
     }
   }
 
-  // 3. Inclusive Tax & Export Math
-  const baseRevenueInput = subTotal - discountAmount; 
+  // --- ITEM-LEVEL HSN TAX PROCESSING ENGINE ---
   let totalTaxAmount = 0;
-  let baseRevenue = baseRevenueInput;
-  let taxDetails = [];
+  let baseRevenue = 0; 
+  let taxBuckets = {}; 
 
   const isExport = country.toLowerCase() !== 'india' && country.toLowerCase() !== 'in';
-  // Standardize state check (e.g., checking against warehouse state)
-  const isIntraState = state.toLowerCase().includes('maharashtra') || state.toLowerCase() === 'mh'; 
+  const isIntraState = state.toLowerCase().includes('jharkhand') || state.toLowerCase() === 'mh'; 
 
-  if (isExport) {
-    // Zero-Rated Export
-    taxDetails.push({ taxType: 'EXPORT', rate: 0, amount: 0 });
-  } else {
-    // Domestic Inclusive GST (Reverse Math: Tax = Total - Total / 1.18)
-    totalTaxAmount = Math.round((baseRevenueInput * 18) / 118); 
-    baseRevenue = baseRevenueInput - totalTaxAmount; 
+  for (const item of validatedItems) {
+    // Split global coupon discounts proportionally across items to preserve clean math line items
+    const itemDiscountRatio = subTotal > 0 ? (item.itemTotal / subTotal) : 0;
+    const itemDiscount = discountAmount * itemDiscountRatio;
+    const discountedItemTotal = item.itemTotal - itemDiscount;
 
-    if (isIntraState) {
-      taxDetails.push({ taxType: 'CGST', rate: 9, amount: Math.round(totalTaxAmount / 2) });
-      taxDetails.push({ taxType: 'SGST', rate: 9, amount: Math.round(totalTaxAmount / 2) });
-    } else {
-      taxDetails.push({ taxType: 'IGST', rate: 18, amount: totalTaxAmount });
+    // Fetch dynamic rate from matching HSN code
+    const itemGSTRate = isExport ? 0 : getGSTRate(item.hsnCode);
+
+    // Inclusive Tax Math: Extracting tax out of the final price
+    const itemBaseRevenue = discountedItemTotal / (1 + (itemGSTRate / 100));
+    const itemTaxAmount = discountedItemTotal - itemBaseRevenue;
+
+    baseRevenue += itemBaseRevenue;
+    totalTaxAmount += itemTaxAmount;
+
+    // Group taxes dynamically into unified percentage buckets for the UI receipt display
+    if (!isExport && itemGSTRate > 0) {
+      if (isIntraState) {
+        const halfRate = itemGSTRate / 2;
+        const halfTax = itemTaxAmount / 2;
+
+        const cgstKey = `CGST_${halfRate}`;
+        if (!taxBuckets[cgstKey]) taxBuckets[cgstKey] = { taxType: 'CGST', rate: halfRate, amount: 0 };
+        taxBuckets[cgstKey].amount += halfTax;
+
+        const sgstKey = `SGST_${halfRate}`;
+        if (!taxBuckets[sgstKey]) taxBuckets[sgstKey] = { taxType: 'SGST', rate: halfRate, amount: 0 };
+        taxBuckets[sgstKey].amount += halfTax;
+      } else {
+        const igstKey = `IGST_${itemGSTRate}`;
+        if (!taxBuckets[igstKey]) taxBuckets[igstKey] = { taxType: 'IGST', rate: itemGSTRate, amount: 0 };
+        taxBuckets[igstKey].amount += itemTaxAmount;
+      }
     }
   }
 
-  // 4. Multi-Currency Exchange Snapshot
+  // Convert map tracking buckets back into standard arrays for Redux consumption
+  const taxDetails = isExport 
+    ? [{ taxType: 'EXPORT', rate: 0, amount: 0 }] 
+    : Object.values(taxBuckets).map(bucket => ({
+        taxType: bucket.taxType,
+        rate: bucket.rate,
+        amount: Math.round(bucket.amount)
+      }));
+
+  const grandTotalStandard = subTotal - discountAmount;
+
+  // Multi-Currency Exchange Snapshot
   const currencyInfo = await getCurrencyForCountry(country);
   
-  // 5. Payment Splitting Logic (Full vs Partial COD)
-  // Calculate the grand total in the target currency
-  const grandTotalForeignCents = Math.max(1, Math.round(baseRevenueInput * currencyInfo.rate));
+  // Payment Splitting Logic (Full vs Partial COD)
+  const grandTotalForeign = Math.max(1, Math.round(grandTotalStandard * currencyInfo.rate));
 
-  let paymentAmount = grandTotalForeignCents; // Default to full amount
-  let advancePaid = grandTotalForeignCents;
+  let paymentAmount = grandTotalForeign; 
+  let advancePaid = grandTotalForeign;
   let balanceDueOnDelivery = 0;
 
   if (paymentOption === 'PARTIAL_COD') {
-    // Calculate exactly 10% of the grand total for the advance payment
-    paymentAmount = Math.max(1, Math.round(grandTotalForeignCents * 0.10));
+    paymentAmount = Math.max(1, Math.round(grandTotalForeign * 0.10));
     advancePaid = paymentAmount;
-    balanceDueOnDelivery = grandTotalForeignCents - advancePaid;
+    balanceDueOnDelivery = grandTotalForeign - advancePaid;
   }
 
   return {
     validatedItems,
     subTotal,
     appliedCouponId,
+    appliedCouponCode,
     discountAmount,
-    baseRevenue,
+    baseRevenue: Math.round(baseRevenue),
+    taxableAmount: Math.round(baseRevenue), 
     taxDetails,
-    totalTaxAmount,
+    totalTaxAmount: Math.round(totalTaxAmount),
     currencyInfo,
     paymentOption,
-    grandTotal: grandTotalForeignCents,
+    grandTotal: grandTotalForeign,
     paymentAmount,
     advancePaid,
     balanceDueOnDelivery
   };
 };
 
-/**
- * @desc    Live calculation of cart totals for the frontend
- * @route   POST /api/checkout/calculate
- * @access  Public / Optional Auth
- */
 export const calculateCheckoutTotals = async (req, res) => {
   try {
-    const { items, country, state, couponCode, paymentOption, guestEmail, deviceId } = req.body;
+    const { items, country, state, couponCode, paymentOption, skipAutoApply, guestEmail, deviceId } = req.body;
     const userId = req.user ? req.user._id : null;
     const safePaymentOption = paymentOption || 'FULL_ONLINE';
+    const safeSkipAutoApply = skipAutoApply || false;
 
     const mathResult = await processCheckoutMath(
-      items, country, state, couponCode, safePaymentOption,
+      items, country, state, couponCode, safePaymentOption, safeSkipAutoApply,
       { userId, guestEmail, deviceId }
     );
 
@@ -168,7 +268,9 @@ export const calculateCheckoutTotals = async (req, res) => {
       success: true,
       data: {
         subTotal: mathResult.subTotal,
+        appliedCouponCode: mathResult.appliedCouponCode, 
         discountAmount: mathResult.discountAmount,
+        taxableAmount: mathResult.taxableAmount, 
         totalTaxAmount: mathResult.totalTaxAmount,
         taxDetails: mathResult.taxDetails,
         grandTotal: mathResult.grandTotal,
@@ -186,33 +288,32 @@ export const calculateCheckoutTotals = async (req, res) => {
   }
 };
 
-/**
- * @desc    Create Razorpay Order and Pending Database Order
- * @route   POST /api/checkout/create-order
- * @access  Public / Optional Auth
- */
 export const createRazorpayOrder = async (req, res) => {
   try {
-    const { items, shippingAddress, billingAddress, couponCode, paymentOption, guestEmail, deviceId } = req.body;
+    const { items, shippingAddress, billingAddress, couponCode, paymentOption, skipAutoApply, guestEmail, deviceId } = req.body;
     const userId = req.user ? req.user._id : null;
     const isGuestCheckout = !userId;
+    const safeSkipAutoApply = skipAutoApply || false;
 
-    // 1. Run the Math Engine
+    // Run the Math Engine
     const mathResult = await processCheckoutMath(
-      items, shippingAddress.country, shippingAddress.state, couponCode, paymentOption,
+      items, shippingAddress.country, shippingAddress.state, couponCode, paymentOption, safeSkipAutoApply,
       { userId, guestEmail, deviceId }
     );
 
-    // 2. Ask Razorpay for an Order ID (Passing the 10% amount if PARTIAL_COD, or 100% if FULL_ONLINE)
+    // Convert Standard Currency back to Subunits (paise) for the Razorpay SDK
+    const razorpayAmountInSubunits = Math.round(mathResult.paymentAmount * 100);
+
+    // Ask Razorpay for an Order ID 
     const razorpayOptions = {
-      amount: mathResult.paymentAmount,
+      amount: razorpayAmountInSubunits, 
       currency: mathResult.currencyInfo.currencyCode,
       receipt: `RCPT_${Date.now().toString().slice(-8)}`, 
     };
 
     const razorpayOrder = await razorpay.orders.create(razorpayOptions);
 
-    // 3. Save the Snapshot to Database
+    // Save the Snapshot to Database (Keeping in standard units)
     const newOrder = new Order({
       user: userId,
       isGuestCheckout,
@@ -231,7 +332,7 @@ export const createRazorpayOrder = async (req, res) => {
       taxDetails: mathResult.taxDetails,
       totalTaxAmount: mathResult.totalTaxAmount,
       
-      // New Payment Split Fields
+      // Payment Split Fields
       paymentOption: mathResult.paymentOption,
       paymentAmount: mathResult.paymentAmount,
       advancePaid: mathResult.advancePaid,
@@ -249,7 +350,7 @@ export const createRazorpayOrder = async (req, res) => {
       data: {
         razorpayOrderId: razorpayOrder.id,
         orderId: savedOrder._id,
-        amount: mathResult.paymentAmount,
+        amount: razorpayAmountInSubunits, 
         currency: mathResult.currencyInfo.currencyCode,
         keyId: process.env.RAZORPAY_KEY_ID 
       }
@@ -261,22 +362,17 @@ export const createRazorpayOrder = async (req, res) => {
   }
 };
 
-/**
- * @desc    Verify Razorpay Payment Signature & Fulfill Order
- * @route   POST /api/checkout/verify-payment
- * @access  Public / Optional Auth
- */
 export const verifyRazorpayPayment = async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, db_order_id } = req.body;
 
-    // 1. Fetch the pending order to check its payment structure
+    // Fetch the pending order to check its payment structure
     const pendingOrder = await Order.findById(db_order_id);
     if (!pendingOrder) {
       return res.status(404).json({ success: false, message: "Order not found in database" });
     }
 
-    // 2. Cryptographic Bouncer
+    // Cryptographic signature evaluation
     const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -292,7 +388,7 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid payment signature" });
     }
 
-    // 3. Payment Confirmed - Determine exact status based on the selected option
+    // Determine target state based on payment choices
     const finalPaymentStatus = pendingOrder.paymentOption === 'PARTIAL_COD' ? 'Partially Paid' : 'Completed';
 
     pendingOrder.paymentStatus = finalPaymentStatus;
@@ -302,12 +398,11 @@ export const verifyRazorpayPayment = async (req, res) => {
 
     const confirmedOrder = await pendingOrder.save();
 
-    // 4. Post-Payment Fulfillment (Deduct Inventory, Increment Coupon)
+    // Deduct inventory and process dependencies safely
     if (confirmedOrder.couponApplied) {
       await Coupon.findByIdAndUpdate(confirmedOrder.couponApplied, { $inc: { usedCount: 1 } });
     }
 
-    // Process inventory updates in parallel for speed
     const inventoryUpdates = confirmedOrder.items.map(item => 
       Product.findOneAndUpdate(
         { "variants._id": item.variantId },
