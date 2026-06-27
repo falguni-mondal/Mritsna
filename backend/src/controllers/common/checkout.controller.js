@@ -1,6 +1,6 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import { createRequire } from "module"; // <-- Safely handles JSON imports in ES Modules
+import { createRequire } from "module"; 
 import Order from "../../models/order.model.js";
 import Product from "../../models/product.model.js";
 import Coupon from "../../models/coupon.model.js";
@@ -22,30 +22,29 @@ const getGSTRate = (hsnCode) => {
   
   const codeStr = hsnCode.toString().trim();
   
-  // 1. Direct exact match (8 or 6 digits)
   if (hsnMap[codeStr]) return hsnMap[codeStr].rate;
   
-  // 2. Fallback to 6-digit sub-heading
   if (codeStr.length > 6 && hsnMap[codeStr.substring(0, 6)]) {
     return hsnMap[codeStr.substring(0, 6)].rate;
   }
   
-  // 3. Fallback to 4-digit chapter heading
   if (codeStr.length >= 4 && hsnMap[codeStr.substring(0, 4)]) {
     return hsnMap[codeStr.substring(0, 4)].rate;
   }
   
-  // 4. Default safety net
   return hsnMap["DEFAULT"].rate;
 };
 
 /**
  * Core Math & Validation Engine
- * Dynamically handles inventory safety, coupon logic, and HSN item taxation.
+ * Dynamically handles inventory safety, coupon logic, HSN item taxation, and Export Markups.
  */
 const processCheckoutMath = async (items, country, state, couponCode, paymentOption, skipAutoApply, userContext) => {
   let subTotal = 0;
   const validatedItems = [];
+  
+  // Define Export status early so we can use it during item pricing
+  const isExport = country.toLowerCase() !== 'india' && country.toLowerCase() !== 'in';
 
   // Validate Items & Calculate SubTotal (from DB, never trust frontend)
   for (const item of items) {
@@ -68,13 +67,20 @@ const processCheckoutMath = async (items, country, state, couponCode, paymentOpt
       sellingPrice = Math.round(basePrice - (basePrice * (discountPercent / 100)));
     }
 
+    // --- THE EXPORT MARKUP ENGINE ---
+    // We inject the markup in base INR to ensure fixed-amount coupons process safely
+    if (isExport) {
+      const exportMarkup = product.isPremium ? 10000 : 5000;
+      sellingPrice += exportMarkup;
+    }
+
     const itemTotal = sellingPrice * item.quantity;
     subTotal += itemTotal;
 
     validatedItems.push({
       product: product._id,
       variantId: variant._id,
-      hsnCode: product.pricing.hsnCode, // Captured for item-level tax lookup
+      hsnCode: product.pricing.hsnCode, 
       title: product.title,
       colorName: variant.colorName,
       slug: product.slug,
@@ -90,7 +96,6 @@ const processCheckoutMath = async (items, country, state, couponCode, paymentOpt
   let appliedCouponId = null;
   let appliedCouponCode = null;
 
-  // Reusable eligibility checker for both manual and auto-coupons
   const evaluateCouponEligibility = async (coupon, currentSubTotal) => {
     if (currentSubTotal < coupon.minOrderValue) {
       return { eligible: false, reason: "Minimum order value not met." };
@@ -127,7 +132,6 @@ const processCheckoutMath = async (items, country, state, couponCode, paymentOpt
   };
 
   if (couponCode) {
-    // User manually entered a code
     const manualCoupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
     if (!manualCoupon) throw new Error("Invalid or expired coupon.");
 
@@ -139,7 +143,6 @@ const processCheckoutMath = async (items, country, state, couponCode, paymentOpt
     appliedCouponCode = manualCoupon.code;
 
   } else if (!skipAutoApply) {
-    // Auto-Apply Engine (Find the best active deal)
     const autoCoupons = await Coupon.find({ isActive: true, isAutoApply: true });
     
     let bestDiscount = 0;
@@ -166,26 +169,21 @@ const processCheckoutMath = async (items, country, state, couponCode, paymentOpt
   let baseRevenue = 0; 
   let taxBuckets = {}; 
 
-  const isExport = country.toLowerCase() !== 'india' && country.toLowerCase() !== 'in';
   const isIntraState = state.toLowerCase().includes('jharkhand') || state.toLowerCase() === 'mh'; 
 
   for (const item of validatedItems) {
-    // Split global coupon discounts proportionally across items to preserve clean math line items
     const itemDiscountRatio = subTotal > 0 ? (item.itemTotal / subTotal) : 0;
     const itemDiscount = discountAmount * itemDiscountRatio;
     const discountedItemTotal = item.itemTotal - itemDiscount;
 
-    // Fetch dynamic rate from matching HSN code
     const itemGSTRate = isExport ? 0 : getGSTRate(item.hsnCode);
 
-    // Inclusive Tax Math: Extracting tax out of the final price
     const itemBaseRevenue = discountedItemTotal / (1 + (itemGSTRate / 100));
     const itemTaxAmount = discountedItemTotal - itemBaseRevenue;
 
     baseRevenue += itemBaseRevenue;
     totalTaxAmount += itemTaxAmount;
 
-    // Group taxes dynamically into unified percentage buckets for the UI receipt display
     if (!isExport && itemGSTRate > 0) {
       if (isIntraState) {
         const halfRate = itemGSTRate / 2;
@@ -206,7 +204,6 @@ const processCheckoutMath = async (items, country, state, couponCode, paymentOpt
     }
   }
 
-  // Convert map tracking buckets back into standard arrays for Redux consumption
   const taxDetails = isExport 
     ? [{ taxType: 'EXPORT', rate: 0, amount: 0 }] 
     : Object.values(taxBuckets).map(bucket => ({
@@ -217,10 +214,10 @@ const processCheckoutMath = async (items, country, state, couponCode, paymentOpt
 
   const grandTotalStandard = subTotal - discountAmount;
 
-  // Multi-Currency Exchange Snapshot
+  // --- MULTI-CURRENCY CONVERSION ---
+  // We execute the final currency conversion here, guaranteeing standard INR logic applied properly above.
   const currencyInfo = await getCurrencyForCountry(country);
   
-  // Payment Splitting Logic (Full vs Partial COD)
   const grandTotalForeign = Math.max(1, Math.round(grandTotalStandard * currencyInfo.rate));
 
   let paymentAmount = grandTotalForeign; 
@@ -295,16 +292,13 @@ export const createRazorpayOrder = async (req, res) => {
     const isGuestCheckout = !userId;
     const safeSkipAutoApply = skipAutoApply || false;
 
-    // Run the Math Engine
     const mathResult = await processCheckoutMath(
       items, shippingAddress.country, shippingAddress.state, couponCode, paymentOption, safeSkipAutoApply,
       { userId, guestEmail, deviceId }
     );
 
-    // Convert Standard Currency back to Subunits (paise) for the Razorpay SDK
     const razorpayAmountInSubunits = Math.round(mathResult.paymentAmount * 100);
 
-    // Ask Razorpay for an Order ID 
     const razorpayOptions = {
       amount: razorpayAmountInSubunits, 
       currency: mathResult.currencyInfo.currencyCode,
@@ -313,7 +307,6 @@ export const createRazorpayOrder = async (req, res) => {
 
     const razorpayOrder = await razorpay.orders.create(razorpayOptions);
 
-    // Save the Snapshot to Database (Keeping in standard units)
     const newOrder = new Order({
       user: userId,
       isGuestCheckout,
@@ -332,7 +325,6 @@ export const createRazorpayOrder = async (req, res) => {
       taxDetails: mathResult.taxDetails,
       totalTaxAmount: mathResult.totalTaxAmount,
       
-      // Payment Split Fields
       paymentOption: mathResult.paymentOption,
       paymentAmount: mathResult.paymentAmount,
       advancePaid: mathResult.advancePaid,
@@ -366,13 +358,11 @@ export const verifyRazorpayPayment = async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, db_order_id } = req.body;
 
-    // Fetch the pending order to check its payment structure
     const pendingOrder = await Order.findById(db_order_id);
     if (!pendingOrder) {
       return res.status(404).json({ success: false, message: "Order not found in database" });
     }
 
-    // Cryptographic signature evaluation
     const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -388,7 +378,6 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid payment signature" });
     }
 
-    // Determine target state based on payment choices
     const finalPaymentStatus = pendingOrder.paymentOption === 'PARTIAL_COD' ? 'Partially Paid' : 'Completed';
 
     pendingOrder.paymentStatus = finalPaymentStatus;
@@ -398,7 +387,6 @@ export const verifyRazorpayPayment = async (req, res) => {
 
     const confirmedOrder = await pendingOrder.save();
 
-    // Deduct inventory and process dependencies safely
     if (confirmedOrder.couponApplied) {
       await Coupon.findByIdAndUpdate(confirmedOrder.couponApplied, { $inc: { usedCount: 1 } });
     }

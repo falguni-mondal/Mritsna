@@ -6,24 +6,35 @@ import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navmenu from "./Navmenu";
 import { IntroContext } from "../../context/IntroContext"; 
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+
+// --- IMPORTS FOR REGION ENGINE ---
+import { setManualRegion } from "../../store/features/regionSlice";
+import { userAxios } from "../../configs/axiosInstance";
 
 // Register the plugin
 gsap.registerPlugin(ScrollTrigger);
 
 const Navbar = () => {
+  const dispatch = useDispatch();
   const [isOpen, setIsOpen] = useState(false);
   
-  // Replace local state with live Redux derived state
   const cartItems = useSelector((state) => state.cart?.items || []);
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   
+  // --- REGION STATE ---
+  const regionData = useSelector((state) => state.region?.data);
+  const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
+  const [isChangingRegion, setIsChangingRegion] = useState(false);
+
+  // Refs for click-outside detection
+  const desktopRegionRef = useRef(null);
+  const mobileRegionRef = useRef(null);
+
   const [isScrolled, setIsScrolled] = useState(false);
-  // Global Context & Routing
   const location = useLocation();
   const { introPlayed } = useContext(IntroContext);
   
-  // Track the path to force a synchronous state reset
   const [currentPath, setCurrentPath] = useState(location.pathname);
 
   // Refs for Animations & Structure
@@ -48,6 +59,64 @@ const Navbar = () => {
     { name: "wishlist", path: "/wishlist" },
   ];
 
+  // --- EXPANDED CURATED REGION LIST ---
+  // We removed the emoji flags. FlagCDN will generate them dynamically using the "code".
+  const availableRegions = [
+    { code: "IN", label: "India", currency: "INR" },
+    { code: "US", label: "USA", currency: "USD" },
+    { code: "GB", label: "UK", currency: "GBP" },
+    { code: "FR", label: "France", currency: "EUR" },
+    { code: "DE", label: "Germany", currency: "EUR" },
+    { code: "IT", label: "Italy", currency: "EUR" },
+    { code: "ES", label: "Spain", currency: "EUR" },
+    { code: "AE", label: "UAE", currency: "AED" },
+    { code: "AU", label: "Australia", currency: "AUD" },
+    { code: "CA", label: "Canada", currency: "CAD" },
+    { code: "SG", label: "Singapore", currency: "SGD" },
+    { code: "SA", label: "Saudi Arabia", currency: "SAR" },
+    { code: "JP", label: "Japan", currency: "JPY" },
+  ];
+
+  // --- CLICK OUTSIDE LISTENER ---
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        desktopRegionRef.current && !desktopRegionRef.current.contains(event.target) &&
+        mobileRegionRef.current && !mobileRegionRef.current.contains(event.target)
+      ) {
+        setIsRegionDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // --- REGION CHANGE HANDLER ---
+  const handleRegionChange = async (countryCode) => {
+    if (countryCode === regionData?.countryCode) {
+      setIsRegionDropdownOpen(false);
+      return;
+    }
+    
+    setIsChangingRegion(true);
+    try {
+      const response = await userAxios.get('/region/detect', {
+        headers: { 'x-user-region': countryCode } // This now successfully bypasses the interceptor!
+      });
+      
+      dispatch(setManualRegion(response.data.data));
+      
+      // Reload the page here, after Redux and LocalStorage have safely committed
+      window.location.reload(); 
+    } catch (error) {
+      console.error("Failed to change region", error);
+      setIsChangingRegion(false);
+    }
+  };
+
   // ==========================================
   // CONFIGURATION
   // ==========================================
@@ -57,6 +126,7 @@ const Navbar = () => {
   if (location.pathname !== currentPath) {
     setCurrentPath(location.pathname);
     setIsScrolled(false);
+    setIsRegionDropdownOpen(false); 
   }
 
   const isDarkTheme = !isScrollBlendRoute || isScrolled;
@@ -161,6 +231,9 @@ const Navbar = () => {
     });
   });
 
+  // Default to India if the regionData hasn't populated yet
+  const currentRegionDetails = availableRegions.find(r => r.code === regionData?.countryCode) || availableRegions[0];
+
   return (
     <>
       <div 
@@ -176,6 +249,7 @@ const Navbar = () => {
           `}
           id="navbar-content"
         >
+          {/* LEFT NAV */}
           <nav className="w-1/3 hidden lg:block" id="desktop-first-nav">
             <ul 
               ref={navContainerRef}
@@ -207,6 +281,7 @@ const Navbar = () => {
             </ul>
           </nav>
 
+          {/* LOGO */}
           <div className="logo lg:w-1/3 flex justify-start lg:justify-center items-center">
             <Link to="/">
               <img 
@@ -217,6 +292,7 @@ const Navbar = () => {
             </Link>
           </div>
 
+          {/* RIGHT NAV (DESKTOP) */}
           <nav className="w-1/3 hidden lg:block" id="desktop-second-nav">
             <ul 
               ref={rightNavContainerRef}
@@ -230,6 +306,58 @@ const Navbar = () => {
                 `}
                 style={{ right: 0, width: 0 }}
               />
+
+              {/* REGION DROPDOWN (CLICK REVEAL) */}
+              <li 
+                ref={desktopRegionRef}
+                className="nav-list-item relative"
+              >
+                <span 
+                  className="cursor-pointer py-1 flex items-center gap-1.5 select-none"
+                  onMouseEnter={handleRightItemEnter}
+                  onClick={() => setIsRegionDropdownOpen(!isRegionDropdownOpen)}
+                >
+                  {/* FIX 1: Universal Image Flag CDN */}
+                  <img 
+                    src={`https://flagcdn.com/w20/${currentRegionDetails.code.toLowerCase()}.png`} 
+                    alt={currentRegionDetails.code} 
+                    className="w-[18px] object-contain rounded-sm"
+                  />
+                  {isChangingRegion ? '...' : currentRegionDetails.code}
+                  <Icon 
+                    icon="lucide:chevron-down" 
+                    className={`w-3 h-3 opacity-70 transition-transform duration-300 ${isRegionDropdownOpen ? "rotate-180" : ""}`} 
+                  />
+                </span>
+
+                {/* FIX 2: Scroll Trap Applied Here */}
+                <div 
+                  className={`absolute top-full right-0 mt-[1.2rem] w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-xl border transition-all duration-300 origin-top
+                    ${isRegionDropdownOpen ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0 pointer-events-none'}
+                    ${isDarkTheme ? 'bg-white border-black/5 text-black' : 'bg-[#1a1a1a] border-white/10 text-white'}
+                  `}
+                  onWheel={(e) => e.stopPropagation()} 
+                  onTouchMove={(e) => e.stopPropagation()}
+                >
+                  {availableRegions.map((r) => (
+                    <button 
+                      key={r.code}
+                      onClick={() => handleRegionChange(r.code)}
+                      className={`text-left px-4 py-3 text-[0.65rem] uppercase tracking-wider transition-colors flex items-center gap-3
+                        ${isDarkTheme ? 'hover:bg-gray-100' : 'hover:bg-white/10'}
+                        ${regionData?.countryCode === r.code ? 'font-bold opacity-40 cursor-default' : ''}
+                      `}
+                    >
+                      <img 
+                        src={`https://flagcdn.com/w20/${r.code.toLowerCase()}.png`} 
+                        alt={r.code} 
+                        className="w-[18px] object-contain rounded-sm shadow-sm"
+                      />
+                      <span>{r.label} ({r.currency})</span>
+                    </button>
+                  ))}
+                </div>
+              </li>
 
               <li 
                 className="nav-list-item"
@@ -262,7 +390,60 @@ const Navbar = () => {
             </ul>
           </nav>
 
+          {/* MOBILE NAV ACTIONS */}
           <div className="flex items-center gap-5 lg:hidden">
+            
+            {/* MOBILE REGION DROPDOWN */}
+            <div className="relative" ref={mobileRegionRef}>
+              <div 
+                className="cursor-pointer text-[0.65rem] font-bold tracking-wider flex items-center gap-1.5 uppercase select-none"
+                onClick={() => setIsRegionDropdownOpen(!isRegionDropdownOpen)}
+              >
+                <img 
+                  src={`https://flagcdn.com/w20/${currentRegionDetails.code.toLowerCase()}.png`} 
+                  alt={currentRegionDetails.code} 
+                  className="w-[18px] object-contain rounded-sm"
+                />
+                {isChangingRegion ? '...' : currentRegionDetails.code}
+                <Icon 
+                  icon="lucide:chevron-down" 
+                  className={`w-3 h-3 opacity-70 transition-transform duration-300 ${isRegionDropdownOpen ? "rotate-180" : ""}`} 
+                />
+              </div>
+
+              {/* FIX 2: Scroll Trap Applied to Mobile Menu */}
+              {isRegionDropdownOpen && (
+                <div 
+                  className={`absolute top-full -right-4 mt-6 w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-2xl border
+                    ${isDarkTheme ? 'bg-white border-black/5 text-black' : 'bg-[#1a1a1a] border-white/10 text-white'}
+                  `}
+                  onWheel={(e) => e.stopPropagation()} 
+                  onTouchMove={(e) => e.stopPropagation()}
+                >
+                  {availableRegions.map((r) => (
+                    <button 
+                      key={r.code}
+                      onClick={() => {
+                        handleRegionChange(r.code);
+                        setIsRegionDropdownOpen(false);
+                      }}
+                      className={`text-left px-4 py-3 text-[0.65rem] uppercase tracking-wider transition-colors flex items-center gap-3
+                        ${isDarkTheme ? 'hover:bg-gray-100' : 'hover:bg-white/10'}
+                        ${regionData?.countryCode === r.code ? 'font-bold opacity-40 cursor-default' : ''}
+                      `}
+                    >
+                      <img 
+                        src={`https://flagcdn.com/w20/${r.code.toLowerCase()}.png`} 
+                        alt={r.code} 
+                        className="w-[18px] object-contain rounded-sm shadow-sm"
+                      />
+                      <span>{r.label} ({r.currency})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="cursor-pointer text-xl flex items-center justify-center hover:opacity-70 transition-opacity duration-300">
               <Icon icon="iconamoon:search" />
             </div>

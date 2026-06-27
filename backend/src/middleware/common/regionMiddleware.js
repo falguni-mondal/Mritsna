@@ -9,16 +9,21 @@ export const regionMiddleware = async (req, res, next) => {
 
     let countryCode = "IN"; // Default fallback
 
-    // Check for a manual user override in cookies
-    // (We will build the endpoint to set this cookie in the next step)
-    if (req.cookies && req.cookies.region) {
-      countryCode = req.cookies.region;
+    // PRIORITY A: Frontend Explicit Header (Driven by React localStorage)
+    if (req.headers['x-user-region']) {
+      countryCode = req.headers['x-user-region'].toUpperCase();
+    }
+    // PRIORITY B: Manual user override in cookies
+    else if (req.cookies && req.cookies.region) {
+      countryCode = req.cookies.region.toUpperCase();
     } 
-    // Guess via Geo-IP if no cookie exists
+    // PRIORITY C: Guess via Geo-IP
     else {
-      // req.ip usually works, but x-forwarded-for is needed if you are behind a proxy/load balancer (like Vercel or Render)
-      // const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress || req.ip;
-    const ip = "8.8.8.8"; // Placeholder for testing (Google's Public DNS IP, located in the US)
+      // req.ip usually works, but x-forwarded-for is needed if you are behind a proxy/load balancer
+      const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress || req.ip;
+      
+      // FOR LOCAL TESTING: Uncomment the Google IP below to simulate a US visitor
+      // const ip = "8.8.8.8"; 
       
       if (ip) {
         const geo = geoip.lookup(ip);

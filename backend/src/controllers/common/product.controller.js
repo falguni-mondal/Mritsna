@@ -1,11 +1,10 @@
-import Product from '../../models/product.model.js'; // Adjust path if necessary
+import Product from '../../models/product.model.js'; 
+import { calculateRegionalPricing } from '../../utils/pricingEngine.js';
 
 export const getNewArrivals = async (req, res, next) => {
   try {
-    // --- Extract the region data from the middleware ---
-    const rate = req.region?.rate || 1;
-    const symbol = req.region?.symbol || '₹';
-    const currencyCode = req.region?.currencyCode || 'INR';
+    // Fallback protection just in case middleware fails
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
     const newArrivals = await Product.find({ 
       status: 'active', 
@@ -21,23 +20,21 @@ export const getNewArrivals = async (req, res, next) => {
       const firstImage = firstVariant.images?.[0] || {};
       const pricing = firstVariant.pricing || { price: 0, discountPercentage: 0 };
 
-      // 1. Calculate Base Prices in INR
-      const basePriceINR = pricing.price;
-      const finalPriceINR = pricing.discountPercentage > 0 
-        ? basePriceINR - (basePriceINR * (pricing.discountPercentage / 100))
-        : basePriceINR;
-
-      // 2. Convert to Regional Price dynamically
-      const originalPriceConverted = Math.round(basePriceINR * rate);
-      const finalPriceConverted = Math.round(finalPriceINR * rate);
+      // --- APPLY THE PRICING ENGINE ---
+      const localizedPricing = calculateRegionalPricing(
+        pricing.price, 
+        pricing.discountPercentage, 
+        product.isPremium || false, 
+        regionData
+      );
 
       return {
         _id: product._id,
         slug: product.slug,
         name: product.title,
         isPremium: product.isPremium || false,
-        originalPrice: originalPriceConverted, // Send the converted price
-        finalPrice: finalPriceConverted,       // Send the converted price
+        originalPrice: localizedPricing.originalPrice, 
+        finalPrice: localizedPricing.sellingPrice,      
         img: firstImage.baseUrl || null, 
         altText: firstImage.altText || product.title
       };
@@ -47,8 +44,8 @@ export const getNewArrivals = async (req, res, next) => {
       success: true,
       count: formattedProducts.length,
       data: formattedProducts,
-      currencySymbol: symbol,       // Pass the symbol for the UI
-      currencyCode: currencyCode 
+      currencySymbol: regionData.symbol,      
+      currencyCode: regionData.currencyCode 
     });
 
   } catch (error) {
@@ -59,10 +56,7 @@ export const getNewArrivals = async (req, res, next) => {
 
 export const getPaginatedProducts = async (req, res, next) => {
   try {
-    // --- Extract the region data from the middleware ---
-    const rate = req.region?.rate || 1;
-    const symbol = req.region?.symbol || '₹';
-    const currencyCode = req.region?.currencyCode || 'INR';
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, parseInt(req.query.limit) || 12);
@@ -118,15 +112,13 @@ export const getPaginatedProducts = async (req, res, next) => {
       const firstImage = firstVariant.images?.[0] || {};
       const pricing = firstVariant.pricing || { price: 0, discountPercentage: 0 };
 
-      // 1. Calculate Base Prices in INR
-      const basePriceINR = pricing.price;
-      const finalPriceINR = pricing.discountPercentage > 0 
-        ? basePriceINR - (basePriceINR * (pricing.discountPercentage / 100))
-        : basePriceINR;
-
-      // 2. Convert to Regional Price dynamically
-      const originalPriceConverted = Math.round(basePriceINR * rate);
-      const finalPriceConverted = Math.round(finalPriceINR * rate);
+      // --- APPLY THE PRICING ENGINE ---
+      const localizedPricing = calculateRegionalPricing(
+        pricing.price, 
+        pricing.discountPercentage, 
+        product.isPremium || false, 
+        regionData
+      );
 
       return {
         _id: product._id,
@@ -134,9 +126,9 @@ export const getPaginatedProducts = async (req, res, next) => {
         name: product.title,
         category: product.category,
         isPremium: product.isPremium || false,
-        originalPrice: originalPriceConverted, // Send the converted price
-        finalPrice: finalPriceConverted,       // Send the converted price
-        discount: pricing.discountPercentage,
+        originalPrice: localizedPricing.originalPrice, 
+        finalPrice: localizedPricing.sellingPrice,      
+        discount: localizedPricing.discountPercentage,
         img: firstImage.baseUrl || null,
         altText: firstImage.altText || product.title
       };
@@ -147,8 +139,8 @@ export const getPaginatedProducts = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: formattedProducts,
-      currencySymbol: symbol,       // Pass the symbol for the UI
-      currencyCode: currencyCode,
+      currencySymbol: regionData.symbol,      
+      currencyCode: regionData.currencyCode,
       pagination: {
         totalItems: totalCount,
         totalPages: totalPages,
@@ -167,10 +159,7 @@ export const getPaginatedProducts = async (req, res, next) => {
 
 export const getSingleProduct = async (req, res, next) => {
   try {
-    // --- Extract the region data from the middleware ---
-    const rate = req.region?.rate || 1;
-    const symbol = req.region?.symbol || '₹';
-    const currencyCode = req.region?.currencyCode || 'INR';
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
     const { slug } = req.params;
     const product = await Product.findOne({ slug, status: 'active' })
@@ -191,14 +180,16 @@ export const getSingleProduct = async (req, res, next) => {
     }
 
     const formattedVariants = product.variants.map(variant => {
-      // 1. Calculate Base Prices in INR
       const basePriceINR = variant.pricing?.price || 0;
       const discount = variant.pricing?.discountPercentage || 0;
-      const finalPriceINR = discount > 0 ? basePriceINR - (basePriceINR * (discount / 100)) : basePriceINR;
       
-      // 2. Convert to Regional Price dynamically
-      const originalPriceConverted = Math.round(basePriceINR * rate);
-      const finalPriceConverted = Math.round(finalPriceINR * rate);
+      // --- APPLY THE PRICING ENGINE ---
+      const localizedPricing = calculateRegionalPricing(
+        basePriceINR, 
+        discount, 
+        product.isPremium || false, 
+        regionData
+      );
 
       const stockQuantity = variant.inventory?.quantity || 0;
       const threshold = variant.inventory?.lowStockThreshold || 3;
@@ -208,9 +199,9 @@ export const getSingleProduct = async (req, res, next) => {
         isMulticolor: variant.isMulticolor,
         colorName: variant.colorName,
         colorHex: variant.colorHex,
-        originalPrice: originalPriceConverted, // Send the converted price
-        finalPrice: finalPriceConverted,       // Send the converted price
-        discountPercentage: discount,
+        originalPrice: localizedPricing.originalPrice, 
+        finalPrice: localizedPricing.sellingPrice,      
+        discountPercentage: localizedPricing.discountPercentage,
         material: variant.attributes?.material,
         finish: variant.attributes?.finish,
         stockQuantity: stockQuantity, 
@@ -234,8 +225,8 @@ export const getSingleProduct = async (req, res, next) => {
       isPremium: product.isPremium,
       dimensions: formattedDimensions,
       variants: formattedVariants,
-      currencySymbol: symbol,
-      currencyCode: currencyCode
+      currencySymbol: regionData.symbol,
+      currencyCode: regionData.currencyCode
     };
 
     return res.status(200).json({

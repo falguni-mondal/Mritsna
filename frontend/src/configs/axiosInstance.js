@@ -13,7 +13,30 @@ export const userAxios = axios.create({
   },
 });
 
-// Optional: User Interceptor
+// --- REQUEST INTERCEPTOR ---
+// Automatically injects the user's location into every API request
+userAxios.interceptors.request.use(
+  (config) => {
+    try {
+      // FIX: Only inject the header if it hasn't been manually set by the API call!
+      if (!config.headers["x-user-region"]) {
+        const storedRegion = localStorage.getItem("user_region");
+        if (storedRegion) {
+          const { countryCode } = JSON.parse(storedRegion);
+          if (countryCode) {
+            config.headers["x-user-region"] = countryCode; 
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("[User HTTP] Failed to parse region for headers:", error);
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// --- EXISTING: RESPONSE INTERCEPTOR ---
 // Catches global errors like 401s before they even hit your Redux slices
 userAxios.interceptors.response.use(
   (response) => response,
