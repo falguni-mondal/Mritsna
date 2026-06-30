@@ -19,17 +19,12 @@ export const countryToCurrency = {
   JP: "JPY", // Japan
   
   // Eurozone Countries
-  DE: "EUR", // Germany
-  FR: "EUR", // France
-  IT: "EUR", // Italy
-  ES: "EUR", // Spain
-  NL: "EUR", // Netherlands
+  DE: "EUR", FR: "EUR", IT: "EUR", ES: "EUR", NL: "EUR",
 };
 
 // 2. Currency Details (Symbols and Static Base Rates)
-// The `rate` is the multiplier (Price in Target Currency = Price in INR * rate)
 export const currencyDetails = {
-  INR: { code: "INR", symbol: "₹", rate: 1 },           // Base
+  INR: { code: "INR", symbol: "₹", rate: 1 },          // Base
   USD: { code: "USD", symbol: "$", rate: 0.012 },       // USA
   AED: { code: "AED", symbol: "د.إ", rate: 0.044 },     // UAE Dirham
   EUR: { code: "EUR", symbol: "€", rate: 0.011 },       // Eurozone
@@ -43,24 +38,16 @@ export const currencyDetails = {
 
 const CACHE_DURATION_MS = 12 * 60 * 60 * 1000; // 12 Hours
 
-/**
- * Fetch Live Rates and Update Database
- * This will be called by your background Cron Job or Lazy loading.
- */
 export const updateLiveExchangeRates = async () => {
   try {
     const now = new Date();
     
-    // Check the database first to see if we even need to call the API
     let dbCache = await ExchangeRate.findOne({ baseCurrency: "INR" });
 
     if (dbCache && (now - dbCache.lastUpdated < CACHE_DURATION_MS)) {
-      return dbCache.rates; // DB cache is fresh, save API credits!
+      return dbCache.rates; 
     }
 
-    // ==========================================
-    // LIVE API INTEGRATION ENABLED
-    // ==========================================
     const API_KEY = process.env.EXCHANGE_RATE_API_KEY;
     
     if (!API_KEY) {
@@ -69,18 +56,11 @@ export const updateLiveExchangeRates = async () => {
     }
 
     const response = await axios.get(`https://v6.exchangerate-api.com/v6/${API_KEY}/latest/INR`);
-    
     const newRates = response.data.conversion_rates; 
 
-    // Upsert (Update if exists, Insert if it doesn't) the rates into MongoDB
     dbCache = await ExchangeRate.findOneAndUpdate(
       { baseCurrency: "INR" },
-      {
-        $set: {
-          rates: newRates,
-          lastUpdated: now
-        }
-      },
+      { $set: { rates: newRates, lastUpdated: now } },
       { new: true, upsert: true }
     );
 
@@ -95,20 +75,28 @@ export const updateLiveExchangeRates = async () => {
 
 /**
  * Get Currency Profile for a specific Country Code
- * Now reads securely from MongoDB with a hardcoded fallback.
+ * Upgraded to intercept direct currency codes sent by the UI.
  */
 export const getCurrencyForCountry = async (countryCode) => {
-  const formattedCode = countryCode ? countryCode.toUpperCase() : "IN";
-  const currencyCode = countryToCurrency[formattedCode] || "INR";
-  const details = currencyDetails[currencyCode];
+  const formattedInput = countryCode ? countryCode.toUpperCase() : "IN";
+  
+  // --- THE FIX: Smart Routing ---
+  let currencyCode = "INR";
+  
+  // 1. Check if the frontend accidentally sent a direct Currency Code (like "AED")
+  if (currencyDetails[formattedInput]) {
+    currencyCode = formattedInput;
+  } 
+  // 2. Otherwise, map the Country Code (like "AE") to the Currency Code
+  else {
+    currencyCode = countryToCurrency[formattedInput] || "INR";
+  }
 
+  const details = currencyDetails[currencyCode];
   let finalRate = details.rate;
 
   try {
-    // Attempt to grab the live rate from MongoDB
     const dbCache = await ExchangeRate.findOne({ baseCurrency: "INR" });
-    
-    // Mongoose Maps use .get() to access dynamic keys
     if (dbCache && dbCache.rates && dbCache.rates.get(currencyCode)) {
       finalRate = dbCache.rates.get(currencyCode);
     }
@@ -117,7 +105,7 @@ export const getCurrencyForCountry = async (countryCode) => {
   }
 
   return {
-    countryCode: formattedCode,
+    countryCode: formattedInput, // Still pass back what the user sent
     currencyCode: details.code,
     symbol: details.symbol,
     rate: finalRate,

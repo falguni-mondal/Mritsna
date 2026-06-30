@@ -6,13 +6,14 @@ import {
   updateCartItemQuantity, 
   removeFromCart, 
   clearCart, 
-  syncCart 
+  syncCart,
+  hydrateGuestCart
 } from '../../controllers/common/cart.controller.js';
 
 import { inventoryCheck } from '../../middleware/common/inventoryCheck.js';
 import { isValidUser } from '../../middleware/common/auth/auth.middleware.js'; 
 
-// --- NEW: Import our Region Middleware ---
+// --- Import our Region Middleware ---
 import { regionMiddleware } from '../../middleware/common/regionMiddleware.js';
 
 const router = express.Router();
@@ -21,6 +22,10 @@ const router = express.Router();
 // PUBLIC ROUTES
 // ==========================================
 router.post('/check-stock', checkStock);
+
+// <-- The Guest Hydration Route -->
+// Notice it is public (no isValidUser) but DOES include regionMiddleware
+router.post('/hydrate', regionMiddleware, hydrateGuestCart);
 
 // ==========================================
 // PROTECTED ROUTES

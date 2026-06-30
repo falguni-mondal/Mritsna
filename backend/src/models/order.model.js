@@ -49,7 +49,7 @@ const orderSchema = new mongoose.Schema(
 
     // --- MULTI-CURRENCY SNAPSHOT ---
     baseCurrency: { type: String, default: 'INR' },
-    paymentCurrency: { type: String, required: true, enum: ['INR', 'USD', 'EUR', 'GBP'] },
+    paymentCurrency: { type: String, required: true, enum: ['INR', 'USD', 'EUR', 'GBP', 'AED', 'AUD', 'CAD', 'SGD', 'SAR', 'JPY'] },
     exchangeRateAtPurchase: { type: Number, default: 1 }, // e.g., 83.5 for USD
 
     // --- INCLUSIVE FINANCIALS & PAYMENT TERMS ---

@@ -60,7 +60,6 @@ const Navbar = () => {
   ];
 
   // --- EXPANDED CURATED REGION LIST ---
-  // We removed the emoji flags. FlagCDN will generate them dynamically using the "code".
   const availableRegions = [
     { code: "IN", label: "India", currency: "INR" },
     { code: "US", label: "USA", currency: "USD" },
@@ -311,13 +310,13 @@ const Navbar = () => {
               <li 
                 ref={desktopRegionRef}
                 className="nav-list-item relative"
+                onMouseEnter={handleRightItemEnter}
               >
                 <span 
                   className="cursor-pointer py-1 flex items-center gap-1.5 select-none"
-                  onMouseEnter={handleRightItemEnter}
                   onClick={() => setIsRegionDropdownOpen(!isRegionDropdownOpen)}
                 >
-                  {/* FIX 1: Universal Image Flag CDN */}
+                  {/* Universal Image Flag CDN */}
                   <img 
                     src={`https://flagcdn.com/w20/${currentRegionDetails.code.toLowerCase()}.png`} 
                     alt={currentRegionDetails.code} 
@@ -330,7 +329,7 @@ const Navbar = () => {
                   />
                 </span>
 
-                {/* FIX 2: Scroll Trap Applied Here */}
+                {/* Scroll Trap Applied Here */}
                 <div 
                   className={`absolute top-full right-0 mt-[1.2rem] w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-xl border transition-all duration-300 origin-top
                     ${isRegionDropdownOpen ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0 pointer-events-none'}
@@ -411,7 +410,7 @@ const Navbar = () => {
                 />
               </div>
 
-              {/* FIX 2: Scroll Trap Applied to Mobile Menu */}
+              {/* Scroll Trap Applied to Mobile Menu */}
               {isRegionDropdownOpen && (
                 <div 
                   className={`absolute top-full -right-4 mt-6 w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-2xl border

@@ -2,22 +2,31 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { userAxios } from '../../configs/axiosInstance'; 
 
 // ==========================================
-// LOCAL STORAGE HELPERS (GUEST WISHLIST)
+// LOCAL STORAGE HELPERS (DUMB GUEST WISHLIST)
 // ==========================================
-const loadGuestWishlist = () => {
-  if (typeof window === 'undefined') return { items: [] };
+const loadGuestWishlistIds = () => {
+  if (typeof window === 'undefined') return [];
   try {
-    const saved = localStorage.getItem('guest_wishlist');
-    return saved ? JSON.parse(saved) : { items: [] };
+    const saved = localStorage.getItem('guest_wishlist_ids');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
+    }
+    return [];
   } catch (error) {
-    console.error("Failed to parse guest wishlist:", error);
-    return { items: [] };
+    console.error("Failed to parse guest wishlist IDs:", error);
+    return [];
   }
 };
 
-const saveGuestWishlist = (items) => {
+const saveGuestWishlistIds = (items) => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('guest_wishlist', JSON.stringify({ items }));
+    // Strip everything except the essential identifiers before saving
+    const dumbList = items.map(item => ({
+      productId: item.productId,
+      variantId: item.variantId
+    }));
+    localStorage.setItem('guest_wishlist_ids', JSON.stringify(dumbList));
   }
 };
 
@@ -25,16 +34,34 @@ const saveGuestWishlist = (items) => {
 // ASYNC THUNKS (API CALLS)
 // ==========================================
 
-// Fetch Authenticated User Wishlist
+// Fetch Authenticated User Wishlist (Backend handles pricing)
 export const fetchUserWishlist = createAsyncThunk(
   'wishlist/fetchUserWishlist',
   async (_, thunkAPI) => {
     try {
       const response = await userAxios.get('/wishlist');
-      // The backend returns an array of items inside data.items
-      return response.data.data.items || [];
+      return response.data;
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to fetch wishlist');
+    }
+  }
+);
+
+// NEW: Hydrate Guest Wishlist (Backend handles pricing based on dumb IDs)
+export const hydrateGuestWishlistAPI = createAsyncThunk(
+  'wishlist/hydrateGuestWishlistAPI',
+  async (_, thunkAPI) => {
+    try {
+      const localItems = loadGuestWishlistIds();
+      
+      if (localItems.length === 0) {
+        return { data: { items: [] } }; 
+      }
+
+      const response = await userAxios.post('/wishlist/hydrate', { localItems });
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to hydrate guest wishlist');
     }
   }
 );
@@ -45,10 +72,8 @@ export const toggleWishlistDB = createAsyncThunk(
   async ({ productId, variantId }, { dispatch, rejectWithValue }) => {
     try {
       const response = await userAxios.post('/wishlist/toggle', { productId, variantId });
-      
-      // Immediately fetch the fresh wishlist to guarantee sync with DB
+      // Immediately fetch the fresh wishlist to guarantee sync with DB and pricing engine
       dispatch(fetchUserWishlist()); 
-      
       return response.data; 
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update wishlist');
@@ -61,51 +86,39 @@ export const syncGuestWishlistToDB = createAsyncThunk(
   'wishlist/syncGuestWishlistToDB',
   async (_, { dispatch, rejectWithValue }) => {
     try {
-      const saved = localStorage.getItem('guest_wishlist');
-      const localData = saved ? JSON.parse(saved) : { items: [] };
-      const items = localData.items || [];
+      // Read the dumb IDs directly
+      const localItems = loadGuestWishlistIds();
       
-      if (items.length > 0) {
-        // --- THE BULLETPROOF PAYLOAD ---
-        // We map both variations of the property names so Mongoose doesn't strip them
-        const syncPayload = items.map(item => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          product: item.productId, // Fallback for Mongoose schema
-          variant: item.variantId  // Fallback for Mongoose schema
-        }));
-
-        // We send it keyed as BOTH localItems and items so the controller finds it
-        await userAxios.post('/wishlist/sync', { 
-          localItems: syncPayload, 
-          items: syncPayload 
-        });
+      if (localItems.length > 0) {
+        await userAxios.post('/wishlist/sync', { localItems });
         
-        // Manually nuke the local storage right here to guarantee deletion
+        // Nuke the local storage and old keys
+        localStorage.removeItem('guest_wishlist_ids');
         localStorage.removeItem('guest_wishlist');
         dispatch({ type: 'wishlist/clearLocalWishlist' });
       }
       
-      // Fetch the newly merged DB wishlist
       dispatch(fetchUserWishlist());
       return true;
     } catch (error) {
-      console.error("WISHLIST SYNC FAILED. Backend response:", error.response?.data || error.message);
+      console.error("WISHLIST SYNC FAILED:", error);
       return rejectWithValue(error.response?.data?.message || 'Failed to sync wishlist');
     }
   }
 );
 
+
 // ==========================================
 // REDUX SLICE
 // ==========================================
-const initialGuestWishlist = loadGuestWishlist();
 
 const initialState = {
-  items: initialGuestWishlist.items,
+  items: [], // Initialized empty, waiting for hydration
   isLoading: false,
   isError: false,
   message: '',
+  currencySymbol: '₹',
+  currencyCode: 'INR',
 };
 
 const wishlistSlice = createSlice({
@@ -113,7 +126,6 @@ const wishlistSlice = createSlice({
   initialState,
   reducers: {
     // --- GUEST WISHLIST ACTIONS (LOCAL ONLY) ---
-    
     toggleLocalItem: (state, action) => {
       const newItem = action.payload; 
       
@@ -127,11 +139,13 @@ const wishlistSlice = createSlice({
         state.items.unshift(newItem);
       }
 
-      saveGuestWishlist(state.items);
+      // Save only the dumb IDs to local storage
+      saveGuestWishlistIds(state.items);
     },
 
     clearLocalWishlist: (state) => {
       state.items = [];
+      localStorage.removeItem('guest_wishlist_ids');
       localStorage.removeItem('guest_wishlist');
     },
 
@@ -142,30 +156,42 @@ const wishlistSlice = createSlice({
   },
   
   extraReducers: (builder) => {
+    // Helper function to handle fulfilling both user and guest wishlists
+    const handleWishlistFulfilled = (state, action) => {
+      state.isLoading = false;
+      const payloadData = action.payload?.data || action.payload || {};
+      
+      state.items = payloadData.items || [];
+      
+      if (action.payload?.currencySymbol || payloadData.currencySymbol) {
+        state.currencySymbol = action.payload?.currencySymbol || payloadData.currencySymbol;
+      }
+      if (action.payload?.currencyCode || payloadData.currencyCode) {
+        state.currencyCode = action.payload?.currencyCode || payloadData.currencyCode;
+      }
+    };
+
     builder
       // --- FETCH USER WISHLIST ---
-      .addCase(fetchUserWishlist.pending, (state) => {
-        state.isLoading = true;
-        state.isError = false;
-      })
-      .addCase(fetchUserWishlist.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.items = action.payload;
-      })
+      .addCase(fetchUserWishlist.pending, (state) => { state.isLoading = true; state.isError = false; })
+      .addCase(fetchUserWishlist.fulfilled, handleWishlistFulfilled)
       .addCase(fetchUserWishlist.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
       })
 
-      // --- TOGGLE DB WISHLIST ---
-      .addCase(toggleWishlistDB.pending, (state) => {
-        state.isLoading = true;
-        state.isError = false;
-      })
-      .addCase(toggleWishlistDB.fulfilled, (state) => {
+      // --- HYDRATE GUEST WISHLIST ---
+      .addCase(hydrateGuestWishlistAPI.pending, (state) => { state.isLoading = true; })
+      .addCase(hydrateGuestWishlistAPI.fulfilled, handleWishlistFulfilled)
+      .addCase(hydrateGuestWishlistAPI.rejected, (state, action) => {
         state.isLoading = false;
+        console.error("Wishlist hydration failed:", action.payload); 
       })
+
+      // --- TOGGLE DB WISHLIST ---
+      .addCase(toggleWishlistDB.pending, (state) => { state.isLoading = true; state.isError = false; })
+      .addCase(toggleWishlistDB.fulfilled, (state) => { state.isLoading = false; })
       .addCase(toggleWishlistDB.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;

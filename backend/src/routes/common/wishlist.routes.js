@@ -3,24 +3,29 @@ import {
   getWishlist, 
   toggleWishlistItem, 
   syncWishlist, 
-  clearWishlist 
+  clearWishlist,
+  hydrateGuestWishlist // <-- 1. Import the new hydration controller
 } from '../../controllers/common/wishlist.controller.js';
 
-// Import your middlewares
 import { isValidUser } from '../../middleware/common/auth/auth.middleware.js'; 
 import { regionMiddleware } from '../../middleware/common/regionMiddleware.js';
 
 const router = express.Router();
 
-// Apply auth to all routes below this line
-router.use(isValidUser);
+// ==========================================
+// PUBLIC ROUTES (For Guests)
+// ==========================================
+router.post('/hydrate', regionMiddleware, hydrateGuestWishlist);
 
-router.get('/', regionMiddleware, getWishlist);
 
-router.post('/toggle', toggleWishlistItem);
+// ==========================================
+// PROTECTED ROUTES (For Authenticated Users)
+// ==========================================
 
-router.post('/sync', syncWishlist);
+router.get('/', isValidUser, regionMiddleware, getWishlist);
 
-router.delete('/clear', clearWishlist);
+router.post('/toggle', isValidUser, toggleWishlistItem);
+router.post('/sync', isValidUser, syncWishlist);
+router.delete('/clear', isValidUser, clearWishlist);
 
 export default router;

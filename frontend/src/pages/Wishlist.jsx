@@ -10,7 +10,7 @@ import { verifyStock, addToCartDB, addLocalItem } from "../store/features/cartSl
 
 // --- Helper: ImageKit Optimization ---
 const getOptimizedImgUrl = (url) => {
-  if (!url) return null; // Return null instead of "" to prevent browser fetch errors
+  if (!url) return null; 
   if (url.includes("tr=")) return url;
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}tr=w-500,q-80`;
@@ -22,32 +22,32 @@ const Wishlist = () => {
   const containerRef = useRef(null);
   const cardRefs = useRef([]);
   
-  // --- Refs for the Custom SVG Empty State ---
   const emptyHeartRef = useRef(null);
   const svgContainerRef = useRef(null);
   const baseHeartRef = useRef(null);
   const crackRef = useRef(null);
 
-  const { items: wishlistItems, isLoading } = useSelector((state) => state.wishlist);
+  // --- THE FIX 1: Extract the currency data from Redux ---
+  const { 
+    items: wishlistItems, 
+    isLoading, 
+    currencySymbol, 
+    currencyCode 
+  } = useSelector((state) => state.wishlist);
+  
   const cartItems = useSelector((state) => state.cart?.items || []);
   const isAuth = useSelector((state) => state.auth?.isAuthenticated);
 
   const [addingToCartId, setAddingToCartId] = useState(null);
 
+  // --- THE FIX 2: Dynamic Formatter ---
   const formatPrice = (price) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(price || 0);
+    // Falls back to en-IN (Lakhs) for INR, uses standard en-US (Thousands) for foreign currency
+    const locale = currencyCode === "INR" ? "en-IN" : "en-US";
+    return `${currencySymbol || "₹"} ${Number(price || 0).toLocaleString(locale, { maximumFractionDigits: 0 })}`;
   };
 
-  // ==========================================
-  // DATA NORMALIZER (Massively simplified due to Backend DTO)
-  // ==========================================
   const normalizeItem = (item) => {
-    // Both Guest (Local Storage) and User (Backend DTO) now use the exact same flat structure.
-    // We just pass it through and provide safety fallbacks.
     return {
       productId: item.productId,
       variantId: item.variantId,
@@ -57,8 +57,8 @@ const Wishlist = () => {
       colorName: item.colorName || "Unknown Color",
       price: item.price || 0,
       status: item.status ? item.status.toLowerCase() : "active",
-      inStock: item.inStock !== undefined ? item.inStock : true, // Fallback for local
-      stockQuantity: item.stockQuantity || 5, // Fallback for local
+      inStock: item.inStock !== undefined ? item.inStock : true, 
+      stockQuantity: item.stockQuantity || 5, 
     };
   };
 
@@ -107,13 +107,7 @@ const Wishlist = () => {
     
     gsap.to(crackRef.current, { strokeDashoffset: -100, duration: 0.4, ease: "power2.in", overwrite: true });
     gsap.to(svgContainerRef.current, { scale: 1.15, opacity: 1, duration: 0.5, ease: "back.out(1.7)", overwrite: true });
-    gsap.to(baseHeartRef.current, { 
-      fill: "#7e7053", 
-      stroke: "#71654c", 
-      duration: 0.4, 
-      delay: 0.2, 
-      overwrite: true 
-    });
+    gsap.to(baseHeartRef.current, { fill: "#7e7053", stroke: "#71654c", duration: 0.4, delay: 0.2, overwrite: true });
   });
 
   const handleDiscoverMouseLeave = contextSafe(() => {
@@ -296,7 +290,6 @@ const Wishlist = () => {
                     to={productUrl} 
                     className={`absolute inset-0 block ${isUnavailable ? "pointer-events-none" : ""}`}
                   >
-                    {/* Conditionally Render the Image or a Placeholder */}
                     {optimizedImg ? (
                       <img 
                         src={optimizedImg} 

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 // ==========================================
-// Sub-Schema: Cart Item
+// Sub-Schema: Cart Item (Identity Only)
 // ==========================================
 const cartItemSchema = new mongoose.Schema({
   product: {
@@ -19,12 +19,9 @@ const cartItemSchema = new mongoose.Schema({
     min: [1, 'Quantity cannot be less than 1'],
     max: [5, 'Maximum 5 items allowed per variant per order'],
     default: 1
-  },
-  price: {
-    type: Number,
-    required: [true, 'Price at time of adding to cart is required'],
-    min: [0, 'Price cannot be negative']
   }
+  // Notice: The 'price' field has been completely removed. 
+  // The database is no longer responsible for storing static financial data.
 }, { 
   // We keep _id true so Mongoose generates a unique ID for each item in the array.
   // This makes it much easier to target and delete specific items later.

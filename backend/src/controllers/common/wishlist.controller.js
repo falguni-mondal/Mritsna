@@ -1,6 +1,11 @@
 import Wishlist from "../../models/wishlist.model.js";
+import Product from "../../models/product.model.js";
+// --- NEW: Inject the universal pricing engine ---
+import { calculateRegionalPricing } from "../../utils/pricingEngine.js";
 
-
+// ==========================================
+// GET USER WISHLIST (DYNAMIC PRICING ENGINE)
+// ==========================================
 export const getWishlist = async (req, res) => {
   try {
     const userId = req.user;
@@ -11,10 +16,8 @@ export const getWishlist = async (req, res) => {
       select: "title slug category isPremium status variants",
     });
 
-    // Extract the region data from the middleware (fallback to INR if missing)
-    const rate = req.region?.rate || 1;
-    const symbol = req.region?.symbol || "₹";
-    const currencyCode = req.region?.currencyCode || "INR";
+    // Extract the region data dynamically attached by our middleware
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
     // If empty wishlist, still send back the currency info so the UI knows what to render
     if (!wishlist) {
@@ -22,8 +25,8 @@ export const getWishlist = async (req, res) => {
         success: true,
         data: { 
           items: [],
-          currencySymbol: symbol,
-          currencyCode: currencyCode
+          currencySymbol: regionData.symbol,
+          currencyCode: regionData.currencyCode
         },
       });
     }
@@ -37,31 +40,29 @@ export const getWishlist = async (req, res) => {
       await wishlist.save();
     }
 
-    // --- THE DTO OPTIMIZATION ---
-    // Format the items so the frontend receives a clean, flat object
+    // --- THE DTO OPTIMIZATION WITH PRICING ENGINE ---
     const formattedItems = validItems.map((item) => {
       const product = item.productId;
       
-      // Find the specific variant the user added
       const variant = product.variants.find(
         (v) => v._id.toString() === item.variantId.toString() || v.id === item.variantId
       );
 
-      // If the variant was deleted from the product, return null to filter it out
       if (!variant) return null;
 
-      // Extract the primary image URL securely
       let imgUrl = "";
       if (variant.images && variant.images.length > 0) {
         const primaryImg = variant.images.find((img) => img.isPrimary) || variant.images[0];
         imgUrl = primaryImg.baseUrl || primaryImg.url || "";
       }
 
-      // Calculate Base Price in INR
-      const basePriceINR = variant.finalPrice || variant.pricing?.price || 0;
-      
-      // Convert to Regional Price dynamically
-      const livePriceConverted = Math.round(basePriceINR * rate);
+      // --- APPLY THE PRICING ENGINE ---
+      const localizedPricing = calculateRegionalPricing(
+        variant.pricing.price, 
+        variant.pricing.discountPercentage || 0, 
+        product.isPremium || false, 
+        regionData
+      );
 
       return {
         productId: product._id || product.id,
@@ -70,21 +71,21 @@ export const getWishlist = async (req, res) => {
         slug: product.slug || "#",
         img: imgUrl,
         colorName: variant.colorName || "Unknown Color",
-        price: livePriceConverted, // Send the converted regional price
+        price: localizedPricing.sellingPrice, // Now perfectly converted + marked up
+        originalPrice: localizedPricing.originalPrice, 
         status: product.status ? product.status.toLowerCase() : "active",
         inStock: variant.inventory?.quantity > 0,
         stockQuantity: variant.inventory?.quantity || 0,
         addedAt: item.addedAt
       };
-    }).filter((item) => item !== null); // Strip out any nulls from deleted variants
+    }).filter((item) => item !== null); 
 
-    // Send the flattened array and currency metadata to the frontend
     return res.status(200).json({
       success: true,
       data: { 
         items: formattedItems,
-        currencySymbol: symbol,
-        currencyCode: currencyCode
+        currencySymbol: regionData.symbol,
+        currencyCode: regionData.currencyCode
       },
     });
   } catch (error) {
@@ -95,7 +96,86 @@ export const getWishlist = async (req, res) => {
   }
 };
 
+// ==========================================
+// HYDRATE GUEST WISHLIST (NEW: DYNAMIC PRICING FOR LOCALSTORAGE)
+// ==========================================
+export const hydrateGuestWishlist = async (req, res, next) => {
+  try {
+    const { localItems } = req.body; 
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
+    if (!localItems || !Array.isArray(localItems) || localItems.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: { items: [], currencySymbol: regionData.symbol, currencyCode: regionData.currencyCode }
+      });
+    }
+
+    const formattedItems = [];
+
+    // Fetch live product data for the IDs sent from localStorage
+    for (const item of localItems) {
+      // Validate IDs before querying MongoDB to prevent cast errors
+      if (!item.productId || !item.variantId) continue;
+
+      const product = await Product.findOne({ _id: item.productId, status: 'active' })
+        .select('title slug category isPremium variants status')
+        .lean();
+
+      if (!product) continue;
+
+      const variant = product.variants.find(v => v._id.toString() === item.variantId.toString());
+      if (!variant) continue;
+
+      let imgUrl = "";
+      if (variant.images && variant.images.length > 0) {
+        const primaryImg = variant.images.find((img) => img.isPrimary) || variant.images[0];
+        imgUrl = primaryImg.baseUrl || primaryImg.url || "";
+      }
+
+      // --- APPLY THE PRICING ENGINE ---
+      const localizedPricing = calculateRegionalPricing(
+        variant.pricing.price, 
+        variant.pricing.discountPercentage || 0, 
+        product.isPremium || false, 
+        regionData
+      );
+
+      formattedItems.push({
+        productId: product._id,
+        variantId: item.variantId,
+        title: product.title,
+        slug: product.slug,
+        img: imgUrl,
+        colorName: variant.colorName,
+        price: localizedPricing.sellingPrice,
+        originalPrice: localizedPricing.originalPrice,
+        status: product.status.toLowerCase(),
+        inStock: variant.inventory?.quantity > 0,
+        stockQuantity: variant.inventory?.quantity || 0,
+        addedAt: new Date().toISOString()
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        items: formattedItems,
+        currencySymbol: regionData.symbol,
+        currencyCode: regionData.currencyCode
+      }
+    });
+
+  } catch (error) {
+    console.error("[Wishlist Controller - hydrateGuestWishlist Error]:", error);
+    return res.status(500).json({ success: false, message: "Failed to hydrate guest wishlist." });
+  }
+};
+
+
+// ==========================================
+// TOGGLE WISHLIST ITEM (DUMB DB UPDATE)
+// ==========================================
 export const toggleWishlistItem = async (req, res) => {
   try {
     const userId = req.user;
@@ -110,10 +190,8 @@ export const toggleWishlistItem = async (req, res) => {
         });
     }
 
-    // Find the user's wishlist
     let wishlist = await Wishlist.findOne({ user: userId });
 
-    // If they don't have a wishlist yet, create one and add the item
     if (!wishlist) {
       wishlist = await Wishlist.create({
         user: userId,
@@ -128,14 +206,12 @@ export const toggleWishlistItem = async (req, res) => {
         });
     }
 
-    // Check if the exact variant is already in the wishlist
     const itemIndex = wishlist.items.findIndex(
       (item) =>
         item.productId.toString() === productId && item.variantId === variantId,
     );
 
     if (itemIndex > -1) {
-      // It exists -> Remove it
       wishlist.items.splice(itemIndex, 1);
       await wishlist.save();
       return res
@@ -146,8 +222,7 @@ export const toggleWishlistItem = async (req, res) => {
           action: "removed",
         });
     } else {
-      // It doesn't exist -> Add it to the top of the list
-      wishlist.items.unshift({ productId, variantId }); // unshift puts it at index 0 (newest first)
+      wishlist.items.unshift({ productId, variantId }); 
       await wishlist.save();
       return res
         .status(200)
@@ -166,14 +241,14 @@ export const toggleWishlistItem = async (req, res) => {
 };
 
 
+// ==========================================
+// GUEST TO USER MERGE (DUMB DB UPDATE)
+// ==========================================
 export const syncWishlist = async (req, res) => {
   try {
     const userId = req.user;
-    
-    // Accept either localItems or items to make it bulletproof against frontend changes
     const itemsToSync = req.body.localItems || req.body.items;
 
-    // If local storage was empty, do nothing
     if (!itemsToSync || !Array.isArray(itemsToSync) || itemsToSync.length === 0) {
       return res
         .status(200)
@@ -182,22 +257,25 @@ export const syncWishlist = async (req, res) => {
 
     let wishlist = await Wishlist.findOne({ user: userId });
 
-    // If they have no DB wishlist, simply create one with the local items
     if (!wishlist) {
+      // Map it down to just the IDs just in case the frontend sent rich data
+      const cleanItems = itemsToSync.map(i => ({
+         productId: i.productId || i.product, 
+         variantId: i.variantId || i.variant 
+      })).filter(i => i.productId && i.variantId);
+
       await Wishlist.create({
         user: userId,
-        items: itemsToSync,
+        items: cleanItems,
       });
       return res
         .status(200)
         .json({ success: true, message: "Wishlist synced successfully." });
     }
 
-    // If they DO have a DB wishlist, we need to merge carefully to avoid duplicates
     let addedCount = 0;
 
     itemsToSync.forEach((localItem) => {
-      // Support frontend sending 'product'/'variant' or 'productId'/'variantId'
       const pId = localItem.productId || localItem.product;
       const vId = localItem.variantId || localItem.variant;
 
@@ -208,7 +286,6 @@ export const syncWishlist = async (req, res) => {
       );
 
       if (!exists && pId && vId) {
-        // Add new items to the top of the list
         wishlist.items.unshift({
           productId: pId,
           variantId: vId,
@@ -217,7 +294,6 @@ export const syncWishlist = async (req, res) => {
       }
     });
 
-    // Only hit the database with a save if we actually added something new
     if (addedCount > 0) {
       await wishlist.save();
     }
@@ -237,11 +313,7 @@ export const syncWishlist = async (req, res) => {
 export const clearWishlist = async (req, res) => {
   try {
     const userId = req.user;
-
-    // We don't delete the document, we just empty the array.
-    // This is much faster and keeps the document index intact.
     await Wishlist.findOneAndUpdate({ user: userId }, { $set: { items: [] } });
-
     return res
       .status(200)
       .json({ success: true, message: "Wishlist cleared." });

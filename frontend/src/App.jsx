@@ -7,24 +7,21 @@ import Footer from './components/footer/Footer';
 import CustomCursor from './components/global/CustomCursor';
 
 import { checkAuth } from "./store/features/authSlice";
-import { fetchUserCart } from './store/features/cartSlice';
-import { fetchUserWishlist } from './store/features/wishlistSlice';
-import { fetchUserRegion } from './store/features/regionSlice'; // <-- Injecting the region thunk
+import { fetchUserCart, hydrateGuestCartAPI } from './store/features/cartSlice';
+// --- FIX: Import the guest wishlist hydration thunk ---
+import { fetchUserWishlist, hydrateGuestWishlistAPI } from './store/features/wishlistSlice';
+import { fetchUserRegion } from './store/features/regionSlice'; 
 
 const App = () => {
   const dispatch = useDispatch();
   
-  // Pull states directly from Redux
   const { isCheckingAuth, isAuthenticated } = useSelector((state) => state.auth);
   
-  // Pull region states
   const { data: regionData, isLoading: isRegionLoading } = useSelector((state) => state.region);
   
-  // A local state to prevent UI jumping until the initial sequence is done
   const [isAppReady, setIsAppReady] = useState(false);
 
   // 1. Fire the Region Check on Mount
-  // If localStorage already had the data, regionData exists and this safely skips the API call
   useEffect(() => {
     if (!regionData) {
       dispatch(fetchUserRegion());
@@ -34,21 +31,26 @@ const App = () => {
   // 2. Fire the Auth Check on Mount
   useEffect(() => {
     dispatch(checkAuth()).finally(() => {
-      // Once auth is checked (success or fail), we unlock the initial app render
       setIsAppReady(true); 
     });
   }, [dispatch]);
 
-  // 3. Listen for Authentication Success to Fetch User Data
+  // 3. THE MAGIC LOOP: Fetching the right data at the right time
   useEffect(() => {
-    if (isAuthenticated) {
-      dispatch(fetchUserCart());
-      dispatch(fetchUserWishlist());
+    if (isAppReady) {
+      if (isAuthenticated) {
+        // Logged In: Fetch from MongoDB, backend handles pricing
+        dispatch(fetchUserCart());
+        dispatch(fetchUserWishlist());
+      } else {
+        // Guest: Send the dumb IDs to the backend to get live regional prices
+        dispatch(hydrateGuestCartAPI());
+        dispatch(hydrateGuestWishlistAPI()); // <-- THE FINAL PIECE
+      }
     }
-  }, [isAuthenticated, dispatch]);
+  }, [isAuthenticated, isAppReady, dispatch]);
 
   // 4. Global UI Blocker
-  // We now block the UI if Auth is checking, the app isn't ready, OR if we are waiting on the IP Region API
   if (isCheckingAuth || !isAppReady || isRegionLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-[#f8f8f8]">

@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Cart from '../../models/cart.model.js';
 import Product from '../../models/product.model.js';
+import { calculateRegionalPricing } from '../../utils/pricingEngine.js';
 
 // ==========================================
 // LIGHTWEIGHT INVENTORY PING
@@ -41,38 +42,35 @@ export const checkStock = async (req, res, next) => {
 };
 
 // ==========================================
-// GET USER CART (UPDATED FOR DYNAMIC CURRENCY)
+// GET USER CART (DYNAMIC PRICING ENGINE)
 // ==========================================
 export const getCart = async (req, res, next) => {
   try {
     const userId = req.user;
 
-    let cart = await Cart.findOne({ user: userId }).populate({
+    const cart = await Cart.findOne({ user: userId }).populate({
       path: 'items.product',
       select: 'title slug category isPremium variants'
     });
 
-    // Extract the region data from the middleware (fallback to INR if missing)
-    const rate = req.region?.rate || 1;
-    const symbol = req.region?.symbol || '₹';
-    const currencyCode = req.region?.currencyCode || 'INR';
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
-    // If cart is empty, still send back the currency info so the UI knows what to render
-    if (!cart) {
+    if (!cart || !cart.items.length) {
       return res.status(200).json({ 
         success: true, 
         data: { 
           items: [], 
           subTotal: 0,
-          currencySymbol: symbol,
-          currencyCode: currencyCode
+          currencySymbol: regionData.symbol,
+          currencyCode: regionData.currencyCode
         } 
       });
     }
 
     let subTotal = 0;
+    
+    // We run every saved item through the pricing engine
     const formattedItems = cart.items.map(cartItem => {
-      
       if (!cartItem.product) return null;
 
       const activeVariant = cartItem.product.variants.find(
@@ -81,16 +79,15 @@ export const getCart = async (req, res, next) => {
 
       if (!activeVariant) return null;
 
-      const basePrice = activeVariant.pricing.price;
-      const discount = activeVariant.pricing.discountPercentage || 0;
-      const livePriceINR = discount > 0 
-        ? basePrice - (basePrice * (discount / 100)) 
-        : basePrice;
+      // --- APPLY THE PRICING ENGINE ---
+      const localizedPricing = calculateRegionalPricing(
+        activeVariant.pricing.price, 
+        activeVariant.pricing.discountPercentage || 0, 
+        cartItem.product.isPremium || false, 
+        regionData
+      );
 
-      // Convert to Regional Price dynamically
-      const livePriceConverted = Math.round(livePriceINR * rate);
-      const itemTotalConverted = cartItem.quantity * livePriceConverted;
-      
+      const itemTotalConverted = cartItem.quantity * localizedPricing.sellingPrice;
       subTotal += itemTotalConverted;
 
       return {
@@ -101,9 +98,10 @@ export const getCart = async (req, res, next) => {
         title: cartItem.product.title,
         colorName: activeVariant.colorName,
         img: activeVariant.images.find(img => img.isPrimary)?.baseUrl || activeVariant.images[0]?.baseUrl,
-        price: livePriceConverted, // Send the converted regional price
+        price: localizedPricing.sellingPrice, // Perfect dynamic price
+        originalPrice: localizedPricing.originalPrice, 
         quantity: cartItem.quantity,
-        itemTotal: itemTotalConverted, // Send the converted total
+        itemTotal: itemTotalConverted, 
         maxLimit: Math.min(5, activeVariant.inventory.quantity)
       };
     }).filter(item => item !== null); 
@@ -113,8 +111,8 @@ export const getCart = async (req, res, next) => {
       data: { 
         items: formattedItems, 
         subTotal,
-        currencySymbol: symbol,       // Pass the symbol so React can render it
-        currencyCode: currencyCode    // Pass the code (e.g. 'USD') just in case
+        currencySymbol: regionData.symbol,      
+        currencyCode: regionData.currencyCode    
       }
     });
   } catch (error) {
@@ -124,13 +122,94 @@ export const getCart = async (req, res, next) => {
 };
 
 // ==========================================
-// ADD TO CART
+// HYDRATE GUEST CART (NEW: DYNAMIC PRICING FOR LOCALSTORAGE)
+// ==========================================
+export const hydrateGuestCart = async (req, res, next) => {
+  try {
+    const { localItems } = req.body; 
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
+
+    if (!localItems || !Array.isArray(localItems) || localItems.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: { items: [], subTotal: 0, currencySymbol: regionData.symbol, currencyCode: regionData.currencyCode }
+      });
+    }
+
+    let subTotal = 0;
+    const formattedItems = [];
+
+    // Fetch live product data for the IDs sent from localStorage
+    for (const item of localItems) {
+      if (!mongoose.Types.ObjectId.isValid(item.productId) || !mongoose.Types.ObjectId.isValid(item.variantId)) {
+        continue;
+      }
+
+      const product = await Product.findOne({ _id: item.productId, status: 'active' })
+        .select('title slug category isPremium variants')
+        .lean();
+
+      if (!product) continue;
+
+      const activeVariant = product.variants.find(v => v._id.toString() === item.variantId.toString());
+      if (!activeVariant) continue;
+
+      // Enforce absolute maximum limits based on DB inventory
+      const maxAllowed = Math.min(5, activeVariant.inventory.quantity);
+      const safeQuantity = Math.min(item.quantity, maxAllowed);
+
+      if (safeQuantity <= 0 && !activeVariant.inventory.allowBackorder) continue; // Out of stock
+
+      // --- APPLY THE PRICING ENGINE ---
+      const localizedPricing = calculateRegionalPricing(
+        activeVariant.pricing.price, 
+        activeVariant.pricing.discountPercentage || 0, 
+        product.isPremium || false, 
+        regionData
+      );
+
+      const itemTotalConverted = safeQuantity * localizedPricing.sellingPrice;
+      subTotal += itemTotalConverted;
+
+      formattedItems.push({
+        cartItemId: `guest-${item.variantId}`, // Fake ID for React keys
+        productId: product._id,
+        variantId: item.variantId,
+        slug: product.slug,
+        title: product.title,
+        colorName: activeVariant.colorName,
+        img: activeVariant.images.find(img => img.isPrimary)?.baseUrl || activeVariant.images[0]?.baseUrl,
+        price: localizedPricing.sellingPrice,
+        originalPrice: localizedPricing.originalPrice,
+        quantity: safeQuantity,
+        itemTotal: itemTotalConverted,
+        maxLimit: maxAllowed
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        items: formattedItems,
+        subTotal,
+        currencySymbol: regionData.symbol,
+        currencyCode: regionData.currencyCode
+      }
+    });
+
+  } catch (error) {
+    console.error("Error hydrating guest cart:", error);
+    next(error);
+  }
+};
+
+// ==========================================
+// ADD TO CART (DUMB DATABASE UPDATE)
 // ==========================================
 export const addToCart = async (req, res, next) => {
   try {
     const userId = req.user;
-    // req.verifiedItem includes `availableStock` passed down from inventoryCheck middleware
-    const { productId, variantId, quantity, price, availableStock } = req.verifiedItem; 
+    const { productId, variantId, quantity, availableStock } = req.verifiedItem; 
 
     let cart = await Cart.findOne({ user: userId });
 
@@ -144,16 +223,14 @@ export const addToCart = async (req, res, next) => {
 
     if (existingItemIndex > -1) {
       const newQuantity = cart.items[existingItemIndex].quantity + quantity;
-      
-      // Enforce both the 5-item limit AND the actual warehouse stock limit
       cart.items[existingItemIndex].quantity = Math.min(newQuantity, 5, availableStock);
-      cart.items[existingItemIndex].price = price; // This is the base INR price
+      // REMOVED: Price is no longer saved
     } else {
       cart.items.push({
         product: productId,
         variantId: variantId,
         quantity: quantity,
-        price: price
+        // REMOVED: Price is no longer saved
       });
     }
 
@@ -172,7 +249,7 @@ export const addToCart = async (req, res, next) => {
 export const updateCartItemQuantity = async (req, res, next) => {
   try {
     const userId = req.user;
-    const { variantId, quantity, price } = req.verifiedItem; 
+    const { variantId, quantity } = req.verifiedItem; 
 
     const cart = await Cart.findOne({ user: userId });
     if (!cart) return res.status(404).json({ success: false, message: 'Cart not found' });
@@ -180,9 +257,7 @@ export const updateCartItemQuantity = async (req, res, next) => {
     const itemIndex = cart.items.findIndex(item => item.variantId.toString() === variantId.toString());
     
     if (itemIndex > -1) {
-      // This is an absolute overwrite from the UI, so middleware check is sufficient
       cart.items[itemIndex].quantity = quantity;
-      cart.items[itemIndex].price = price;
       await cart.save();
       return res.status(200).json({ success: true, message: 'Cart updated.' });
     } else {
@@ -236,7 +311,7 @@ export const clearCart = async (req, res, next) => {
 };
 
 // ==========================================
-// GUEST TO USER MERGE
+// GUEST TO USER MERGE (DUMB DATABASE UPDATE)
 // ==========================================
 export const syncCart = async (req, res, next) => {
   try {
@@ -263,9 +338,6 @@ export const syncCart = async (req, res, next) => {
       if (product && product.variants.length > 0) {
         const variant = product.variants[0];
         const dbStock = variant.inventory.quantity;
-        const currentPriceINR = variant.pricing.discountPercentage > 0 
-          ? variant.pricing.price - (variant.pricing.price * (variant.pricing.discountPercentage / 100))
-          : variant.pricing.price;
 
         if (dbStock > 0 || variant.inventory.allowBackorder) {
           const existingItemIndex = cart.items.findIndex(
@@ -275,13 +347,13 @@ export const syncCart = async (req, res, next) => {
           if (existingItemIndex > -1) {
             const combinedQty = cart.items[existingItemIndex].quantity + localItem.quantity;
             cart.items[existingItemIndex].quantity = Math.min(combinedQty, 5, dbStock);
-            cart.items[existingItemIndex].price = currentPriceINR;
+            // REMOVED: Price is no longer saved
           } else {
             cart.items.push({
               product: localItem.productId,
               variantId: localItem.variantId,
               quantity: Math.min(localItem.quantity, 5, dbStock),
-              price: currentPriceINR,
+              // REMOVED: Price is no longer saved
             });
           }
         }

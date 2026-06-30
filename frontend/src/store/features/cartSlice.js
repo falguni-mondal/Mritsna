@@ -2,36 +2,34 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { userAxios } from '../../configs/axiosInstance'; 
 
 // ==========================================
-// LOCAL STORAGE HELPERS (GUEST CART)
+// LOCAL STORAGE HELPERS (DUMB GUEST CART)
 // ==========================================
-const loadGuestCart = () => {
-  if (typeof window === 'undefined') return { items: [], subTotal: 0, currencySymbol: '₹', currencyCode: 'INR' };
+// We only ever load and save the "Identity" of the items, never the prices or currency.
+const loadGuestCartIds = () => {
+  if (typeof window === 'undefined') return [];
   try {
-    const saved = localStorage.getItem('guest_cart');
+    const saved = localStorage.getItem('guest_cart_ids');
     if (saved) {
       const parsed = JSON.parse(saved);
-      return {
-        items: parsed.items || [],
-        subTotal: parsed.subTotal || 0,
-        currencySymbol: parsed.currencySymbol || '₹',
-        currencyCode: parsed.currencyCode || 'INR'
-      };
+      return Array.isArray(parsed) ? parsed : [];
     }
-    return { items: [], subTotal: 0, currencySymbol: '₹', currencyCode: 'INR' };
+    return [];
   } catch (error) {
-    console.error("Failed to parse guest cart:", error);
-    return { items: [], subTotal: 0, currencySymbol: '₹', currencyCode: 'INR' };
+    console.error("Failed to parse guest cart IDs:", error);
+    return [];
   }
 };
 
-const saveGuestCart = (items, subTotal, currencySymbol, currencyCode) => {
+const saveGuestCartIds = (items) => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('guest_cart', JSON.stringify({ items, subTotal, currencySymbol, currencyCode }));
+    // Strip everything except the essential identifiers before saving
+    const dumbList = items.map(item => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      quantity: item.quantity
+    }));
+    localStorage.setItem('guest_cart_ids', JSON.stringify(dumbList));
   }
-};
-
-const calculateSubTotal = (items) => {
-  return items.reduce((total, item) => total + (item.price * item.quantity), 0);
 };
 
 // ==========================================
@@ -53,6 +51,7 @@ export const verifyStock = createAsyncThunk(
   }
 );
 
+// Fetch Cart for Logged-In Users
 export const fetchUserCart = createAsyncThunk(
   'cart/fetchUserCart',
   async (_, thunkAPI) => {
@@ -61,6 +60,27 @@ export const fetchUserCart = createAsyncThunk(
       return response.data;
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to fetch cart');
+    }
+  }
+);
+
+// NEW: Hydrate Cart for Guest Users
+// Takes the dumb IDs from localStorage and gets the live math from the backend
+export const hydrateGuestCartAPI = createAsyncThunk(
+  'cart/hydrateGuestCartAPI',
+  async (_, thunkAPI) => {
+    try {
+      const localItems = loadGuestCartIds();
+      
+      // If there's nothing in local storage, don't bother hitting the API
+      if (localItems.length === 0) {
+        return { data: { items: [], subTotal: 0 } }; 
+      }
+
+      const response = await userAxios.post('/cart/hydrate', { localItems });
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to hydrate guest cart');
     }
   }
 );
@@ -106,19 +126,14 @@ export const removeFromCartDB = createAsyncThunk(
 
 export const syncGuestCartToDB = createAsyncThunk(
   'cart/syncGuestCartToDB',
-  async (_, { getState, dispatch, rejectWithValue }) => {
+  async (_, { dispatch, rejectWithValue }) => {
     try {
-      const { items } = getState().cart; 
+      // Read the dumb list directly from local storage for syncing
+      const localItems = loadGuestCartIds();
       
-      if (items.length > 0) {
-        const localItems = items.map(item => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity: item.quantity
-        }));
-
+      if (localItems.length > 0) {
         await userAxios.post('/cart/sync', { localItems });
-        dispatch({ type: 'cart/clearLocalCart' });
+        dispatch(clearLocalCart());
       }
       
       dispatch(fetchUserCart());
@@ -133,43 +148,36 @@ export const syncGuestCartToDB = createAsyncThunk(
 // ==========================================
 // REDUX SLICE
 // ==========================================
-const initialGuestCart = loadGuestCart();
 
 const initialState = {
-  items: initialGuestCart.items,
-  subTotal: initialGuestCart.subTotal,
-  isLoading: false,
+  // We initialize with empty values because we must wait for the hydration API to run
+  items: [],
+  subTotal: 0,
+  isLoading: false, // Will turn true on mount if there are IDs to hydrate
   isError: false,
   message: '',
-  currencySymbol: initialGuestCart.currencySymbol,
-  currencyCode: initialGuestCart.currencyCode,
+  currencySymbol: '₹',
+  currencyCode: 'INR',
 };
 
 const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    // We update local state optimistically, save the dumb IDs to storage, 
+    // but the actual visual data will be handled by the UI or a subsequent hydration call.
     addLocalItem: (state, action) => {
       const newItem = action.payload;
-
-      if (newItem.currencySymbol && newItem.currencyCode) {
-        state.currencySymbol = newItem.currencySymbol;
-        state.currencyCode = newItem.currencyCode;
-      }
-
       const existingIndex = state.items.findIndex(item => item.variantId === newItem.variantId);
 
       if (existingIndex > -1) {
         const combinedQty = state.items[existingIndex].quantity + newItem.quantity;
         state.items[existingIndex].quantity = Math.min(combinedQty, 5, newItem.maxLimit || 5);
-        state.items[existingIndex].itemTotal = state.items[existingIndex].quantity * state.items[existingIndex].price;
       } else {
-        newItem.itemTotal = newItem.quantity * newItem.price;
         state.items.push(newItem);
       }
 
-      state.subTotal = calculateSubTotal(state.items);
-      saveGuestCart(state.items, state.subTotal, state.currencySymbol, state.currencyCode);
+      saveGuestCartIds(state.items);
     },
 
     updateLocalQuantity: (state, action) => {
@@ -178,23 +186,22 @@ const cartSlice = createSlice({
 
       if (existingItem) {
         existingItem.quantity = quantity;
-        existingItem.itemTotal = quantity * existingItem.price;
-        state.subTotal = calculateSubTotal(state.items);
-        saveGuestCart(state.items, state.subTotal, state.currencySymbol, state.currencyCode);
+        saveGuestCartIds(state.items);
       }
     },
 
     removeLocalItem: (state, action) => {
       const variantId = action.payload;
       state.items = state.items.filter(item => item.variantId !== variantId);
-      state.subTotal = calculateSubTotal(state.items);
-      saveGuestCart(state.items, state.subTotal, state.currencySymbol, state.currencyCode);
+      saveGuestCartIds(state.items);
     },
 
     clearLocalCart: (state) => {
       state.items = [];
       state.subTotal = 0;
-      localStorage.removeItem('guest_cart');
+      localStorage.removeItem('guest_cart_ids');
+      // Also clean up the old storage key just in case a returning user has it
+      localStorage.removeItem('guest_cart'); 
     },
 
     clearCartErrors: (state) => {
@@ -204,28 +211,43 @@ const cartSlice = createSlice({
   },
   
   extraReducers: (builder) => {
+    // Helper function to handle fulfilling both user and guest carts
+    const handleCartFulfilled = (state, action) => {
+      state.isLoading = false;
+      const payloadData = action.payload?.data || action.payload || {};
+      
+      state.items = payloadData.items || [];
+      state.subTotal = payloadData.subTotal || 0;
+      
+      // Look for currency info in either the root payload or the nested data object
+      if (action.payload?.currencySymbol || payloadData.currencySymbol) {
+        state.currencySymbol = action.payload?.currencySymbol || payloadData.currencySymbol;
+      }
+      if (action.payload?.currencyCode || payloadData.currencyCode) {
+        state.currencyCode = action.payload?.currencyCode || payloadData.currencyCode;
+      }
+    };
+
     builder
-      .addCase(fetchUserCart.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(fetchUserCart.fulfilled, (state, action) => {
-        state.isLoading = false;
-        
-        // Ensure we safely extract data depending on how the backend nested it
-        const payloadData = action.payload.data || action.payload;
-        
-        state.items = payloadData.items || [];
-        state.subTotal = payloadData.subTotal || 0;
-        
-        state.currencySymbol = action.payload.currencySymbol || payloadData.currencySymbol || '₹';
-        state.currencyCode = action.payload.currencyCode || payloadData.currencyCode || 'INR';
-      })
+      // --- LOGGED IN CART FLOW ---
+      .addCase(fetchUserCart.pending, (state) => { state.isLoading = true; })
+      .addCase(fetchUserCart.fulfilled, handleCartFulfilled)
       .addCase(fetchUserCart.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
       })
 
+      // --- GUEST HYDRATION FLOW ---
+      .addCase(hydrateGuestCartAPI.pending, (state) => { state.isLoading = true; })
+      .addCase(hydrateGuestCartAPI.fulfilled, handleCartFulfilled)
+      .addCase(hydrateGuestCartAPI.rejected, (state, action) => {
+        state.isLoading = false;
+        // Don't show a massive error if hydration fails, just leave it empty to prevent crashing
+        console.error("Hydration failed:", action.payload); 
+      })
+
+      // --- DB MUTATIONS ---
       .addCase(addToCartDB.pending, (state) => {
         state.isLoading = true;
         state.isError = false;

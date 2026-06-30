@@ -9,29 +9,25 @@ import {
   verifyStock,
   addToCartDB,
   addLocalItem,
+  hydrateGuestCartAPI 
 } from "../../store/features/cartSlice";
 
-// --- NEW: Import Wishlist Actions ---
 import {
   toggleWishlistDB,
   toggleLocalItem,
+  hydrateGuestWishlistAPI // <-- 1. Import the new hydration thunk
 } from "../../store/features/wishlistSlice";
 
 const ProductActions = ({ product, activeVariant }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate(); 
 
-  // Get Auth State & Cart Items
   const isAuth = useSelector((state) => state.auth?.isAuthenticated);
   const cartItems = useSelector((state) => state.cart?.items || []); 
-  
-  // --- NEW: Get Wishlist State ---
   const wishlistItems = useSelector((state) => state.wishlist?.items || []);
 
-  // --- FIX 1: Grab the active currency from the Product slice ---
   const { currencySymbol, currencyCode } = useSelector((state) => state.product);
 
-  // Check if the current variant is already in the cart or wishlist
   const isItemInCart = cartItems.some((item) => item.variantId === activeVariant.variantId);
   const isInWishlist = wishlistItems.some(
     (item) => item.productId === product.id && item.variantId === activeVariant.variantId
@@ -42,14 +38,12 @@ const ProductActions = ({ product, activeVariant }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   
-  // Debounce Tracking States
   const [isVerifyingQty, setIsVerifyingQty] = useState(false);
   const qtyDebounceTimer = useRef(null);
 
   const { inStock, stockQuantity } = activeVariant;
   const maxLimit = stockQuantity !== undefined ? Math.min(5, stockQuantity) : 5;
 
-  // Reset quantity back to 1 if the user switches color variants, and cleanup timers
   useEffect(() => {
     setQuantity(1);
     return () => {
@@ -62,22 +56,18 @@ const ProductActions = ({ product, activeVariant }) => {
   const buyTextDarkRef = useRef(null);
   const buyTextLightRef = useRef(null);
 
-  // Quantity Handler ---
+  // ... (handleQuantity remains exactly the same) ...
   const handleQuantity = (type) => {
     let newQty = quantity;
     if (type === "dec" && quantity > 1) newQty -= 1;
     if (type === "inc" && quantity < maxLimit) newQty += 1;
     if (newQty === quantity) return;
 
-    // 1. Optimistic UI Update (Instant feedback, keeps buttons clickable)
     setQuantity(newQty);
 
-    // 2. Clear existing timer if user is clicking rapidly
     if (qtyDebounceTimer.current) clearTimeout(qtyDebounceTimer.current);
 
-    // 3. Set the debounce timer (800ms delay)
     qtyDebounceTimer.current = setTimeout(async () => {
-      // ONLY lock the Add to Cart button when the pause is over and the API call starts
       setIsVerifyingQty(true); 
       
       try {
@@ -91,18 +81,17 @@ const ProductActions = ({ product, activeVariant }) => {
 
         if (!stockCheck.isAvailable) {
           alert(stockCheck.message);
-          // If they requested too many, gracefully snap them back to the max available
           setQuantity(stockCheck.availableStock);
         }
       } catch (error) {
         console.error("Stock verification failed:", error);
       } finally {
-        setIsVerifyingQty(false); // Unlock the buttons
+        setIsVerifyingQty(false); 
       }
     }, 800); 
   };
 
-  // The Main Cart Button Handler
+  // ... (handleMainButtonClick remains exactly the same) ...
   const handleMainButtonClick = async () => {
     if (isItemInCart) {
       navigate("/cart");
@@ -119,7 +108,6 @@ const ProductActions = ({ product, activeVariant }) => {
     setIsAdding(true);
 
     try {
-      // Final safety check before actual add
       const pingPayload = {
         productId: product.id,
         variantId: activeVariant.variantId,
@@ -143,25 +131,15 @@ const ProductActions = ({ product, activeVariant }) => {
           })
         ).unwrap();
       } else {
-        // Extract raw image URL
-        const rawImageUrl = activeVariant.images?.find((img) => img.isPrimary)?.url || activeVariant.images?.[0]?.url;
-
         dispatch(
           addLocalItem({
             productId: product.id,
             variantId: activeVariant.variantId,
-            slug: product.slug,
-            title: product.title,
-            colorName: activeVariant.colorName,
-            img: rawImageUrl,
-            price: activeVariant.finalPrice || activeVariant.originalPrice,
             quantity: quantity,
             maxLimit: stockCheck.availableStock,
-            // --- FIX 2: Attach the currency so cartSlice can save it to localStorage ---
-            currencySymbol: currencySymbol,
-            currencyCode: currencyCode
           })
         );
+        dispatch(hydrateGuestCartAPI());
       }
 
       setQuantity(1);
@@ -172,9 +150,9 @@ const ProductActions = ({ product, activeVariant }) => {
     }
   };
 
-  // --- NEW: The Wishlist Toggle Handler ---
+  // --- THE FIX: The Wishlist Toggle Handler ---
   const handleWishlistToggle = async () => {
-    if (isTogglingWishlist) return; // Prevent spam clicking
+    if (isTogglingWishlist) return; 
 
     if (isAuth) {
       setIsTogglingWishlist(true);
@@ -189,22 +167,14 @@ const ProductActions = ({ product, activeVariant }) => {
         setIsTogglingWishlist(false);
       }
     } else {
-      // For guests, we save the rich data so the Wishlist Page can render it immediately
-      const rawImageUrl = activeVariant.images?.find((img) => img.isPrimary)?.url || activeVariant.images?.[0]?.url;
-      
+      // 2. We are now using the Dumb Architecture for the Wishlist too!
       dispatch(toggleLocalItem({
         productId: product.id,
         variantId: activeVariant.variantId,
-        title: product.title,
-        slug: product.slug,
-        colorName: activeVariant.colorName,
-        img: rawImageUrl,
-        price: activeVariant.finalPrice || activeVariant.pricing?.price, // Check pricing object safely
-        status: product.status || 'active',
-        // --- FIX 3: Also attach currency here just in case wishlist needs it locally ---
-        currencySymbol: currencySymbol,
-        currencyCode: currencyCode
       }));
+
+      // 3. Immediately tell Redux to ask the backend for the live prices/images
+      dispatch(hydrateGuestWishlistAPI());
     }
   };
 
@@ -244,21 +214,9 @@ const ProductActions = ({ product, activeVariant }) => {
     const y = e.clientY - rect.top;
 
     gsap.set(buyRippleRef.current, { x: x, y: y, scale: 0 });
-    gsap.to(buyRippleRef.current, {
-      scale: 1,
-      duration: 0.5,
-      ease: "power3.out",
-    });
-    gsap.to(buyTextDarkRef.current, {
-      opacity: 0,
-      duration: 0.3,
-      ease: "power2.out",
-    });
-    gsap.to(buyTextLightRef.current, {
-      opacity: 1,
-      duration: 0.3,
-      ease: "power2.out",
-    });
+    gsap.to(buyRippleRef.current, { scale: 1, duration: 0.5, ease: "power3.out" });
+    gsap.to(buyTextDarkRef.current, { opacity: 0, duration: 0.3, ease: "power2.out" });
+    gsap.to(buyTextLightRef.current, { opacity: 1, duration: 0.3, ease: "power2.out" });
   });
 
   const handleBuyMouseLeave = contextSafe((e) => {
@@ -267,23 +225,9 @@ const ProductActions = ({ product, activeVariant }) => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    gsap.to(buyRippleRef.current, {
-      scale: 0,
-      x: x,
-      y: y,
-      duration: 0.5,
-      ease: "power3.out",
-    });
-    gsap.to(buyTextDarkRef.current, {
-      opacity: 1,
-      duration: 0.3,
-      ease: "power2.out",
-    });
-    gsap.to(buyTextLightRef.current, {
-      opacity: 0,
-      duration: 0.3,
-      ease: "power2.out",
-    });
+    gsap.to(buyRippleRef.current, { scale: 0, x: x, y: y, duration: 0.5, ease: "power3.out" });
+    gsap.to(buyTextDarkRef.current, { opacity: 1, duration: 0.3, ease: "power2.out" });
+    gsap.to(buyTextLightRef.current, { opacity: 0, duration: 0.3, ease: "power2.out" });
   });
 
   return (
@@ -292,7 +236,6 @@ const ProductActions = ({ product, activeVariant }) => {
         <div className="flex items-center justify-between border border-black/10 px-4 w-[100px] lg:w-32 shrink-0">
           <button
             onClick={() => handleQuantity("dec")}
-            // Disable if verifying to prevent buggy states
             disabled={quantity <= 1 || !inStock || isAdding || isItemInCart || isVerifyingQty}
             className={`p-2 cursor-pointer transition-opacity ${quantity <= 1 || !inStock || isAdding || isItemInCart || isVerifyingQty ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
           >
@@ -305,7 +248,6 @@ const ProductActions = ({ product, activeVariant }) => {
 
           <button
             onClick={() => handleQuantity("inc")}
-            // Disable if verifying to prevent buggy states
             disabled={quantity >= maxLimit || !inStock || isAdding || isItemInCart || isVerifyingQty}
             className={`p-2 cursor-pointer transition-opacity ${quantity >= maxLimit || !inStock || isAdding || isItemInCart || isVerifyingQty ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
           >
@@ -315,7 +257,6 @@ const ProductActions = ({ product, activeVariant }) => {
 
         <button
           onClick={handleMainButtonClick}
-          // Button remains clickable if it's in the cart (to redirect), but disables if verifying or out of stock
           disabled={(!inStock && !isItemInCart) || isAdding || isVerifyingQty}
           className="flex-1 flex justify-center items-center gap-2 bg-[#1a1a1a] text-white text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -336,7 +277,6 @@ const ProductActions = ({ product, activeVariant }) => {
           )}
         </button>
 
-        {/* --- WISHLIST BUTTON --- */}
         <button 
           onClick={handleWishlistToggle}
           disabled={isTogglingWishlist}
