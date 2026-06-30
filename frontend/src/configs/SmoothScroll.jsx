@@ -10,13 +10,13 @@ const SmoothScroll = ({ children }) => {
   const lenisRef = useRef(null);
   const location = useLocation();
 
-  // --- 1. Core Lenis Initialization ---
+  // --- Core Lenis Initialization ---
   useEffect(() => {
     const lenis = new Lenis({
-      // 1. Stretched Duration: Creates a heavier, more luxurious glide
+      // Stretched Duration: Creates a heavier, more luxurious glide
       duration: 1.2, 
       
-      // 2. Quartic Out Easing: Softer start and a much more elegant fade-out
+      // Quartic Out Easing: Softer start and a much more elegant fade-out
       easing: (t) => 1 - Math.pow(1 - t, 4), 
       
       direction: "vertical",
@@ -24,7 +24,7 @@ const SmoothScroll = ({ children }) => {
       smooth: true,
       smoothTouch: false, 
       
-      // 3. Wheel Multiplier: Tightens visual frames for perceived higher FPS
+      // Wheel Multiplier: Tightens visual frames for perceived higher FPS
       wheelMultiplier: 0.8, 
       touchMultiplier: 2,
     });
@@ -51,14 +51,14 @@ const SmoothScroll = ({ children }) => {
     };
   }, []); 
 
-  // --- 2. The SPA Router Fix (The Cascading Refresh) ---
+  // --- The SPA Router Fix (The Cascading Refresh) ---
   useEffect(() => {
     if (!lenisRef.current) return;
 
-    // Step 1: Instantly snap scroll back to the top on page transition
+    // Instantly snap scroll back to the top on page transition
     lenisRef.current.scrollTo(0, { immediate: true });
 
-    // Step 2: Force recalculations as the DOM settles
+    // Force recalculations as the DOM settles
     const refreshScroll = () => {
       ScrollTrigger.refresh();
       // Explicitly tell Lenis to remeasure the document body height

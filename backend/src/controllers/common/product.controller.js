@@ -54,6 +54,9 @@ export const getNewArrivals = async (req, res, next) => {
   }
 };
 
+
+
+
 export const getPaginatedProducts = async (req, res, next) => {
   try {
     const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
@@ -157,6 +160,8 @@ export const getPaginatedProducts = async (req, res, next) => {
   }
 };
 
+
+
 export const getSingleProduct = async (req, res, next) => {
   try {
     const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
@@ -236,6 +241,84 @@ export const getSingleProduct = async (req, res, next) => {
 
   } catch (error) {
     console.error("Error fetching single product:", error);
+    next(error);
+  }
+};
+
+
+export const searchProducts = async (req, res, next) => {
+  try {
+    const query = req.query.q || '';
+    
+    // If the user clears the input, return an empty array immediately without hitting the DB
+    if (!query.trim()) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
+
+    // Case-insensitive search regex
+    const searchRegex = new RegExp(query, 'i');
+
+    // Search across Title, Category, OR Variant Color Name
+    const filter = {
+      status: 'active',
+      $or: [
+        { title: searchRegex },
+        { category: searchRegex },
+        { 'variants.colorName': searchRegex }
+      ]
+    };
+
+    const products = await Product.find(filter)
+      .select('title slug category isPremium variants.pricing variants.images variants.colorName')
+      .limit(6) // Keep it limited for a snappy dropdown UI
+      .lean();
+
+    const formattedProducts = products.map((product) => {
+      // Find the specific variant that matches the color search (if applicable), or just use the first one
+      let matchingVariant = product.variants?.[0] || {};
+      
+      // If they searched for a specific color (like "Blue"), try to show that specific colored variant image
+      const colorMatch = product.variants?.find(v => v.colorName.match(searchRegex));
+      if (colorMatch) {
+        matchingVariant = colorMatch;
+      }
+
+      const firstImage = matchingVariant.images?.[0] || {};
+      const pricing = matchingVariant.pricing || { price: 0, discountPercentage: 0 };
+
+      // --- APPLY THE PRICING ENGINE ---
+      const localizedPricing = calculateRegionalPricing(
+        pricing.price, 
+        pricing.discountPercentage, 
+        product.isPremium || false, 
+        regionData
+      );
+
+      return {
+        _id: product._id,
+        slug: product.slug,
+        title: product.title,
+        category: product.category,
+        colorName: matchingVariant.colorName,
+        isPremium: product.isPremium || false,
+        originalPrice: localizedPricing.originalPrice, 
+        finalPrice: localizedPricing.sellingPrice,      
+        img: firstImage.baseUrl || null,
+        altText: firstImage.altText || product.title
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedProducts,
+      currencySymbol: regionData.symbol,      
+      currencyCode: regionData.currencyCode
+    });
+
+  } catch (error) {
+    console.error("Error searching products:", error);
     next(error);
   }
 };

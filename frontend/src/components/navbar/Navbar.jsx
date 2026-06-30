@@ -5,29 +5,29 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navmenu from "./Navmenu";
+import SearchOverlay from "./SearchOverlay";
 import { IntroContext } from "../../context/IntroContext"; 
 import { useSelector, useDispatch } from "react-redux";
 
-// --- IMPORTS FOR REGION ENGINE ---
 import { setManualRegion } from "../../store/features/regionSlice";
 import { userAxios } from "../../configs/axiosInstance";
 
-// Register the plugin
 gsap.registerPlugin(ScrollTrigger);
 
 const Navbar = () => {
   const dispatch = useDispatch();
   const [isOpen, setIsOpen] = useState(false);
   
+  // --- THE ONLY SEARCH STATE IN NAVBAR ---
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  
   const cartItems = useSelector((state) => state.cart?.items || []);
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   
-  // --- REGION STATE ---
   const regionData = useSelector((state) => state.region?.data);
   const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
   const [isChangingRegion, setIsChangingRegion] = useState(false);
 
-  // Refs for click-outside detection
   const desktopRegionRef = useRef(null);
   const mobileRegionRef = useRef(null);
 
@@ -37,7 +37,6 @@ const Navbar = () => {
   
   const [currentPath, setCurrentPath] = useState(location.pathname);
 
-  // Refs for Animations & Structure
   const navbarRef = useRef(null);
   const navContainerRef = useRef(null);
   const underlineRef = useRef(null);
@@ -59,7 +58,6 @@ const Navbar = () => {
     { name: "wishlist", path: "/wishlist" },
   ];
 
-  // --- EXPANDED CURATED REGION LIST ---
   const availableRegions = [
     { code: "IN", label: "India", currency: "INR" },
     { code: "US", label: "USA", currency: "USD" },
@@ -76,7 +74,6 @@ const Navbar = () => {
     { code: "JP", label: "Japan", currency: "JPY" },
   ];
 
-  // --- CLICK OUTSIDE LISTENER ---
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -86,14 +83,10 @@ const Navbar = () => {
         setIsRegionDropdownOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- REGION CHANGE HANDLER ---
   const handleRegionChange = async (countryCode) => {
     if (countryCode === regionData?.countryCode) {
       setIsRegionDropdownOpen(false);
@@ -103,12 +96,10 @@ const Navbar = () => {
     setIsChangingRegion(true);
     try {
       const response = await userAxios.get('/region/detect', {
-        headers: { 'x-user-region': countryCode } // This now successfully bypasses the interceptor!
+        headers: { 'x-user-region': countryCode }
       });
       
       dispatch(setManualRegion(response.data.data));
-      
-      // Reload the page here, after Redux and LocalStorage have safely committed
       window.location.reload(); 
     } catch (error) {
       console.error("Failed to change region", error);
@@ -116,9 +107,6 @@ const Navbar = () => {
     }
   };
 
-  // ==========================================
-  // CONFIGURATION
-  // ==========================================
   const scrollBlendRoutes = ["/"]; 
   const isScrollBlendRoute = scrollBlendRoutes.includes(location.pathname);
 
@@ -126,6 +114,7 @@ const Navbar = () => {
     setCurrentPath(location.pathname);
     setIsScrolled(false);
     setIsRegionDropdownOpen(false); 
+    setIsSearchOpen(false); // Close search heavily on route change
   }
 
   const isDarkTheme = !isScrollBlendRoute || isScrolled;
@@ -198,7 +187,6 @@ const Navbar = () => {
     const containerWidth = rightNavContainerRef.current.offsetWidth;
     const targetLeft = item.offsetLeft;
     const targetWidth = item.offsetWidth;
-    
     const targetRight = containerWidth - (targetLeft + targetWidth);
 
     if (!isRightHovering.current) {
@@ -230,7 +218,6 @@ const Navbar = () => {
     });
   });
 
-  // Default to India if the regionData hasn't populated yet
   const currentRegionDetails = availableRegions.find(r => r.code === regionData?.countryCode) || availableRegions[0];
 
   return (
@@ -306,7 +293,7 @@ const Navbar = () => {
                 style={{ right: 0, width: 0 }}
               />
 
-              {/* REGION DROPDOWN (CLICK REVEAL) */}
+              {/* REGION DROPDOWN */}
               <li 
                 ref={desktopRegionRef}
                 className="nav-list-item relative"
@@ -316,7 +303,6 @@ const Navbar = () => {
                   className="cursor-pointer py-1 flex items-center gap-1.5 select-none"
                   onClick={() => setIsRegionDropdownOpen(!isRegionDropdownOpen)}
                 >
-                  {/* Universal Image Flag CDN */}
                   <img 
                     src={`https://flagcdn.com/w20/${currentRegionDetails.code.toLowerCase()}.png`} 
                     alt={currentRegionDetails.code} 
@@ -329,7 +315,6 @@ const Navbar = () => {
                   />
                 </span>
 
-                {/* Scroll Trap Applied Here */}
                 <div 
                   className={`absolute top-full right-0 mt-[1.2rem] w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-xl border transition-all duration-300 origin-top
                     ${isRegionDropdownOpen ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0 pointer-events-none'}
@@ -358,11 +343,15 @@ const Navbar = () => {
                 </div>
               </li>
 
+              {/* DESKTOP SEARCH TRIGGER */}
               <li 
                 className="nav-list-item"
                 onMouseEnter={handleRightItemEnter}
               >
-                <span className="cursor-pointer py-1 inline-block">
+                <span 
+                  className="cursor-pointer py-1 inline-block"
+                  onClick={() => setIsSearchOpen(true)}
+                >
                   search
                 </span>
               </li>
@@ -392,7 +381,6 @@ const Navbar = () => {
           {/* MOBILE NAV ACTIONS */}
           <div className="flex items-center gap-5 lg:hidden">
             
-            {/* MOBILE REGION DROPDOWN */}
             <div className="relative" ref={mobileRegionRef}>
               <div 
                 className="cursor-pointer text-[0.65rem] font-bold tracking-wider flex items-center gap-1.5 uppercase select-none"
@@ -410,7 +398,6 @@ const Navbar = () => {
                 />
               </div>
 
-              {/* Scroll Trap Applied to Mobile Menu */}
               {isRegionDropdownOpen && (
                 <div 
                   className={`absolute top-full -right-4 mt-6 w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-2xl border
@@ -443,7 +430,11 @@ const Navbar = () => {
               )}
             </div>
 
-            <div className="cursor-pointer text-xl flex items-center justify-center hover:opacity-70 transition-opacity duration-300">
+            {/* MOBILE SEARCH TRIGGER */}
+            <div 
+              className="cursor-pointer text-xl flex items-center justify-center hover:opacity-70 transition-opacity duration-300"
+              onClick={() => setIsSearchOpen(true)}
+            >
               <Icon icon="iconamoon:search" />
             </div>
 
@@ -469,6 +460,9 @@ const Navbar = () => {
       </div>
       
       <Navmenu isOpen={isOpen} setIsOpen={setIsOpen} />
+
+      {/* SEARCH OVERLAY COMPONENT */}
+      <SearchOverlay isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} />
     </>
   );
 };

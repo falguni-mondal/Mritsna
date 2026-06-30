@@ -2,15 +2,17 @@ import express from 'express';
 import { 
   getNewArrivals, 
   getPaginatedProducts,
-  getSingleProduct
+  getSingleProduct,
+  searchProducts // <-- Import the new search controller
 } from '../../controllers/common/product.controller.js';
 
-// --- NEW: Import the Region Middleware ---
 import { regionMiddleware } from '../../middleware/common/regionMiddleware.js';
 
 const router = express.Router();
 
 router.get('/new-arrivals', regionMiddleware, getNewArrivals);
+
+router.get('/search', regionMiddleware, searchProducts);
 
 router.get('/', regionMiddleware, getPaginatedProducts);
 
