@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Cart from '../../models/cart.model.js';
 import Product from '../../models/product.model.js';
+import User from '../../models/user.model.js';
 import { calculateRegionalPricing } from '../../utils/pricingEngine.js';
 
 // ==========================================
@@ -54,6 +55,18 @@ export const getCart = async (req, res, next) => {
     });
 
     const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
+
+    if (userId) {
+      User.findByIdAndUpdate(userId, {
+        lastKnownRegion: {
+          countryCode: regionData.countryCode,
+          currencyCode: regionData.currencyCode,
+          symbol: regionData.symbol,
+          rate: regionData.rate
+        }
+      }).catch(err => console.error("[Silent Tracking Error]:", err));
+    }
+    // -----------------------------------
 
     if (!cart || !cart.items.length) {
       return res.status(200).json({ 
@@ -224,13 +237,11 @@ export const addToCart = async (req, res, next) => {
     if (existingItemIndex > -1) {
       const newQuantity = cart.items[existingItemIndex].quantity + quantity;
       cart.items[existingItemIndex].quantity = Math.min(newQuantity, 5, availableStock);
-      // REMOVED: Price is no longer saved
     } else {
       cart.items.push({
         product: productId,
         variantId: variantId,
         quantity: quantity,
-        // REMOVED: Price is no longer saved
       });
     }
 
@@ -347,13 +358,11 @@ export const syncCart = async (req, res, next) => {
           if (existingItemIndex > -1) {
             const combinedQty = cart.items[existingItemIndex].quantity + localItem.quantity;
             cart.items[existingItemIndex].quantity = Math.min(combinedQty, 5, dbStock);
-            // REMOVED: Price is no longer saved
           } else {
             cart.items.push({
               product: localItem.productId,
               variantId: localItem.variantId,
               quantity: Math.min(localItem.quantity, 5, dbStock),
-              // REMOVED: Price is no longer saved
             });
           }
         }

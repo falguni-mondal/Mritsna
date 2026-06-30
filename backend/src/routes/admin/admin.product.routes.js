@@ -16,7 +16,7 @@ import {
   updateProductSchema 
 } from '../../middleware/admin/product.validation.js';
 
-import { isAdmin, isValidUser } from "../../middleware/common/auth/auth.middleware.js";
+import { isAdmin } from "../../middleware/common/auth/auth.middleware.js";
 
 const router = express.Router();
 

@@ -33,10 +33,17 @@ const userSchema = new mongoose.Schema(
       default: null
     },
     addresses: [{ 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Address' 
-  }],
-    // -------------------------
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'Address' 
+    }],
+
+    lastKnownRegion: {
+      countryCode: { type: String, default: 'IN' },
+      currencyCode: { type: String, default: 'INR' },
+      symbol: { type: String, default: '₹' },
+      rate: { type: Number, default: 1 }
+    },
+
     isClaimed: { 
       type: Boolean, 
       default: false 

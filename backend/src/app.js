@@ -10,6 +10,7 @@ import cors from "cors";
 // Routes
 import adminAuthRoutes from "./routes/admin/admin.auth.routes.js";
 import adminProductRoutes from './routes/admin/admin.product.routes.js';
+import adminCartRoutes from './routes/admin/admin.cart.routes.js';
 
 import authRouter from "./routes/common/auth.routes.js";
 import productRoutes from './routes/common/product.routes.js';
@@ -73,6 +74,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/v1/admin/auth", adminAuthRoutes);
 app.use('/api/v1/admin/products', adminProductRoutes);
+app.use('/api/v1/admin/carts', adminCartRoutes);
 
 //  public routes
 app.use("/api/v1/auth", authRouter);

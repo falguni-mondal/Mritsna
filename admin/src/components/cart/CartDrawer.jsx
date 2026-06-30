@@ -1,0 +1,217 @@
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Icon } from "@iconify/react";
+import toast from "react-hot-toast";
+import { 
+  fetchCartDetails, 
+  clearCurrentCartDetails, 
+  adminClearCart, 
+  triggerCartReminder 
+} from "../../store/slices/cartSlice";
+
+const formatINR = (amount) => {
+  return `₹ ${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+};
+
+const getOptimizedImgUrl = (url) => {
+  if (!url) return "";
+  if (url.includes("tr=")) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}tr=w-200,q-80`;
+};
+
+// Premium Toast Styling
+const toastConfig = {
+  style: {
+    borderRadius: '2px',
+    background: '#1a1a1a',
+    color: '#fff',
+    fontSize: '0.75rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    padding: '12px 20px',
+  },
+  iconTheme: {
+    primary: '#fff',
+    secondary: '#1a1a1a',
+  },
+};
+
+const CartDrawer = ({ isOpen, onClose, cartId }) => {
+  const dispatch = useDispatch();
+  
+  const { currentCartDetails: cart, isDetailsLoading, isActionLoading } = useSelector((state) => state.adminCart);
+
+  useEffect(() => {
+    if (isOpen && cartId) {
+      dispatch(fetchCartDetails(cartId));
+    }
+  }, [isOpen, cartId, dispatch]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  const handleClose = () => {
+    onClose();
+    setTimeout(() => dispatch(clearCurrentCartDetails()), 300);
+  };
+
+  const handleClearCart = async () => {
+    if (window.confirm("Are you sure you want to forcibly clear this cart? This will release the inventory holds.")) {
+      try {
+        await dispatch(adminClearCart(cartId)).unwrap();
+        toast.success("Inventory holds released.", toastConfig);
+        handleClose();
+      } catch (error) {
+        toast.error("Failed to clear cart.", toastConfig);
+      }
+    }
+  };
+
+  const handleSendReminder = async () => {
+    try {
+      await dispatch(triggerCartReminder(cartId)).unwrap();
+      toast.success("Reminder email queued.", toastConfig);
+    } catch (error) {
+      toast.error("Failed to send reminder.", toastConfig);
+    }
+  };
+
+  // --- ANTI-BUBBLING HANDLER ---
+  // This physically stops smooth-scrolling engines from hijacking the scroll inside the drawer
+  const stopScrollPropagation = (e) => {
+    e.stopPropagation();
+  };
+
+  return (
+    <>
+      <div 
+        onClick={handleClose}
+        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-[99998] transition-opacity duration-500
+          ${isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}
+        `}
+      />
+
+      {/* FIX 1: h-[100dvh] ensures perfect viewport height lock. 
+        data-lenis-prevent="true" is an industry-standard escape hatch for Lenis smooth scroll.
+      */}
+      <div 
+        data-lenis-prevent="true"
+        className={`fixed top-0 right-0 h-[100dvh] w-full max-w-lg bg-white shadow-2xl z-[99999] flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.77,0,0.175,1)]
+          ${isOpen ? "translate-x-0" : "translate-x-full"}
+        `}
+      >
+        {/* FIX 2: shrink-0 added to Header */}
+        <div className="shrink-0 px-8 py-6 border-b border-black/10 flex justify-between items-center bg-[#f8f8f8]">
+          <h2 className="text-sm font-bold tracking-widest uppercase">Cart Details</h2>
+          <button 
+            onClick={handleClose}
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/10 transition-colors cursor-pointer"
+          >
+            <Icon icon="ph:x-light" className="text-xl" />
+          </button>
+        </div>
+
+        {/* FIX 3: Explicit isolation via onWheel and onTouchMove. 
+          The flex-1 ensures it pushes against the strict boundaries of the header and footer.
+        */}
+        <div 
+          onWheel={stopScrollPropagation}
+          onTouchMove={stopScrollPropagation}
+          className="flex-1 overflow-y-auto overscroll-contain min-h-0 custom-scrollbar p-8"
+        >
+          {isDetailsLoading || !cart ? (
+            <div className="h-full flex flex-col items-center justify-center opacity-30">
+              <Icon icon="ph:spinner-gap-light" className="text-4xl animate-spin mb-4" />
+              <p className="text-xs uppercase tracking-widest font-bold">Accessing Records...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-10">
+              
+              <div>
+                <h3 className="text-[0.65rem] uppercase tracking-widest font-bold opacity-50 mb-4">Customer Profile</h3>
+                <div className="bg-[#f8f8f8] p-5 border border-black/5 rounded-sm">
+                  <p className="text-lg font-medium mb-1">{cart.user.name}</p>
+                  <p className="text-sm opacity-60 mb-4">{cart.user.email}</p>
+                  <div className="flex justify-between text-xs border-t border-black/5 pt-4 mt-2">
+                    <span className="opacity-50">Phone: {cart.user.phone}</span>
+                    <span className="opacity-50">Since: {new Date(cart.user.registeredAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-[0.65rem] uppercase tracking-widest font-bold opacity-50 mb-4">Pipeline Breakdown</h3>
+                <div className="flex justify-between items-end mb-6">
+                  <span className="text-3xl font-light">{formatINR(cart.summary.cartValueINR)}</span>
+                  <span className="text-sm opacity-60 mb-1">{cart.summary.totalItems} Items Total</span>
+                </div>
+
+                <div className="flex flex-col gap-6">
+                  {cart.items.map((item) => (
+                    <div key={item.cartItemId} className="flex gap-4 border-b border-black/5 pb-6 last:border-0">
+                      <div className="w-20 h-24 bg-[#eeeeee] shrink-0 overflow-hidden">
+                        <img 
+                          src={getOptimizedImgUrl(item.image)} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover mix-blend-multiply"
+                        />
+                      </div>
+                      <div className="flex flex-col justify-between flex-1 py-1">
+                        <div>
+                          <p className="text-sm font-medium leading-tight mb-1 line-clamp-1">{item.title}</p>
+                          <p className="text-[0.65rem] uppercase tracking-widest opacity-50 mb-2">
+                            {item.color} | SKU: {item.sku}
+                          </p>
+                          {item.isStockBottleneck && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-100 text-red-800 text-[0.6rem] uppercase tracking-widest font-bold rounded-sm">
+                              <Icon icon="ph:warning-circle" /> Stock Bottleneck ({item.stockAvailable} available)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex justify-between items-end text-sm">
+                          <span className="opacity-60">Qty: {item.quantityInCart}</span>
+                          <span className="font-medium">{formatINR(item.itemTotal)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* FIX 4: shrink-0 added to Footer */}
+        {!isDetailsLoading && cart && (
+          <div className="shrink-0 p-6 border-t border-black/10 bg-[#f8f8f8] flex gap-4">
+            <button
+              onClick={handleClearCart}
+              disabled={isActionLoading}
+              className="flex-1 py-4 border border-black text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              Force Clear
+            </button>
+            <button
+              onClick={handleSendReminder}
+              disabled={isActionLoading}
+              className="flex-1 py-4 bg-black border border-black text-white text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              Send Reminder
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+export default CartDrawer;
