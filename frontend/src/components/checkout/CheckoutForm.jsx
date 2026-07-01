@@ -141,11 +141,11 @@ const CheckoutForm = ({ formData, onChange, setFormData, isGuest }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
             <label className={labelClass}>First Name</label>
-            <input type="text" name="firstName" value={formData.firstName} onChange={onChange} className={inputClass} placeholder="John" readOnly={!isGuest} />
+            <input type="text" name="firstName" value={formData.firstName} onChange={onChange} className={inputClass} placeholder="John" />
           </div>
           <div>
             <label className={labelClass}>Last Name</label>
-            <input type="text" name="lastName" value={formData.lastName} onChange={onChange} className={inputClass} placeholder="Doe" readOnly={!isGuest} />
+            <input type="text" name="lastName" value={formData.lastName} onChange={onChange} className={inputClass} placeholder="Doe" />
           </div>
           <div className="md:col-span-2">
             <label className={labelClass}>Email Address</label>

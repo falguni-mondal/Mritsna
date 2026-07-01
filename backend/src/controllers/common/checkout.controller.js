@@ -16,7 +16,7 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// --- HELPER: Prefix-matching HSN Lookup Engine ---
+// --- Prefix-matching HSN Lookup Engine ---
 const getGSTRate = (hsnCode) => {
   if (!hsnCode) return hsnMap["DEFAULT"].rate;
 
@@ -96,28 +96,77 @@ const processCheckoutMath = async (
     });
   }
 
-  // --- Coupon Engine (Evaluating against the Converted SubTotal) ---
+  // --- Coupon Engine (Upgraded for Enterprise Constraints) ---
   let discountAmount = 0;
   let appliedCouponId = null;
   let appliedCouponCode = null;
+  let appliedEligibleItemIds = new Set();
+  let appliedEligibleSubTotal = 0;
 
-  const evaluateCouponEligibility = async (coupon, currentSubTotal) => {
-    // If the coupon has a min order value stored in INR, convert it to compare against currentSubTotal
-    const localizedMinOrderValue = Math.round(
-      coupon.minOrderValue * regionData.rate,
-    );
-    if (currentSubTotal < localizedMinOrderValue) {
-      return { eligible: false, reason: "Minimum order value not met." };
+  const evaluateCouponEligibility = async (coupon) => {
+    // Region Gateway Check
+    if (coupon.applicableRegions && coupon.applicableRegions.length > 0) {
+      const regions = coupon.applicableRegions.map((r) => r.toUpperCase());
+      if (!regions.includes("GLOBAL") && !regions.includes(regionData.countryCode.toUpperCase())) {
+        return { eligible: false, reason: "This coupon is not valid in your shipping region." };
+      }
     }
 
+    // Identity Gateway Check (Target Users)
+    if (coupon.targetUsers && coupon.targetUsers.length > 0) {
+      if (!userContext.userId || !coupon.targetUsers.map((id) => id.toString()).includes(userContext.userId.toString())) {
+        return { eligible: false, reason: "This coupon is restricted to specific users." };
+      }
+    }
+
+    // Product Specificity Engine (Calculate Eligible SubTotal)
+    let eligibleSubTotal = 0;
+    const eligibleItemIds = new Set();
+
+    for (const item of validatedItems) {
+      const productIdStr = item.product.toString();
+      let isEligible = true;
+
+      // Ensure item is in applicable list (if defined)
+      if (coupon.applicableProducts && coupon.applicableProducts.length > 0) {
+        if (!coupon.applicableProducts.map((id) => id.toString()).includes(productIdStr)) {
+          isEligible = false;
+        }
+      }
+
+      // Ensure item is not in excluded list (if defined)
+      if (coupon.excludedProducts && coupon.excludedProducts.length > 0) {
+        if (coupon.excludedProducts.map((id) => id.toString()).includes(productIdStr)) {
+          isEligible = false;
+        }
+      }
+
+      if (isEligible) {
+        eligibleSubTotal += item.itemTotal;
+        eligibleItemIds.add(productIdStr);
+      }
+    }
+
+    if (eligibleSubTotal === 0) {
+      return { eligible: false, reason: "Your cart does not contain items eligible for this coupon." };
+    }
+
+    // Min Order Value Check (calculated strictly against the ELIGIBLE subtotal)
+    const localizedMinOrderValue = Math.round(coupon.minOrderValue * regionData.rate);
+    if (eligibleSubTotal < localizedMinOrderValue) {
+      return { eligible: false, reason: `Minimum eligible order value of ${regionData.symbol}${localizedMinOrderValue} not met.` };
+    }
+
+    // Global Usage Limit Check
+    if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
+      return { eligible: false, reason: "This coupon has reached its maximum global usage limit." };
+    }
+
+    // User Identity Fingerprint Check
     const fingerprintQuery = [];
     if (userContext.userId) fingerprintQuery.push({ user: userContext.userId });
-    if (userContext.guestEmail)
-      fingerprintQuery.push({
-        guestEmail: userContext.guestEmail.toLowerCase(),
-      });
-    if (userContext.deviceId)
-      fingerprintQuery.push({ deviceId: userContext.deviceId });
+    if (userContext.guestEmail) fingerprintQuery.push({ guestEmail: userContext.guestEmail.toLowerCase() });
+    if (userContext.deviceId) fingerprintQuery.push({ deviceId: userContext.deviceId });
 
     if (fingerprintQuery.length > 0) {
       const pastUsageCount = await Order.countDocuments({
@@ -127,29 +176,37 @@ const processCheckoutMath = async (
       });
 
       if (pastUsageCount >= coupon.usagePerUserLimit) {
-        return { eligible: false, reason: "Coupon usage limit reached." };
+        return { eligible: false, reason: "You have reached the maximum usage limit for this coupon." };
       }
     }
 
+    // Core Discount Math
     let calculatedDiscount = 0;
     if (coupon.discountType === "percentage") {
-      calculatedDiscount = Math.round(
-        (currentSubTotal * coupon.discountValue) / 100,
-      );
+      calculatedDiscount = Math.round((eligibleSubTotal * coupon.discountValue) / 100);
+      
+      // Enforce Maximum Cap
       if (coupon.maxDiscountAmount) {
-        const localizedMaxDiscount = Math.round(
-          coupon.maxDiscountAmount * regionData.rate,
-        );
+        const localizedMaxDiscount = Math.round(coupon.maxDiscountAmount * regionData.rate);
         calculatedDiscount = Math.min(calculatedDiscount, localizedMaxDiscount);
       }
     } else if (coupon.discountType === "fixed_amount") {
       // Fixed amounts in the DB are assumed to be INR. Convert to user's currency.
       calculatedDiscount = Math.round(coupon.discountValue * regionData.rate);
+      
+      // Ensure a fixed amount discount doesn't exceed the eligible items' total
+      calculatedDiscount = Math.min(calculatedDiscount, eligibleSubTotal); 
     }
 
-    return { eligible: true, discountAmount: calculatedDiscount };
+    return { 
+      eligible: true, 
+      discountAmount: calculatedDiscount, 
+      eligibleItemIds, 
+      eligibleSubTotal 
+    };
   };
 
+  // Evaluate Manual Coupon Entry
   if (couponCode) {
     const manualCoupon = await Coupon.findOne({
       code: couponCode.toUpperCase(),
@@ -157,13 +214,17 @@ const processCheckoutMath = async (
     });
     if (!manualCoupon) throw new Error("Invalid or expired coupon.");
 
-    const evaluation = await evaluateCouponEligibility(manualCoupon, subTotal);
+    const evaluation = await evaluateCouponEligibility(manualCoupon);
     if (!evaluation.eligible) throw new Error(evaluation.reason);
 
     discountAmount = evaluation.discountAmount;
     appliedCouponId = manualCoupon._id;
     appliedCouponCode = manualCoupon.code;
+    appliedEligibleItemIds = evaluation.eligibleItemIds;
+    appliedEligibleSubTotal = evaluation.eligibleSubTotal;
+
   } else if (!skipAutoApply) {
+    // Evaluate Auto-Apply Coupons
     const autoCoupons = await Coupon.find({
       isActive: true,
       isAutoApply: true,
@@ -171,13 +232,17 @@ const processCheckoutMath = async (
 
     let bestDiscount = 0;
     let bestCoupon = null;
+    let bestEligibleItemIds = new Set();
+    let bestEligibleSubTotal = 0;
 
     for (const autoCoupon of autoCoupons) {
-      const evaluation = await evaluateCouponEligibility(autoCoupon, subTotal);
+      const evaluation = await evaluateCouponEligibility(autoCoupon);
 
       if (evaluation.eligible && evaluation.discountAmount > bestDiscount) {
         bestDiscount = evaluation.discountAmount;
         bestCoupon = autoCoupon;
+        bestEligibleItemIds = evaluation.eligibleItemIds;
+        bestEligibleSubTotal = evaluation.eligibleSubTotal;
       }
     }
 
@@ -185,6 +250,8 @@ const processCheckoutMath = async (
       discountAmount = bestDiscount;
       appliedCouponId = bestCoupon._id;
       appliedCouponCode = bestCoupon.code;
+      appliedEligibleItemIds = bestEligibleItemIds;
+      appliedEligibleSubTotal = bestEligibleSubTotal;
     }
   }
 
@@ -193,11 +260,15 @@ const processCheckoutMath = async (
   let baseRevenue = 0;
   let taxBuckets = {};
 
-  const isIntraState =
-    state.toLowerCase().includes("jharkhand") || state.toLowerCase() === "mh";
+  const isIntraState = state.toLowerCase().includes("jharkhand") || state.toLowerCase() === "mh";
 
   for (const item of validatedItems) {
-    const itemDiscountRatio = subTotal > 0 ? item.itemTotal / subTotal : 0;
+    // The discount is strictly distributed ONLY to the items that were eligible for the coupon
+    const isItemEligibleForDiscount = appliedEligibleItemIds.has(item.product.toString());
+    const itemDiscountRatio = (isItemEligibleForDiscount && appliedEligibleSubTotal > 0) 
+      ? item.itemTotal / appliedEligibleSubTotal 
+      : 0;
+    
     const itemDiscount = discountAmount * itemDiscountRatio;
     const discountedItemTotal = item.itemTotal - itemDiscount;
 

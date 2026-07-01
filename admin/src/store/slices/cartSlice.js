@@ -18,12 +18,12 @@ export const fetchCartStats = createAsyncThunk(
   }
 );
 
-// 2. Fetch Paginated Carts Table
+// 2. Fetch Paginated Carts Table (NOW WITH REGION FILTER)
 export const fetchActiveCarts = createAsyncThunk(
   'adminCart/fetchActiveCarts',
-  async ({ page = 1, limit = 15, filter = 'all' }, { rejectWithValue }) => {
+  async ({ page = 1, limit = 15, filter = 'all', region = 'global' }, { rejectWithValue }) => {
     try {
-      const response = await adminAxios.get(`/carts?page=${page}&limit=${limit}&filter=${filter}`);
+      const response = await adminAxios.get(`/carts?page=${page}&limit=${limit}&filter=${filter}&region=${region}`);
       return response.data; // Returns { data, pagination }
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch active carts');
@@ -53,7 +53,7 @@ export const adminClearCart = createAsyncThunk(
       
       // Refresh the details and the table after clearing
       dispatch(fetchCartDetails(cartId));
-      dispatch(fetchActiveCarts({ page: 1, limit: 15, filter: 'all' }));
+      dispatch(fetchActiveCarts({ page: 1, limit: 15, filter: 'all', region: 'global' }));
       dispatch(fetchCartStats());
       
       return response.data.message;

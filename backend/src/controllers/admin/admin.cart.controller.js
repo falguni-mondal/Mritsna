@@ -4,8 +4,9 @@ import User from '../../models/user.model.js';
 import { calculateRegionalPricing } from '../../utils/pricingEngine.js';
 
 // ==========================================
-// HELPER: CALCULATE CART VALUE (DUAL ENGINE)
-// Calculates strict base INR for accounting, and localized foreign pricing if region is provided.
+// HELPER: CALCULATE CART VALUE (TRUE REVENUE ENGINE)
+// Applies export markups to the Base INR if the user is foreign, 
+// ensuring the dashboard reflects accurate Gross Merchandise Value.
 // ==========================================
 const calculateLiveCartMetrics = (cart, regionData = null) => {
   let cartTotalBaseINR = 0; 
@@ -13,30 +14,42 @@ const calculateLiveCartMetrics = (cart, regionData = null) => {
   let totalItems = 0;
   const detailedItems = [];
 
+  // Determine if user is foreign based on passed region data
+  const isForeign = regionData && regionData.countryCode !== 'IN' && regionData.countryCode !== 'INDIA';
+
   if (cart.items && cart.items.length > 0) {
     cart.items.forEach(cartItem => {
-      if (!cartItem.product) return; // Skip if product was deleted from DB
+      if (!cartItem.product) return; 
 
       const variant = cartItem.product.variants.find(
         v => v._id.toString() === cartItem.variantId.toString()
       );
 
       if (variant) {
-        // 1. Strict Base INR Calculation (No export markups)
         const basePrice = variant.pricing?.price || 0;
         const discount = variant.pricing?.discountPercentage || 0;
-        const baseSellingPriceINR = discount > 0 
+        
+        // 1. Calculate raw product price in INR
+        let baseSellingPriceINR = discount > 0 
           ? Math.round(basePrice - (basePrice * (discount / 100))) 
           : basePrice;
+
+        // --- OPTION A: TRUE REVENUE INJECTION ---
+        // If the user is foreign, we inject the export markup into the base INR value.
+        // This ensures the admin sees the true INR equivalent of what the user is paying.
+        if (isForeign) {
+          const exportMarkupINR = cartItem.product.isPremium ? 10000 : 5000;
+          baseSellingPriceINR += exportMarkupINR;
+        }
 
         cartTotalBaseINR += baseSellingPriceINR * cartItem.quantity;
         totalItems += cartItem.quantity;
 
-        // 2. Foreign/Localized Calculation (If region is provided)
+        // 2. Foreign/Localized Calculation for UI display
         let localizedData = null;
-        if (regionData) {
+        if (isForeign) {
           const regionalPricing = calculateRegionalPricing(
-            basePrice,
+            basePrice, 
             discount,
             cartItem.product.isPremium || false,
             regionData
@@ -60,9 +73,9 @@ const calculateLiveCartMetrics = (cart, regionData = null) => {
           variantId: variant._id,
           color: variant.colorName,
           sku: variant.sku,
-          baseUnitPriceINR: baseSellingPriceINR,
+          baseUnitPriceINR: baseSellingPriceINR, 
           baseItemTotalINR: baseSellingPriceINR * cartItem.quantity,
-          localizedData, // Null if regionData is not passed
+          localizedData, 
           quantityInCart: cartItem.quantity,
           stockAvailable: variant.inventory?.quantity || 0,
           isStockBottleneck: cartItem.quantity > (variant.inventory?.quantity || 0),
@@ -81,10 +94,8 @@ const calculateLiveCartMetrics = (cart, regionData = null) => {
 export const getCartDashboardStats = async (req, res, next) => {
   try {
     const activeCarts = await Cart.find({ 'items.0': { $exists: true } })
-      .populate({
-        path: 'items.product',
-        select: 'variants'
-      })
+      .populate({ path: 'user', select: 'lastKnownRegion' })
+      .populate({ path: 'items.product', select: 'variants isPremium' })
       .lean();
 
     let totalPipelineValue = 0;
@@ -95,8 +106,9 @@ export const getCartDashboardStats = async (req, res, next) => {
     const productPopularity = {}; 
 
     activeCarts.forEach(cart => {
-      // Intentionally NOT passing region data here. We strictly want Base INR for dashboard accounting.
-      const metrics = calculateLiveCartMetrics(cart);
+      const userRegion = cart.user?.lastKnownRegion;
+      const metrics = calculateLiveCartMetrics(cart, userRegion);
+      
       totalPipelineValue += metrics.cartTotalBaseINR;
 
       if (new Date(cart.updatedAt) < yesterday) {
@@ -133,13 +145,14 @@ export const getCartDashboardStats = async (req, res, next) => {
 };
 
 // ==========================================
-// 2. GET PAGINATED LIST (THE SPLIT-VIEW TABLE)
+//  GET PAGINATED LIST (THE SPLIT-VIEW TABLE WITH REGION FILTER)
 // ==========================================
 export const getAllActiveCarts = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, parseInt(req.query.limit) || 15);
     const filterType = req.query.filter || 'all'; 
+    const regionFilter = req.query.region || 'global'; // 'global', 'domestic', 'international', or 'US', 'GB', etc.
 
     let dateFilter = {};
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -151,12 +164,54 @@ export const getAllActiveCarts = async (req, res, next) => {
     }
 
     const query = { 'items.0': { $exists: true }, ...dateFilter };
+
+    // --- REGION FILTERING STRATEGY (TWO-STEP QUERY) ---
+    if (regionFilter !== 'global') {
+      let userQuery = {};
+
+      if (regionFilter === 'domestic') {
+        // Find users with IN/INDIA, or legacy users with no region set
+        userQuery = { 
+          $or: [
+            { 'lastKnownRegion.countryCode': { $in: ['IN', 'INDIA'] } },
+            { lastKnownRegion: { $exists: false } }
+          ]
+        };
+      } else if (regionFilter === 'international') {
+        // Find all users who actively have a non-India region
+        userQuery = { 
+          'lastKnownRegion.countryCode': { $nin: ['IN', 'INDIA', null, ''] },
+          lastKnownRegion: { $exists: true }
+        };
+      } else {
+        // Exact match for specific countries like 'US', 'GB'
+        userQuery = { 'lastKnownRegion.countryCode': regionFilter.toUpperCase() };
+      }
+
+      // Step 1: Get matching User IDs
+      const matchingUsers = await User.find(userQuery).select('_id').lean();
+      const matchingUserIds = matchingUsers.map(user => user._id);
+
+      // Early Return: If no users match the region, stop the query and return empty to save DB load
+      if (matchingUserIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          pagination: { totalItems: 0, totalPages: 0, currentPage: page, limit }
+        });
+      }
+
+      // Bind User IDs to the main cart query
+      query.user = { $in: matchingUserIds };
+    }
+    // ---------------------------------------------------
+
     const skip = (page - 1) * limit;
 
     const [carts, totalCount] = await Promise.all([
       Cart.find(query)
-        .populate({ path: 'user', select: 'firstName lastName email' })
-        .populate({ path: 'items.product', select: 'variants' })
+        .populate({ path: 'user', select: 'firstName lastName email lastKnownRegion' })
+        .populate({ path: 'items.product', select: 'title slug isPremium variants' }) 
         .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -165,19 +220,25 @@ export const getAllActiveCarts = async (req, res, next) => {
     ]);
 
     const formattedCarts = carts.map(cart => {
-      // Again, strict Base INR for the table view
-      const metrics = calculateLiveCartMetrics(cart);
+      const userRegion = cart.user?.lastKnownRegion;
+      const metrics = calculateLiveCartMetrics(cart, userRegion);
       const isAbandoned = new Date(cart.updatedAt) < yesterday;
+      const isForeign = userRegion && userRegion.countryCode !== 'IN' && userRegion.countryCode !== 'INDIA';
 
       return {
         cartId: cart._id,
         user: cart.user ? {
           id: cart.user._id,
           name: `${cart.user.firstName || ''} ${cart.user.lastName || ''}`.trim() || 'Unknown User',
-          email: cart.user.email
-        } : { name: 'Deleted User', email: 'N/A' },
+          email: cart.user.email,
+          countryCode: userRegion?.countryCode || 'IN'
+        } : { name: 'Deleted User', email: 'N/A', countryCode: 'IN' },
         itemCount: metrics.totalItems,
-        cartValueINR: metrics.cartTotalBaseINR,
+        cartValueBaseINR: metrics.cartTotalBaseINR,
+        cartValueLocalized: metrics.cartTotalLocalized,
+        currencyCode: userRegion?.currencyCode || 'INR',
+        symbol: userRegion?.symbol || '₹',
+        isForeign,
         isAbandoned,
         lastActive: cart.updatedAt
       };
@@ -208,7 +269,6 @@ export const getCartDetails = async (req, res, next) => {
     const { cartId } = req.params;
 
     const cart = await Cart.findById(cartId)
-      // Added lastKnownRegion to the select array so the dual-engine has the data it needs
       .populate({ path: 'user', select: 'firstName lastName email phoneCode phoneNumber createdAt lastKnownRegion' })
       .populate({ path: 'items.product', select: 'title slug isPremium variants' })
       .lean();
@@ -217,7 +277,6 @@ export const getCartDetails = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
 
-    // Pass the user's region data to trigger the dual-calculation engine
     const userRegion = cart.user?.lastKnownRegion;
     const metrics = calculateLiveCartMetrics(cart, userRegion);
 
@@ -233,7 +292,6 @@ export const getCartDetails = async (req, res, next) => {
       };
     }
 
-    // Determine if the user is operating in a foreign currency
     const isForeign = userRegion && userRegion.countryCode !== 'IN' && userRegion.countryCode !== 'INDIA';
 
     return res.status(200).json({

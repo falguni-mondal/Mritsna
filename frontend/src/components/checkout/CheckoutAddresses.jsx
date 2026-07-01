@@ -17,7 +17,7 @@ const CheckoutAddresses = ({ user, isGuest, selectedAddressId, onSelect }) => {
     }
   }, [isGuest]);
 
-  if (addresses.length === 0) return null; // Hide if no saved addresses
+  if (addresses.length === 0) return null;
 
   return (
     <section>

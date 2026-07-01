@@ -1,40 +1,33 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchCartStats, fetchActiveCarts } from "../../store/slices/cartSlice";
-import CartMetrics from "../../components/cart/CartMetrics";
-import CartTable from "../../components/cart/CartTable";
-import CartDrawer from "../../components/cart/CartDrawer";
+import { fetchWishlistStats, fetchActiveWishlists } from "../../store/slices/wishlistSlice";
+import WishlistMetrics from "../../components/wishlist/WishlistMetrics";
+import WishlistTable from "../../components/wishlist/WishlistTable";
+import WishlistDrawer from "../../components/wishlist/WishlistDrawer";
 
-const Carts = () => {
+const Wishlists = () => {
   const dispatch = useDispatch();
   
-  const { stats, cartsList, pagination, isLoading } = useSelector((state) => state.adminCart);
+  const { stats, wishlistsList, pagination, isLoading } = useSelector((state) => state.adminWishlist);
 
-  const [currentFilter, setCurrentFilter] = useState("all");
-  const [currentRegion, setCurrentRegion] = useState("global"); // NEW: Region state
+  const [currentRegion, setCurrentRegion] = useState("global");
   const [currentPage, setCurrentPage] = useState(1);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedCartId, setSelectedCartId] = useState(null);
+  const [selectedWishlistId, setSelectedWishlistId] = useState(null);
 
   // Fetch Stats on mount
   useEffect(() => {
-    dispatch(fetchCartStats());
+    dispatch(fetchWishlistStats());
   }, [dispatch]);
 
-  // Fetch Table Data whenever page, filter, or region changes
+  // Fetch Table Data whenever page or region changes
   useEffect(() => {
-    dispatch(fetchActiveCarts({ 
+    dispatch(fetchActiveWishlists({ 
       page: currentPage, 
       limit: 15, 
-      filter: currentFilter,
       region: currentRegion 
     }));
-  }, [dispatch, currentPage, currentFilter, currentRegion]);
-
-  const handleFilterChange = (filter) => {
-    setCurrentFilter(filter);
-    setCurrentPage(1); // Reset to page 1 on filter change
-  };
+  }, [dispatch, currentPage, currentRegion]);
 
   const handleRegionChange = (region) => {
     setCurrentRegion(region);
@@ -45,15 +38,15 @@ const Carts = () => {
     setCurrentPage(newPage);
   };
 
-  const handleRowClick = (cartId) => {
-    setSelectedCartId(cartId);
+  const handleRowClick = (wishlistId) => {
+    setSelectedWishlistId(wishlistId);
     setIsDrawerOpen(true);
   };
 
   const closeDrawer = () => {
     setIsDrawerOpen(false);
     // Slight delay to allow slide-out animation to finish before clearing data
-    setTimeout(() => setSelectedCartId(null), 300);
+    setTimeout(() => setSelectedWishlistId(null), 300);
   };
 
   return (
@@ -63,26 +56,24 @@ const Carts = () => {
         {/* Header */}
         <header className="mb-10">
           <h1 className="text-2xl lg:text-3xl font-light tracking-widest uppercase mb-2">
-            Active Carts
+            Customer Wishlists
           </h1>
           <p className="text-sm opacity-50">
-            Monitor real-time pipeline value and recover abandoned sessions.
+            Track user intent, identify top-demanded products, and forecast inventory needs.
           </p>
         </header>
 
         {/* Metrics Grid */}
-        <CartMetrics stats={stats} isLoading={isLoading} />
+        <WishlistMetrics stats={stats} isLoading={isLoading} />
 
         {/* Data Table */}
         <div className="mt-10 bg-white border border-black/5 p-6 shadow-sm">
-          <CartTable 
-            carts={cartsList}
+          <WishlistTable 
+            wishlists={wishlistsList}
             pagination={pagination}
             isLoading={isLoading}
-            currentFilter={currentFilter}
-            currentRegion={currentRegion} // Passed down
-            onFilterChange={handleFilterChange}
-            onRegionChange={handleRegionChange} // Passed down
+            currentRegion={currentRegion}
+            onRegionChange={handleRegionChange}
             onPageChange={handlePageChange}
             onRowClick={handleRowClick}
           />
@@ -91,13 +82,13 @@ const Carts = () => {
       </div>
 
       {/* Deep-Dive Drawer */}
-      <CartDrawer 
+      <WishlistDrawer 
         isOpen={isDrawerOpen} 
         onClose={closeDrawer} 
-        cartId={selectedCartId} 
+        wishlistId={selectedWishlistId} 
       />
     </div>
   );
 };
 
-export default Carts;
+export default Wishlists;

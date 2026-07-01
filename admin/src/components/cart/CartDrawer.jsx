@@ -13,6 +13,11 @@ const formatINR = (amount) => {
   return `₹ ${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 };
 
+// Dynamic formatter for foreign currencies (USD, EUR, etc.)
+const formatForeignCurrency = (amount, currencyCode, symbol) => {
+  return `${symbol} ${Number(amount || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+};
+
 const getOptimizedImgUrl = (url) => {
   if (!url) return "";
   if (url.includes("tr=")) return url;
@@ -20,7 +25,6 @@ const getOptimizedImgUrl = (url) => {
   return `${url}${separator}tr=w-200,q-80`;
 };
 
-// Premium Toast Styling
 const toastConfig = {
   style: {
     borderRadius: '2px',
@@ -85,8 +89,6 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
     }
   };
 
-  // --- ANTI-BUBBLING HANDLER ---
-  // This physically stops smooth-scrolling engines from hijacking the scroll inside the drawer
   const stopScrollPropagation = (e) => {
     e.stopPropagation();
   };
@@ -100,16 +102,12 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
         `}
       />
 
-      {/* FIX 1: h-[100dvh] ensures perfect viewport height lock. 
-        data-lenis-prevent="true" is an industry-standard escape hatch for Lenis smooth scroll.
-      */}
       <div 
         data-lenis-prevent="true"
         className={`fixed top-0 right-0 h-[100dvh] w-full max-w-lg bg-white shadow-2xl z-[99999] flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.77,0,0.175,1)]
           ${isOpen ? "translate-x-0" : "translate-x-full"}
         `}
       >
-        {/* FIX 2: shrink-0 added to Header */}
         <div className="shrink-0 px-8 py-6 border-b border-black/10 flex justify-between items-center bg-[#f8f8f8]">
           <h2 className="text-sm font-bold tracking-widest uppercase">Cart Details</h2>
           <button 
@@ -120,9 +118,6 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
           </button>
         </div>
 
-        {/* FIX 3: Explicit isolation via onWheel and onTouchMove. 
-          The flex-1 ensures it pushes against the strict boundaries of the header and footer.
-        */}
         <div 
           onWheel={stopScrollPropagation}
           onTouchMove={stopScrollPropagation}
@@ -139,7 +134,14 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
               <div>
                 <h3 className="text-[0.65rem] uppercase tracking-widest font-bold opacity-50 mb-4">Customer Profile</h3>
                 <div className="bg-[#f8f8f8] p-5 border border-black/5 rounded-sm">
-                  <p className="text-lg font-medium mb-1">{cart.user.name}</p>
+                  <div className="flex justify-between items-start mb-1">
+                    <p className="text-lg font-medium">{cart.user.name}</p>
+                    {cart.summary.isForeign && (
+                      <span className="bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                        Export: {cart.user.countryCode}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm opacity-60 mb-4">{cart.user.email}</p>
                   <div className="flex justify-between text-xs border-t border-black/5 pt-4 mt-2">
                     <span className="opacity-50">Phone: {cart.user.phone}</span>
@@ -150,8 +152,22 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
 
               <div>
                 <h3 className="text-[0.65rem] uppercase tracking-widest font-bold opacity-50 mb-4">Pipeline Breakdown</h3>
+                
+                {/* DUAL DISPLAY PIPELINE TOTAL */}
                 <div className="flex justify-between items-end mb-6">
-                  <span className="text-3xl font-light">{formatINR(cart.summary.cartValueINR)}</span>
+                  <div>
+                    <span className="text-3xl font-light">
+                      {cart.summary.isForeign 
+                        ? formatForeignCurrency(cart.summary.cartValueLocalized, cart.summary.currencyCode, cart.summary.symbol) 
+                        : formatINR(cart.summary.cartValueBaseINR)
+                      }
+                    </span>
+                    {cart.summary.isForeign && (
+                      <p className="text-xs opacity-50 font-medium mt-1">
+                        Base Value: {formatINR(cart.summary.cartValueBaseINR)}
+                      </p>
+                    )}
+                  </div>
                   <span className="text-sm opacity-60 mb-1">{cart.summary.totalItems} Items Total</span>
                 </div>
 
@@ -172,14 +188,28 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
                             {item.color} | SKU: {item.sku}
                           </p>
                           {item.isStockBottleneck && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-100 text-red-800 text-[0.6rem] uppercase tracking-widest font-bold rounded-sm">
-                              <Icon icon="ph:warning-circle" /> Stock Bottleneck ({item.stockAvailable} available)
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-100 text-red-800 text-[0.6rem] uppercase tracking-widest font-bold rounded-sm mt-1">
+                              <Icon icon="ph:warning-circle" /> Stock Bottleneck ({item.stockAvailable} left)
                             </span>
                           )}
                         </div>
-                        <div className="flex justify-between items-end text-sm">
+                        
+                        {/* DUAL DISPLAY ITEM TOTAL */}
+                        <div className="flex justify-between items-end text-sm mt-2">
                           <span className="opacity-60">Qty: {item.quantityInCart}</span>
-                          <span className="font-medium">{formatINR(item.itemTotal)}</span>
+                          <div className="text-right">
+                            <span className="font-medium">
+                              {cart.summary.isForeign && item.localizedData
+                                ? formatForeignCurrency(item.localizedData.itemTotal, cart.summary.currencyCode, cart.summary.symbol)
+                                : formatINR(item.baseItemTotalINR)
+                              }
+                            </span>
+                            {cart.summary.isForeign && (
+                              <p className="text-[0.6rem] opacity-40">
+                                Base: {formatINR(item.baseItemTotalINR)}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -190,7 +220,6 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
           )}
         </div>
 
-        {/* FIX 4: shrink-0 added to Footer */}
         {!isDetailsLoading && cart && (
           <div className="shrink-0 p-6 border-t border-black/10 bg-[#f8f8f8] flex gap-4">
             <button

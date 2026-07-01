@@ -50,14 +50,12 @@ const Checkout = () => {
     if (user && !isGuest) {
       setFormData(prev => ({ 
         ...prev, 
-        firstName: user.firstName || '', 
-        lastName: user.lastName || '', 
         email: user.email || '' 
       }));
     }
   }, [user, isGuest]);
 
-  // --- HANDOFF 2: Address Selection Prefill ---
+  // --- Address Selection Prefill ---
   const handleAddressSelect = (address) => {
     setSelectedAddressId(address.id);
     setFormData(prev => ({

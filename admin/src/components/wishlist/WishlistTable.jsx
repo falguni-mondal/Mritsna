@@ -1,14 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 
-const formatINR = (amount) => {
-  return `₹ ${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-};
-
-const formatForeignCurrency = (amount, currencyCode, symbol) => {
-  return `${symbol} ${Number(amount || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
-};
-
 const timeAgo = (dateString) => {
   const date = new Date(dateString);
   const now = new Date();
@@ -20,7 +12,6 @@ const timeAgo = (dateString) => {
   return `${Math.floor(diffInSeconds / 86400)}d ago`;
 };
 
-// Defined outside to prevent recreation on every render
 const regionOptions = [
   { value: "global", label: "Global (All)" },
   { value: "domestic", label: "Domestic (India)" },
@@ -32,13 +23,11 @@ const regionOptions = [
   { value: "AE", label: "UAE" },
 ];
 
-const CartTable = ({ 
-  carts, 
+const WishlistTable = ({ 
+  wishlists, 
   pagination, 
   isLoading, 
-  currentFilter, 
   currentRegion, 
-  onFilterChange, 
   onRegionChange, 
   onPageChange, 
   onRowClick 
@@ -46,13 +35,6 @@ const CartTable = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  const tabs = [
-    { id: "all", label: "All Carts" },
-    { id: "recent", label: "Recent (< 24h)" },
-    { id: "abandoned", label: "Abandoned (> 24h)" },
-  ];
-
-  // Close custom dropdown when clicking outside of it
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -60,12 +42,8 @@ const CartTable = ({
       }
     };
     
-    if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    if (isDropdownOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen]);
 
   const handleOptionClick = (value) => {
@@ -73,34 +51,13 @@ const CartTable = ({
     setIsDropdownOpen(false);
   };
 
-  // Find the label for the currently selected region
   const selectedRegionLabel = regionOptions.find(opt => opt.value === currentRegion)?.label || "Global (All)";
 
   return (
     <div className="flex flex-col w-full">
       
-      {/* Top Controls: Tabs & Custom Region Filter */}
-      <div className="flex flex-wrap items-center justify-between border-b border-black/10 mb-6 gap-y-4">
-        
-        {/* Left: Time Filters */}
-        <div className="flex items-center gap-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onFilterChange(tab.id)}
-              className={`pb-4 text-xs font-bold uppercase tracking-widest transition-colors relative
-                ${currentFilter === tab.id ? "text-black" : "text-black/40 hover:text-black/70"}
-              `}
-            >
-              {tab.label}
-              {currentFilter === tab.id && (
-                <span className="absolute bottom-0 left-0 w-full h-[2px] bg-black" />
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Right: Custom Region Dropdown */}
+      {/* Top Controls: Just the Region Filter for Wishlists */}
+      <div className="flex justify-end border-b border-black/10 mb-6">
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -116,16 +73,13 @@ const CartTable = ({
             />
           </button>
 
-          {/* Floating Dropdown Menu */}
           {isDropdownOpen && (
             <div className="absolute top-full right-0 mt-1 w-56 bg-white shadow-xl border border-black/5 z-[60] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
               {regionOptions.map((option, index) => {
                 if (option.type === "divider") {
                   return <div key={`divider-${index}`} className="h-px bg-black/5 my-2" />;
                 }
-                
                 const isSelected = currentRegion === option.value;
-                
                 return (
                   <button
                     key={option.value}
@@ -135,16 +89,13 @@ const CartTable = ({
                     `}
                   >
                     {option.label}
-                    {isSelected && (
-                      <Icon icon="ph:check-bold" className="text-black" />
-                    )}
+                    {isSelected && <Icon icon="ph:check-bold" className="text-black" />}
                   </button>
                 );
               })}
             </div>
           )}
         </div>
-
       </div>
 
       {/* Table */}
@@ -153,76 +104,48 @@ const CartTable = ({
           <thead>
             <tr className="border-b border-black/5 text-[0.65rem] uppercase tracking-widest opacity-50">
               <th className="py-4 px-4 font-bold">Customer</th>
-              <th className="py-4 px-4 font-bold">Items</th>
-              <th className="py-4 px-4 font-bold">Value</th>
-              <th className="py-4 px-4 font-bold">Status</th>
-              <th className="py-4 px-4 font-bold text-right">Last Active</th>
+              <th className="py-4 px-4 font-bold">Total Items</th>
+              <th className="py-4 px-4 font-bold text-right">Last Updated</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan="5" className="py-12 text-center">
+                <td colSpan="3" className="py-12 text-center">
                   <Icon icon="ph:spinner-gap-light" className="text-3xl animate-spin mx-auto opacity-30" />
                 </td>
               </tr>
-            ) : carts.length === 0 ? (
+            ) : wishlists.length === 0 ? (
               <tr>
-                <td colSpan="5" className="py-12 text-center text-sm opacity-40">
-                  No carts found for this filter.
+                <td colSpan="3" className="py-12 text-center text-sm opacity-40">
+                  No wishlists found for this region.
                 </td>
               </tr>
             ) : (
-              carts.map((cart) => (
+              wishlists.map((wishlist) => (
                 <tr 
-                  key={cart.cartId} 
-                  onClick={() => onRowClick(cart.cartId)}
+                  key={wishlist.wishlistId} 
+                  onClick={() => onRowClick(wishlist.wishlistId)}
                   className="border-b border-black/5 hover:bg-black/[0.02] transition-colors cursor-pointer group"
                 >
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-medium">{cart.user.name}</p>
-                      {cart.isForeign && (
+                      <p className="text-sm font-medium">{wishlist.user.name}</p>
+                      {wishlist.isForeign && (
                         <span className="bg-black/5 text-black text-[0.55rem] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm">
-                          {cart.user.countryCode}
+                          {wishlist.user.countryCode}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs opacity-50">{cart.user.email}</p>
+                    <p className="text-xs opacity-50">{wishlist.user.email}</p>
                   </td>
                   
-                  <td className="py-4 px-4 text-sm">{cart.itemCount}</td>
-                  
-                  {/* DUAL DISPLAY VALUE COLUMN */}
-                  <td className="py-4 px-4">
-                    {cart.isForeign ? (
-                      <div>
-                        <p className="text-sm font-medium">
-                          {formatForeignCurrency(cart.cartValueLocalized, cart.currencyCode, cart.symbol)}
-                        </p>
-                        <p className="text-[0.65rem] opacity-50 font-medium mt-0.5">
-                          Base: {formatINR(cart.cartValueBaseINR)}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-sm font-medium">{formatINR(cart.cartValueBaseINR)}</p>
-                    )}
-                  </td>
-
-                  <td className="py-4 px-4">
-                    {cart.isAbandoned ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-red-100 text-red-800 text-[0.65rem] uppercase tracking-widest font-bold">
-                        Abandoned
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-green-100 text-green-800 text-[0.65rem] uppercase tracking-widest font-bold">
-                        Active
-                      </span>
-                    )}
+                  <td className="py-4 px-4 text-sm font-medium">
+                    {wishlist.itemCount} <span className="opacity-50 font-normal ml-1">saved</span>
                   </td>
                   
                   <td className="py-4 px-4 text-sm text-right opacity-60">
-                    {timeAgo(cart.lastActive)}
+                    {timeAgo(wishlist.lastActive)}
                   </td>
                 </tr>
               ))
@@ -259,4 +182,4 @@ const CartTable = ({
   );
 };
 
-export default CartTable;
+export default WishlistTable;
