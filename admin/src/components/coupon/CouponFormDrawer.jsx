@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
@@ -11,6 +11,64 @@ import {
   clearCurrentCouponDetails 
 } from "../../store/slices/couponSlice";
 
+// --- CUSTOM SELECT COMPONENT ---
+const CustomSelect = ({ name, value, options, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  const selectedOption = options.find((opt) => opt.value === value);
+
+  const handleSelect = (optionValue) => {
+    onChange({ target: { name, value: optionValue } });
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-transparent border-b border-black/20 pb-2 text-sm focus:outline-none flex justify-between items-center cursor-pointer hover:border-black transition-colors"
+      >
+        <span className={selectedOption ? "text-black" : "text-gray-400"}>
+          {selectedOption ? selectedOption.label : "Select option..."}
+        </span>
+        <Icon 
+          icon="ph:caret-down-bold" 
+          className={`text-[0.65rem] opacity-50 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} 
+        />
+      </div>
+      
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full mt-1 bg-white border border-black/5 shadow-xl z-[60] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          {options.map((option) => (
+            <div
+              key={option.value}
+              onClick={() => handleSelect(option.value)}
+              className={`px-4 py-2.5 text-xs cursor-pointer transition-colors flex justify-between items-center group
+                ${value === option.value ? "bg-black/5 text-black font-bold" : "text-gray-600 hover:bg-black/5 hover:text-black"}
+              `}
+            >
+              {option.label}
+              {value === option.value && <Icon icon="ph:check-bold" className="text-black" />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- INITIAL STATE ---
 const initialFormState = {
   code: "",
   description: "",
@@ -18,12 +76,19 @@ const initialFormState = {
   discountValue: 0,
   maxDiscountAmount: "",
   minOrderValue: 0,
-  applicableRegions: "GLOBAL", // Stored as a comma separated string for the UI
+  applicableRegions: "GLOBAL", 
   usageLimit: "",
   usagePerUserLimit: 1,
+  startDate: "", // <-- NEW: Added to state
   expiryDate: "",
   isAutoApply: false,
 };
+
+const discountOptions = [
+  { value: "percentage", label: "Percentage (%)" },
+  { value: "fixed_amount", label: "Fixed Amount (Base INR)" },
+  { value: "free_shipping", label: "Free Shipping" },
+];
 
 const toastConfig = {
   style: {
@@ -35,6 +100,12 @@ const toastConfig = {
     letterSpacing: '0.1em',
     padding: '12px 20px',
   },
+};
+
+// --- HELPER TO GET LOCAL DATETIME STRING FOR INPUT ---
+const getLocalDatetimeString = (dateObj) => {
+  const tzoffset = dateObj.getTimezoneOffset() * 60000;
+  return new Date(dateObj.getTime() - tzoffset).toISOString().slice(0, 16);
 };
 
 const CouponFormDrawer = ({ isOpen, onClose, couponId }) => {
@@ -56,7 +127,13 @@ const CouponFormDrawer = ({ isOpen, onClose, couponId }) => {
       if (isEditMode) {
         dispatch(fetchCouponDetails(couponId));
       } else {
-        setFormData({ ...initialFormState, expiryDate: getTomorrowDateString() });
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setFormData({ 
+          ...initialFormState, 
+          startDate: getLocalDatetimeString(new Date()),
+          expiryDate: getLocalDatetimeString(tomorrow) 
+        });
       }
     } else {
       document.body.style.overflow = "";
@@ -77,17 +154,12 @@ const CouponFormDrawer = ({ isOpen, onClose, couponId }) => {
         applicableRegions: coupon.applicableRegions.join(", "),
         usageLimit: coupon.usageLimit || "",
         usagePerUserLimit: coupon.usagePerUserLimit || 1,
-        expiryDate: new Date(coupon.expiryDate).toISOString().slice(0, 16), // Format for datetime-local
+        startDate: coupon.startDate ? getLocalDatetimeString(new Date(coupon.startDate)) : "", // <-- NEW: Safely parses existing DB start dates
+        expiryDate: coupon.expiryDate ? getLocalDatetimeString(new Date(coupon.expiryDate)) : "", 
         isAutoApply: coupon.isAutoApply,
       });
     }
   }, [coupon, isEditMode]);
-
-  const getTomorrowDateString = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().slice(0, 16);
-  };
 
   const handleClose = () => {
     onClose();
@@ -157,7 +229,6 @@ const CouponFormDrawer = ({ isOpen, onClose, couponId }) => {
 
   const stopScrollPropagation = (e) => e.stopPropagation();
 
-  // Common input classes
   const labelClass = "block text-[0.65rem] font-bold tracking-widest uppercase opacity-60 mb-2";
   const inputClass = "w-full bg-transparent border-b border-black/20 pb-2 text-sm focus:outline-none focus:border-black transition-colors";
 
@@ -236,16 +307,12 @@ const CouponFormDrawer = ({ isOpen, onClose, couponId }) => {
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <label className={labelClass}>Discount Type</label>
-                    <select 
-                      name="discountType" 
-                      value={formData.discountType} 
+                    <CustomSelect 
+                      name="discountType"
+                      value={formData.discountType}
+                      options={discountOptions}
                       onChange={handleChange}
-                      className={inputClass}
-                    >
-                      <option value="percentage">Percentage (%)</option>
-                      <option value="fixed_amount">Fixed Amount (Base INR)</option>
-                      <option value="free_shipping">Free Shipping</option>
-                    </select>
+                    />
                   </div>
                   <div>
                     <label className={labelClass}>Value</label>
@@ -331,16 +398,30 @@ const CouponFormDrawer = ({ isOpen, onClose, couponId }) => {
                   </div>
                 </div>
 
-                <div>
-                  <label className={labelClass}>Expiry Date & Time</label>
-                  <input 
-                    type="datetime-local" 
-                    name="expiryDate" 
-                    required
-                    value={formData.expiryDate} 
-                    onChange={handleChange}
-                    className={inputClass} 
-                  />
+                {/* --- FIX: Start and Expiry Dates Side-by-Side --- */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className={labelClass}>Start Date & Time</label>
+                    <input 
+                      type="datetime-local" 
+                      name="startDate" 
+                      required
+                      value={formData.startDate} 
+                      onChange={handleChange}
+                      className={inputClass} 
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Expiry Date & Time</label>
+                    <input 
+                      type="datetime-local" 
+                      name="expiryDate" 
+                      required
+                      value={formData.expiryDate} 
+                      onChange={handleChange}
+                      className={inputClass} 
+                    />
+                  </div>
                 </div>
 
                 <label className="flex items-center gap-3 cursor-pointer group pt-2">

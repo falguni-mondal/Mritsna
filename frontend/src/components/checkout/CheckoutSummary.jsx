@@ -22,7 +22,8 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
     appliedCouponCode, 
     paymentOption, 
     calculationStatus,
-    orderCreationStatus // Needed to lock the pay button while fetching gateway keys
+    orderCreationStatus, 
+    error 
   } = useSelector((state) => state.checkout);
 
   const formatPrice = (price) => {
@@ -43,10 +44,20 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
 
   const isProcessing = calculationStatus === 'loading' || orderCreationStatus === 'loading';
 
+  // --- ERROR CATEGORIZATION ENGINE ---
+  const isCouponError = error && (
+    error.toLowerCase().includes('coupon') || 
+    error.toLowerCase().includes('eligible') ||
+    error.toLowerCase().includes('discount') ||
+    appliedCouponCode !== null 
+  );
+  
+  const isGeneralError = error && !isCouponError;
+
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-black/5 relative">
+    <div className="bg-white p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-black/5 relative flex flex-col">
       
-      {/* Loading Overlay when math is recalculating */}
+      {/* Loading Overlay */}
       {calculationStatus === 'loading' && (
         <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl">
            <Icon icon="lucide:loader-2" className="animate-spin text-black" width="24" />
@@ -55,8 +66,24 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
 
       <h2 className="text-lg font-medium mb-6">Order Summary</h2>
 
-      {/* Cart Items Preview */}
-      <div className="space-y-4 mb-8 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+      {/* --- SYSTEM CRASH / GENERAL ERROR BANNER --- */}
+      {isGeneralError && calculationStatus === 'failed' && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-lg flex items-start gap-3 text-red-800 animate-in fade-in slide-in-from-top-2">
+          <Icon icon="lucide:alert-triangle" className="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+          <div className="flex flex-col">
+            <span className="text-[0.7rem] uppercase tracking-widest font-bold text-red-600 mb-1">System Notice</span>
+            <span className="text-sm">{error}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Cart Items Preview (Scroll-Hijack Fix Applied Here) */}
+      <div 
+        data-lenis-prevent="true"
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        className="space-y-4 mb-8 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar"
+      >
         {cartItems && cartItems.length > 0 ? (
           cartItems.map((item, idx) => (
             <div key={item.variantId || idx} className="flex gap-4 items-center">
@@ -91,25 +118,34 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
             </button>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              value={localCouponInput}
-              onChange={(e) => setLocalCouponInput(e.target.value.toUpperCase())}
-              placeholder="Gift card or discount code" 
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-black uppercase tracking-widest transition-colors"
-            />
-            <button 
-              onClick={handleApplyCoupon}
-              className="bg-black text-white px-6 py-3 rounded-lg text-[0.65rem] font-bold tracking-widest uppercase hover:bg-gray-800 transition-colors"
-            >
-              Apply
-            </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={localCouponInput}
+                onChange={(e) => setLocalCouponInput(e.target.value.toUpperCase())}
+                placeholder="Gift card or discount code" 
+                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-black uppercase tracking-widest transition-colors"
+              />
+              <button 
+                onClick={handleApplyCoupon}
+                className="bg-black text-white px-6 py-3 rounded-lg text-[0.65rem] font-bold tracking-widest uppercase hover:bg-gray-800 transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+            
+            {/* --- SPECIFIC COUPON ERROR DISPLAY --- */}
+            {isCouponError && calculationStatus === 'failed' && (
+              <p className="text-[0.65rem] text-red-600 tracking-widest uppercase font-bold px-1 mt-1 flex items-center gap-1">
+                <Icon icon="lucide:alert-circle" width="12" /> {error}
+              </p>
+            )}
           </div>
         )}
       </div>
 
-      {/* Live Financial Breakdown (Inclusive Tax UI) */}
+      {/* Live Financial Breakdown */}
       <div className="space-y-3 text-sm">
         <div className="flex justify-between text-gray-500">
           <span>Item Total (Tax Incl.)</span>
@@ -123,7 +159,6 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
           </div>
         )}
 
-        {/* Expandable Tax Section showing Taxable Amount and Tax */}
         <div className="border-t border-dashed border-gray-200 pt-3 mt-3">
           <div className="flex justify-between text-gray-500 mb-2">
             <span>Taxable Value</span>
@@ -164,11 +199,10 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
         </div>
       </div>
 
-      {/* Payment Split Logic Toggle */}
+      {/* Payment Options */}
       <div className="mt-8 pt-6 border-t border-black/10">
         <h3 className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-gray-400 mb-4">Payment Options</h3>
         <div className="space-y-3">
-          {/* Full Online */}
           <label className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-all ${paymentOption === 'FULL_ONLINE' ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-black/30'}`}>
             <div className="flex items-center gap-3">
               <input 
@@ -182,7 +216,6 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
             </div>
           </label>
 
-          {/* Partial COD */}
           <label className={`flex items-start justify-between p-4 rounded-lg border cursor-pointer transition-all ${paymentOption === 'PARTIAL_COD' ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-black/30'}`}>
             <div className="flex items-center gap-3">
               <input 
@@ -200,7 +233,6 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
           </label>
         </div>
 
-        {/* Clear visibility on what they are paying right now */}
         {paymentOption === 'PARTIAL_COD' && (
            <div className="mt-4 p-4 bg-orange-50 border border-orange-100 rounded-lg text-sm text-orange-900 flex justify-between items-center">
              <span>Due Today (10%):</span>
@@ -209,7 +241,6 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
         )}
       </div>
 
-      {/* Giant Pay Button */}
       <button 
         onClick={onPay}
         disabled={!cartItems || cartItems.length === 0 || isProcessing}

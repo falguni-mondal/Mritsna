@@ -116,11 +116,10 @@ const couponSchema = new mongoose.Schema(
 );
 
 // Pre-save hook: Auto-disable if the expiry date has passed
-couponSchema.pre('save', function (next) {
+couponSchema.pre('save', function () {
   if (this.expiryDate && this.expiryDate < new Date()) {
     this.isActive = false;
   }
-  next();
 });
 
 export default mongoose.model('Coupon', couponSchema);

@@ -36,14 +36,17 @@ const itemSchema = z.object({
 export const calculateTotalsSchema = z.object({
   body: z.object({
     items: z.array(itemSchema).min(1, "Cart cannot be empty"),
-    country: z.string().min(2, "Country is required to calculate taxes"),
-    state: z.string().min(2, "State is required to calculate taxes"),
-    couponCode: z.string().trim().toUpperCase().optional().nullable(),
     
-    // Allows the frontend to request a preview of the Partial COD split
+    // FIX: Make location data optional on initial load so the subtotal can calculate
+    country: z.string().optional().or(z.literal('')),
+    state: z.string().optional().or(z.literal('')),
+    
+    // FIX: Declare identity fields so Zod doesn't strip them, allowing coupon limit checks to work
+    guestEmail: z.string().email().optional().or(z.literal('')),
+    deviceId: z.string().optional().or(z.literal('')),
+    
+    couponCode: z.string().trim().toUpperCase().optional().nullable(),
     paymentOption: paymentOptionEnum.optional().default('FULL_ONLINE'), 
-
-    // If the user explicitly removes an auto-applied coupon, the frontend sends true
     skipAutoApply: z.boolean().optional().default(false),
   }),
 });
@@ -58,20 +61,12 @@ export const createOrderSchema = z.object({
     shippingAddress: addressSchema,
     billingAddress: addressSchema,
     couponCode: z.string().trim().toUpperCase().optional().nullable(),
-    
-    // Strictly require the payment option so the controller knows exactly how to charge Razorpay
     paymentOption: paymentOptionEnum,
-    
-    // For guest checkouts, these help track coupon usage
     guestEmail: z.string().email("Invalid guest email format").trim().toLowerCase().optional().nullable(),
     deviceId: z.string().min(10, "Device ID is required for security checks").optional().nullable(),
-
     skipAutoApply: z.boolean().optional().default(false),
   })
-  // SuperRefine: Ensure guest checkout has an email
   .superRefine((data, ctx) => {
-    // Note: The actual check if a user is logged in happens in the controller via req.user
-    // But we can enforce that if deviceId is passed (guest), email should ideally be present
     if (data.deviceId && !data.guestEmail && !data.shippingAddress.email) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -84,7 +79,6 @@ export const createOrderSchema = z.object({
 
 /**
  * Validate Razorpay Payment Verification
- * Used when Razorpay redirects back to the server with success signatures
  */
 export const verifyPaymentSchema = z.object({
   body: z.object({

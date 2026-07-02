@@ -18,8 +18,11 @@ export const validateRequest = (schema) => async (req, res, next) => {
   } catch (error) {
     // If validation fails, intercept and return a clean, frontend-friendly error response
     if (error instanceof ZodError) {
-      // Map the array of Zod errors into a clean format
-      const formattedErrors = error.errors.map((err) => ({
+      
+      // FIX: Safely extract the array to prevent .map() crashes
+      const validationErrors = error.issues || error.errors || [];
+      
+      const formattedErrors = validationErrors.map((err) => ({
         field: err.path.join('.'), // e.g., 'body.shippingAddress.email'
         message: err.message,
       }));
