@@ -50,7 +50,7 @@ const orderSchema = new mongoose.Schema(
     // --- MULTI-CURRENCY SNAPSHOT ---
     baseCurrency: { type: String, default: 'INR' },
     paymentCurrency: { type: String, required: true, enum: ['INR', 'USD', 'EUR', 'GBP', 'AED', 'AUD', 'CAD', 'SGD', 'SAR', 'JPY'] },
-    exchangeRateAtPurchase: { type: Number, default: 1 }, // e.g., 83.5 for USD
+    exchangeRateAtPurchase: { type: Number, default: 1 },
 
     // --- INCLUSIVE FINANCIALS & PAYMENT TERMS ---
     // Example: ₹10,000 is stored as 1000000 paise
@@ -66,7 +66,7 @@ const orderSchema = new mongoose.Schema(
     taxDetails: { type: [taxDetailSchema], default: [] },
     totalTaxAmount: { type: Number, default: 0 }, // What the government gets
     
-    // --- NEW: PARTIAL COD SUPPORT ---
+    // --- PARTIAL COD SUPPORT ---
     paymentOption: { 
       type: String, 
       enum: ['FULL_ONLINE', 'PARTIAL_COD'], 

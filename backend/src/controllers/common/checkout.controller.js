@@ -103,7 +103,7 @@ const processCheckoutMath = async (
   let appliedEligibleSubTotal = 0;
 
   const evaluateCouponEligibility = async (coupon) => {
-    // FIX: Defensive array mapping to prevent crash on old DB documents
+    // Defensive array mapping to prevent crash on old DB documents
     if (
       Array.isArray(coupon.applicableRegions) &&
       coupon.applicableRegions.length > 0
@@ -206,7 +206,7 @@ const processCheckoutMath = async (
     if (fingerprintQuery.length > 0) {
       const pastUsageCount = await Order.countDocuments({
         couponApplied: coupon._id,
-        paymentStatus: { $ne: "Failed" },
+        paymentStatus: { $in: ["Completed", "Partially Paid"] },
         $or: fingerprintQuery,
       });
 
