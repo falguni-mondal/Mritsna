@@ -13,6 +13,7 @@ import adminProductRoutes from './routes/admin/admin.product.routes.js';
 import adminCartRoutes from './routes/admin/admin.cart.routes.js';
 import adminWishlistRoutes from './routes/admin/admin.wishlist.routes.js';
 import adminCouponRoutes from './routes/admin/admin.coupon.routes.js';
+import adminOrderRoutes from './routes/admin/admin.order.routes.js';
 
 import authRouter from "./routes/common/auth.routes.js";
 import productRoutes from './routes/common/product.routes.js';
@@ -20,6 +21,8 @@ import cartRoutes from './routes/common/cart.routes.js';
 import wishlistRoutes from './routes/common/wishlist.routes.js';
 import checkoutRoutes from './routes/common/checkout.routes.js';
 import regionRoutes from './routes/common/region.routes.js';
+import orderRoutes from './routes/common/order.routes.js';
+import webhookRoutes from './routes/common/webhook.routes.js';
 
 const app = express();
 
@@ -42,7 +45,8 @@ app.set("trust proxy", true);
 
 // Webhook Specific Parser (Stripe/Payment Gateways need raw buffers)
 // We isolate this so we don't waste memory buffering every standard JSON request
-app.use("/api/webhooks", express.raw({ type: "application/json" }));
+app.use("/api/v1/webhooks", express.raw({ type: "application/json" }));
+app.use('/api/v1/webhooks', webhookRoutes);
 
 
 // Standard Body Parsers & Cookies
@@ -79,6 +83,7 @@ app.use('/api/v1/admin/products', adminProductRoutes);
 app.use('/api/v1/admin/carts', adminCartRoutes);
 app.use('/api/v1/admin/wishlists', adminWishlistRoutes);
 app.use('/api/v1/admin/coupons', adminCouponRoutes);
+app.use('/api/v1/admin/orders', adminOrderRoutes);
 
 //  public routes
 app.use("/api/v1/auth", authRouter);
@@ -87,6 +92,7 @@ app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/checkout', checkoutRoutes);
 app.use('/api/v1/region', regionRoutes);
+app.use('/api/v1/orders', orderRoutes);
 
 
 // Global Catch-All Error Handler (MANDATORY for preventing server crashes)

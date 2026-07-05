@@ -96,6 +96,7 @@ const orderSchema = new mongoose.Schema(
     trackingNumber: { type: String, default: null },
     courierPartner: { type: String, default: null },
     trackingUrl: { type: String, default: null },
+    shippingLabelUrl: { type: String, default: null },
 
     // --- TIMELINES ---
     paidAt: { type: Date, default: null },
@@ -107,7 +108,7 @@ const orderSchema = new mongoose.Schema(
 );
 
 // --- Pre-Save Hook: Auto-Generate Order Number ---
-orderSchema.pre('save', function (next) {
+orderSchema.pre('save', function () {
   if (this.isNew) {
     const timestampHex = Math.floor(Date.now() / 1000).toString(16).toUpperCase();
     const randomHex = Math.floor(Math.random() * 16777215).toString(16).toUpperCase().padStart(4, '0');
