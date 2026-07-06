@@ -108,7 +108,7 @@ const orderSchema = new mongoose.Schema(
 );
 
 // --- Pre-Save Hook: Auto-Generate Order Number ---
-orderSchema.pre('save', function () {
+orderSchema.pre('save', async function () {
   if (this.isNew) {
     const timestampHex = Math.floor(Date.now() / 1000).toString(16).toUpperCase();
     const randomHex = Math.floor(Math.random() * 16777215).toString(16).toUpperCase().padStart(4, '0');
