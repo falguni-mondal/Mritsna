@@ -119,7 +119,7 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-col lg:flex-row">
               <input 
                 type="text" 
                 value={localCouponInput}

@@ -3,20 +3,63 @@ import Product from "../../models/product.model.js";
 import { createShipment } from "../../services/logistics.service.js";
 
 
+const buildOrderFilter = (query) => {
+  const { currency, startDate, endDate, search } = query;
+  let filter = {};
+
+  // Currency Filter (Domestic vs International vs Specific)
+  if (currency) {
+    const currUpper = currency.toUpperCase();
+    if (currUpper === "DOMESTIC") {
+      filter.paymentCurrency = "INR";
+    } else if (currUpper === "INTERNATIONAL") {
+      filter.paymentCurrency = { $ne: "INR" };
+    } else if (currUpper !== "ALL") {
+      filter.paymentCurrency = currUpper;
+    }
+  }
+
+  // 2. Date Range Filter
+  if (startDate || endDate) {
+    filter.createdAt = {};
+    if (startDate) {
+      filter.createdAt.$gte = new Date(startDate);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // Set to the very end of the selected day
+      filter.createdAt.$lte = end;
+    }
+  }
+
+  // 3. Search Filter (Order Number or Email)
+  if (search) {
+    filter.$or = [
+      { orderNumber: { $regex: search, $options: "i" } },
+      { guestEmail: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  return filter;
+};
+
+
 export const getAllOrders = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
 
-    const orders = await Order.find()
+    const filter = buildOrderFilter(req.query);
+
+    const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("user", "name email") // Optional: brings in basic user details if registered
-      .lean(); // Faster execution for read-only queries
+      .populate("user", "name email") 
+      .lean(); 
 
-    const totalOrders = await Order.countDocuments();
+    const totalOrders = await Order.countDocuments(filter);
 
     return res.status(200).json({
       success: true,
@@ -33,6 +76,66 @@ export const getAllOrders = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || "Failed to retrieve orders.",
+    });
+  }
+};
+
+
+export const exportOrders = async (req, res) => {
+  try {
+    const { exportType } = req.query; // Expected: 'all' or 'profit'
+    const filter = buildOrderFilter(req.query);
+
+    // If exporting profit, strictly filter for successful, paid transactions
+    if (exportType === "profit") {
+      filter.orderStatus = { $in: ["Confirmed", "Processing", "Shipped", "Delivered"] };
+      filter.paymentStatus = { $in: ["Completed", "Partially Paid"] };
+    }
+
+    // Fetch without pagination to export the entire matching dataset
+    const orders = await Order.find(filter)
+      .sort({ createdAt: -1 })
+      .populate("user", "firstName lastName email")
+      .lean();
+
+    // Map data to cleanly formatted objects ready for CSV parsing
+    const exportData = orders.map((order) => {
+      let customerName = "Guest";
+      if (order.shippingAddress?.firstName) {
+        customerName = `${order.shippingAddress.firstName} ${order.shippingAddress.lastName}`;
+      } else if (order.user) {
+        customerName = `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim();
+      }
+
+      const customerEmail = order.isGuestCheckout ? order.guestEmail : (order.user?.email || "Unknown");
+      const grandTotal = (order.advancePaid || 0) + (order.balanceDueOnDelivery || 0) || order.paymentAmount || 0;
+
+      return {
+        "Order Number": order.orderNumber,
+        "Date": new Date(order.createdAt).toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' }),
+        "Customer Name": customerName,
+        "Customer Email": customerEmail,
+        "Payment Status": order.paymentStatus,
+        "Order Status": order.orderStatus,
+        "Currency": order.paymentCurrency,
+        "Grand Total": grandTotal,
+        "Total Tax Amount": order.totalTaxAmount || 0,
+        "Profit (Base Revenue)": order.baseRevenue || 0,
+        "Courier Partner": order.courierPartner || "N/A",
+        "Tracking Number": order.trackingNumber || "N/A"
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: exportData.length,
+      data: exportData,
+    });
+  } catch (error) {
+    console.error("[Admin Export Orders Error]:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to generate order export.",
     });
   }
 };
@@ -58,12 +161,10 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found." });
     }
 
-    // Prevent re-cancelling or re-returning if already done (protects inventory counts)
     const isAlreadyRestocked = ["Cancelled", "Returned"].includes(order.orderStatus);
     const isNowRestocking = ["Cancelled", "Returned"].includes(orderStatus);
 
     if (isNowRestocking && !isAlreadyRestocked) {
-      // Auto-restock inventory mathematically
       for (const item of order.items) {
         await Product.updateOne(
           {
@@ -78,7 +179,6 @@ export const updateOrderStatus = async (req, res) => {
       order.cancelledAt = new Date();
     }
 
-    // If marking as delivered manually
     if (orderStatus === 'Delivered' && order.orderStatus !== 'Delivered') {
       order.deliveredAt = new Date();
     }
@@ -131,7 +231,7 @@ export const fulfillOrder = async (req, res) => {
     let totalWeightGrams = 0;
 
     order.items.forEach((item) => {
-      const itemWeight = item.product?.shipping?.weightGrams || 500; // Updated to match your schema's exact path (weightGrams)
+      const itemWeight = item.product?.shipping?.weightGrams || 500; 
       totalWeightGrams += itemWeight * item.quantity;
     });
 

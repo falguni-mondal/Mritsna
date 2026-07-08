@@ -25,7 +25,7 @@ const SmoothScroll = ({ children }) => {
       smoothTouch: false, 
       
       // Wheel Multiplier: Tightens visual frames for perceived higher FPS
-      wheelMultiplier: 0.8, 
+      wheelMultiplier: 1.2, 
       touchMultiplier: 2,
     });
 
