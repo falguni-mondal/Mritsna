@@ -73,6 +73,20 @@ const OrderLedger = ({ order }) => {
             <span>Grand Total</span>
             <span>{currencyFormatter.format(grandTotal)}</span>
           </div>
+
+          {/* Conditional COD / Partial COD Block */}
+          {(order.paymentOption === 'PARTIAL_COD' || order.balanceDueOnDelivery > 0) && (
+            <div className="pt-3 mt-3 border-t border-gray-100 border-dashed space-y-2">
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Advance Paid Online</span>
+                <span>{currencyFormatter.format(order.advancePaid || 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold text-black">
+                <span>Balance Due (To Collect)</span>
+                <span>{currencyFormatter.format(order.balanceDueOnDelivery || 0)}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

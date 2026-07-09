@@ -237,7 +237,7 @@ export const fulfillOrder = async (req, res) => {
 
     const order = await Order.findById(orderId).populate({
       path: "items.product",
-      select: "shipping",
+      select: "shipping variants title",
     });
 
     if (!order) {
@@ -258,14 +258,7 @@ export const fulfillOrder = async (req, res) => {
       });
     }
 
-    let totalWeightGrams = 0;
-
-    order.items.forEach((item) => {
-      const itemWeight = item.product?.shipping?.weightGrams || 500; 
-      totalWeightGrams += itemWeight * item.quantity;
-    });
-
-    const shipmentResult = await createShipment(order, totalWeightGrams);
+    const shipmentResult = await createShipment(order);
 
     order.trackingNumber = shipmentResult.waybill;
     order.shippingLabelUrl = shipmentResult.labelUrl;
@@ -287,7 +280,7 @@ export const fulfillOrder = async (req, res) => {
     });
   } catch (error) {
     console.error("[Admin Fulfill Order Error]:", error);
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
       message: error.message || "Failed to process logistics fulfillment.",
     });

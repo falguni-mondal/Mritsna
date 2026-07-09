@@ -20,7 +20,6 @@ const orderItemSchema = new mongoose.Schema({
   slug: { type: String, required: true },
   img: { type: String, required: true },
   quantity: { type: Number, required: true, min: 1 },
-  // Stored as Integer (Paise). This is the Admin MRP inclusive of tax.
   priceAtPurchase: { type: Number, required: true },
   itemTotal: { type: Number, required: true }
 }, { _id: false });
