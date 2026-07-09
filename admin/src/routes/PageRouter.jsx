@@ -19,6 +19,7 @@ import Carts from "../pages/panel/Carts";
 import Wishlists from "../pages/panel/Wishlists";
 import Coupons from "../pages/panel/Coupons";
 import Orders from "../pages/panel/Orders";
+import OrderDetails from "../pages/services/orders/OrderDetails";
 // import Orders from "../pages/panel/Orders";
 // import Carts from "../pages/panel/Carts";
 // import Wishlists from "../pages/panel/Wishlists";
@@ -71,6 +72,7 @@ const PageRouter = () => {
         <Route path="wishlists" element={<Wishlists />} />
         <Route path="coupons" element={<Coupons />} />
         <Route path="orders" element={<Orders />} />
+        <Route path="orders/:orderId" element={<OrderDetails />} />
 
         {/* <Route path="orders" element={<Orders />} /> */}
         {/* <Route path="carts" element={<Carts />} /> */}

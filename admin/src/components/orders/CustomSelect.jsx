@@ -38,11 +38,11 @@ const CustomSelect = ({ name, options, value, onChange, placeholder = "Select op
   };
 
   return (
-    <div className="relative w-full" ref={containerRef}>
+    <div className="relative w-full px-4 border-b border-gray-200 focus:border-black transition-colors" ref={containerRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-transparent text-[11px] uppercase tracking-wider border-b border-gray-200 py-2 text-left text-gray-900 focus:outline-none focus:border-black transition-colors flex justify-between items-center"
+        className="w-full bg-transparent text-[11px] uppercase tracking-wider py-2 text-left text-gray-900 focus:outline-none flex justify-between items-center"
       >
         <span className="truncate">{selectedLabel}</span>
         <svg

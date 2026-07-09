@@ -3,6 +3,7 @@ import axiosInstance from "../../configs/axiosInstance";
 
 // --- Async Thunks ---
 
+// 1. Fetch All Orders (Paginated & Filtered)
 export const fetchAdminOrders = createAsyncThunk(
   "adminOrders/fetchAll",
   async ({ page = 1, limit = 10, search, currency, startDate, endDate }, { rejectWithValue }) => {
@@ -19,7 +20,22 @@ export const fetchAdminOrders = createAsyncThunk(
   }
 );
 
-// New Thunk for Exporting Filtered Data
+// 2. Fetch Single Order by ID
+export const fetchAdminOrderById = createAsyncThunk(
+  "adminOrders/fetchById",
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.get(`/orders/${orderId}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch order details."
+      );
+    }
+  }
+);
+
+// 3. Export Filtered Data
 export const exportAdminOrders = createAsyncThunk(
   "adminOrders/export",
   async ({ exportType, search, currency, startDate, endDate }, { rejectWithValue }) => {
@@ -36,6 +52,7 @@ export const exportAdminOrders = createAsyncThunk(
   }
 );
 
+// 4. Update Order Status Manually
 export const updateAdminOrderStatus = createAsyncThunk(
   "adminOrders/updateStatus",
   async ({ orderId, orderStatus }, { rejectWithValue }) => {
@@ -52,6 +69,7 @@ export const updateAdminOrderStatus = createAsyncThunk(
   }
 );
 
+// 5. Fulfill Order via Delhivery
 export const fulfillAdminOrder = createAsyncThunk(
   "adminOrders/fulfill",
   async (orderId, { rejectWithValue }) => {
@@ -72,14 +90,17 @@ const adminOrderSlice = createSlice({
   name: "adminOrders",
   initialState: {
     orders: [],
+    currentOrder: null, // Holds the data for the OrderDetails page
     pagination: {
       currentPage: 1,
       totalPages: 1,
       totalOrders: 0,
+      successfulOrders: 0,
     },
     loading: false,
+    currentOrderLoading: false, // Separate loader for the details page
     actionLoading: false,
-    exportLoading: false, // New state specifically for the CSV download button
+    exportLoading: false, 
     error: null,
     actionError: null,
   },
@@ -88,6 +109,9 @@ const adminOrderSlice = createSlice({
       state.error = null;
       state.actionError = null;
     },
+    clearCurrentOrder: (state) => {
+      state.currentOrder = null;
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -103,6 +127,20 @@ const adminOrderSlice = createSlice({
       })
       .addCase(fetchAdminOrders.rejected, (state, action) => {
         state.loading = false;
+        state.error = action.payload;
+      })
+
+      // --- Fetch Single Order By ID ---
+      .addCase(fetchAdminOrderById.pending, (state) => {
+        state.currentOrderLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchAdminOrderById.fulfilled, (state, action) => {
+        state.currentOrderLoading = false;
+        state.currentOrder = action.payload.data;
+      })
+      .addCase(fetchAdminOrderById.rejected, (state, action) => {
+        state.currentOrderLoading = false;
         state.error = action.payload;
       })
 
@@ -126,11 +164,18 @@ const adminOrderSlice = createSlice({
       })
       .addCase(updateAdminOrderStatus.fulfilled, (state, action) => {
         state.actionLoading = false;
+        
+        // 1. Update in the main table list if it exists there
         const updatedOrderIndex = state.orders.findIndex(
           (order) => order._id === action.payload.data._id
         );
         if (updatedOrderIndex !== -1) {
           state.orders[updatedOrderIndex] = action.payload.data;
+        }
+
+        // 2. Update the single order view if we are currently looking at it
+        if (state.currentOrder && state.currentOrder._id === action.payload.data._id) {
+          state.currentOrder = action.payload.data;
         }
       })
       .addCase(updateAdminOrderStatus.rejected, (state, action) => {
@@ -146,6 +191,8 @@ const adminOrderSlice = createSlice({
       .addCase(fulfillAdminOrder.fulfilled, (state, action) => {
         state.actionLoading = false;
         const { orderNumber, trackingNumber, shippingLabelUrl, orderStatus } = action.payload.data;
+        
+        // 1. Update in the main table list
         const updatedOrderIndex = state.orders.findIndex(
           (order) => order.orderNumber === orderNumber
         );
@@ -153,6 +200,13 @@ const adminOrderSlice = createSlice({
           state.orders[updatedOrderIndex].trackingNumber = trackingNumber;
           state.orders[updatedOrderIndex].shippingLabelUrl = shippingLabelUrl;
           state.orders[updatedOrderIndex].orderStatus = orderStatus;
+        }
+
+        // 2. Update the single order view if we are currently looking at it
+        if (state.currentOrder && state.currentOrder.orderNumber === orderNumber) {
+          state.currentOrder.trackingNumber = trackingNumber;
+          state.currentOrder.shippingLabelUrl = shippingLabelUrl;
+          state.currentOrder.orderStatus = orderStatus;
         }
       })
       .addCase(fulfillAdminOrder.rejected, (state, action) => {
@@ -162,5 +216,5 @@ const adminOrderSlice = createSlice({
   },
 });
 
-export const { clearOrderErrors } = adminOrderSlice.actions;
+export const { clearOrderErrors, clearCurrentOrder } = adminOrderSlice.actions;
 export default adminOrderSlice.reducer;

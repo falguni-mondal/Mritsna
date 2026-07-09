@@ -40,7 +40,7 @@ const orderSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     isGuestCheckout: { type: Boolean, default: false },
     guestEmail: { type: String, index: true },
-    deviceId: { type: String, required: true, index: true }, // CRITICAL for Guest Coupon Limits
+    deviceId: { type: String, required: true, index: true },
 
     // --- LOGISTICS ---
     shippingAddress: { type: addressSchema, required: true },

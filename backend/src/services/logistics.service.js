@@ -1,18 +1,17 @@
 import axios from "axios";
 
-// Create a centralized Axios client for Delhivery
+// Centralized Axios client for Delhivery Production
 const delhiveryAPI = axios.create({
-  baseURL: process.env.DELHIVERY_BASE_URL,
+  baseURL: process.env.DELHIVERY_BASE_URL || "https://track.delhivery.com",
   headers: {
-    "Content-Type": "application/json",
     Accept: "application/json",
     Authorization: `Token ${process.env.DELHIVERY_API_KEY}`,
   },
 });
 
 /**
- * 1. Check Pincode Serviceability
- * Useful for validating an address before checkout or fulfillment.
+ * Check Pincode Serviceability
+ * Validates an address before checkout or fulfillment.
  */
 export const checkPincodeServiceability = async (pinCode) => {
   try {
@@ -36,57 +35,83 @@ export const checkPincodeServiceability = async (pinCode) => {
 };
 
 /**
- * 2. Create Shipment (Fulfill Order)
+ * Create Shipment (Fulfill Order)
  * The main engine for pushing an order to Delhivery.
  */
 export const createShipment = async (orderData, totalWeightGrams) => {
   try {
-    // Delhivery strictly requires the COD amount to be the balance due. 
-    // If it's FULL_ONLINE, this will correctly evaluate to 0.
     const isCOD = orderData.paymentOption === "PARTIAL_COD";
-    const codAmountToCollect = isCOD ? orderData.balanceDueOnDelivery : 0;
     
-    // Delhivery accepts weight in grams. 
-    // If it exceeds a certain limit (e.g., 10kg), they automatically route it to Surface Heavy.
-    const safeWeight = totalWeightGrams > 0 ? totalWeightGrams : 500; 
+    // Database is in standard Rupees, so we pass it directly to Delhivery
+    const codAmountToCollect = isCOD ? orderData.balanceDueOnDelivery : 0;
+    const subTotalRupees = orderData.subTotal;   const safeWeight = totalWeightGrams > 0 ? totalWeightGrams : 500; 
+    // Strip out +91, spaces, and dashes. Grab exactly 10 digits.
+    const cleanPhone = orderData.shippingAddress.phone.replace(/\D/g, '').slice(-10);
 
-    const payload = {
-      format: "json",
-      data: {
-        shipments: [
-          {
-            name: `${orderData.shippingAddress.firstName} ${orderData.shippingAddress.lastName}`,
-            add: orderData.shippingAddress.street,
-            pin: orderData.shippingAddress.pinCode,
-            city: orderData.shippingAddress.city,
-            state: orderData.shippingAddress.state,
-            country: orderData.shippingAddress.country,
-            phone: orderData.shippingAddress.phone,
-            order: orderData.orderNumber,
-            
-            // Format strictly to Delhivery's enums
-            payment_mode: isCOD ? "COD" : "Pre-paid",
-            cod_amount: codAmountToCollect,
-            total_amount: orderData.subTotal, // The actual value of the goods
-            
-            quantity: orderData.items.reduce((acc, item) => acc + item.quantity, 0).toString(),
-            weight: safeWeight.toString(),
-          }
-        ],
-        pickup_location: {
-          // This MUST match the Warehouse Name registered in your Delhivery Dashboard
-          name: process.env.DELHIVERY_WAREHOUSE_NAME || "Primary Warehouse" 
+    const shipmentPayload = {
+      shipments: [
+        {
+          name: `${orderData.shippingAddress.firstName} ${orderData.shippingAddress.lastName}`.trim(),
+          add: orderData.shippingAddress.street,
+          pin: orderData.shippingAddress.pinCode,
+          city: orderData.shippingAddress.city,
+          state: orderData.shippingAddress.state,
+          country: orderData.shippingAddress.country,
+          phone: cleanPhone,
+          order: orderData.orderNumber,
+          
+          payment_mode: isCOD ? "COD" : "Pre-paid",
+          cod_amount: codAmountToCollect,
+          total_amount: subTotalRupees,           
+          quantity: orderData.items.reduce((acc, item) => acc + item.quantity, 0).toString(),
+          weight: safeWeight.toString(),
         }
+      ],
+      pickup_location: {
+        // MUST perfectly match your Delhivery Dashboard (Settings > Pickup Locations)
+        name: process.env.DELHIVERY_WAREHOUSE_NAME || "Primary Warehouse" 
       }
     };
 
-    // The standard API endpoint for creating a shipment and getting a waybill instantly
-    const response = await delhiveryAPI.post("/api/cbs/v1.2/shipment/create/", payload);
+    // Delhivery requires application/x-www-form-urlencoded
+    const payloadParams = new URLSearchParams();
+    payloadParams.append("format", "json");
+    payloadParams.append("data", JSON.stringify(shipmentPayload));
+
+    const response = await delhiveryAPI.post("/api/cmu/create.json", payloadParams, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    const resData = response.data;
+
+    // Handle root-level rejection from Delhivery (Type-checking applied to bypass booleans)
+    if (resData.success === false || resData.error === true || resData.error === "true") {
+      let extractedError = "Invalid payload or warehouse configuration.";
+      
+      if (resData.rmks) {
+        extractedError = typeof resData.rmks === "string" ? resData.rmks : JSON.stringify(resData.rmks);
+      } else if (resData.error && typeof resData.error === "string" && resData.error !== "true") {
+        extractedError = resData.error;
+      }
+      
+      throw new Error(extractedError);
+    }
     
-    const packageData = response.data.packages?.[0];
+    const packageData = resData.packages?.[0];
     
+    // Extract exact error strings if the specific package was rejected
     if (!packageData || packageData.status !== "Success") {
-      throw new Error(packageData?.remarks || "Courier rejected the shipment payload.");
+      let specificError = "Courier rejected the shipment details.";
+      if (Array.isArray(packageData?.remarks)) {
+        specificError = packageData.remarks.join(" | "); 
+      } else if (packageData?.remarks) {
+        specificError = typeof packageData.remarks === "string" ? packageData.remarks : JSON.stringify(packageData.remarks);
+      } else if (packageData?.client_error) {
+        specificError = packageData.client_error;
+      }
+      throw new Error(specificError);
     }
 
     return {
@@ -97,13 +122,25 @@ export const createShipment = async (orderData, totalWeightGrams) => {
     };
 
   } catch (error) {
-    console.error("[Delhivery] Create Shipment Failed:", error?.response?.data || error.message);
-    throw new Error("Failed to dispatch order to courier.");
+    let exactError = error.message;
+
+    // If Axios caught an HTTP error (400/500), extract the exact string safely
+    if (error.response && error.response.data) {
+      const errData = error.response.data;
+      if (errData.rmks) {
+        exactError = typeof errData.rmks === "string" ? errData.rmks : JSON.stringify(errData.rmks);
+      } else if (errData.error && typeof errData.error === "string" && errData.error !== "true") {
+        exactError = errData.error;
+      }
+    }
+
+    console.error("[Delhivery] Create Shipment Failed:", exactError);
+    throw new Error(exactError || "Failed to dispatch order to courier.");
   }
 };
 
 /**
- * 3. Track Shipment
+ * Track Shipment
  * Fetches the live location timeline of the box.
  */
 export const trackShipment = async (waybill) => {
@@ -114,7 +151,7 @@ export const trackShipment = async (waybill) => {
     if (!shipmentData) throw new Error("Tracking data not found for this Waybill.");
 
     return {
-      status: shipmentData.Status?.Status, // e.g., "In Transit", "Delivered", "RTO Delivered"
+      status: shipmentData.Status?.Status, 
       instructions: shipmentData.Status?.Instructions,
       statusDateTime: shipmentData.Status?.StatusDateTime,
       destination: shipmentData.Destination,
@@ -127,7 +164,7 @@ export const trackShipment = async (waybill) => {
 };
 
 /**
- * 4. Generate PDF Label (Fallback)
+ * Generate PDF Label (Fallback)
  * Only use this if the labelUrl wasn't generated during createShipment.
  */
 export const generateShippingLabel = async (waybill) => {

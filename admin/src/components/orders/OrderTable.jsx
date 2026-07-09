@@ -4,14 +4,12 @@ import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
-// Register the GSAP hook
 gsap.registerPlugin(useGSAP);
 
-const OrderTable = ({ orders }) => {
+const OrderTable = ({ orders, startIndex }) => {
   const navigate = useNavigate();
   const tableRef = useRef(null);
 
-  // Staggered row animation
   useGSAP(() => {
     if (orders && orders.length > 0) {
       gsap.fromTo(
@@ -36,6 +34,9 @@ const OrderTable = ({ orders }) => {
         <thead>
           <tr className="border-b border-gray-200">
             <th className="px-6 py-5 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+              S.No
+            </th>
+            <th className="px-6 py-5 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
               Order ID
             </th>
             <th className="px-6 py-5 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
@@ -56,11 +57,14 @@ const OrderTable = ({ orders }) => {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {orders.map((order) => {
+          {orders.map((order, index) => {
             const orderTotal = (order.advancePaid || 0) + (order.balanceDueOnDelivery || 0) || order.paymentAmount || 0;
 
             return (
               <tr key={order._id} className="table-row hover:bg-[#FAFAFA] transition-colors duration-300">
+                <td className="px-6 py-6 whitespace-nowrap text-xs text-gray-400 tracking-wide">
+                  {(startIndex + index + 1).toString().padStart(2, '0')}
+                </td>
                 <td className="px-6 py-6 whitespace-nowrap text-sm font-medium text-gray-900 tracking-wide">
                   {order.orderNumber}
                 </td>

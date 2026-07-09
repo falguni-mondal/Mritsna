@@ -2,12 +2,10 @@ import Order from "../../models/order.model.js";
 import Product from "../../models/product.model.js";
 import { createShipment } from "../../services/logistics.service.js";
 
-
 const buildOrderFilter = (query) => {
   const { currency, startDate, endDate, search } = query;
   let filter = {};
 
-  // Currency Filter (Domestic vs International vs Specific)
   if (currency) {
     const currUpper = currency.toUpperCase();
     if (currUpper === "DOMESTIC") {
@@ -19,7 +17,6 @@ const buildOrderFilter = (query) => {
     }
   }
 
-  // 2. Date Range Filter
   if (startDate || endDate) {
     filter.createdAt = {};
     if (startDate) {
@@ -27,12 +24,11 @@ const buildOrderFilter = (query) => {
     }
     if (endDate) {
       const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999); // Set to the very end of the selected day
+      end.setHours(23, 59, 59, 999); 
       filter.createdAt.$lte = end;
     }
   }
 
-  // 3. Search Filter (Order Number or Email)
   if (search) {
     filter.$or = [
       { orderNumber: { $regex: search, $options: "i" } },
@@ -42,7 +38,6 @@ const buildOrderFilter = (query) => {
 
   return filter;
 };
-
 
 export const getAllOrders = async (req, res) => {
   try {
@@ -59,7 +54,15 @@ export const getAllOrders = async (req, res) => {
       .populate("user", "name email") 
       .lean(); 
 
-    const totalOrders = await Order.countDocuments(filter);
+    // Run parallel counts for efficiency
+    const [totalOrders, successfulOrders] = await Promise.all([
+      Order.countDocuments(filter),
+      Order.countDocuments({
+        ...filter,
+        orderStatus: { $in: ["Confirmed", "Processing", "Shipped", "Delivered"] },
+        paymentStatus: { $in: ["Completed", "Partially Paid"] }
+      })
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -68,6 +71,7 @@ export const getAllOrders = async (req, res) => {
         currentPage: page,
         totalPages: Math.ceil(totalOrders / limit),
         totalOrders,
+        successfulOrders 
       },
       data: orders,
     });
@@ -80,25 +84,21 @@ export const getAllOrders = async (req, res) => {
   }
 };
 
-
 export const exportOrders = async (req, res) => {
   try {
-    const { exportType } = req.query; // Expected: 'all' or 'profit'
+    const { exportType } = req.query; 
     const filter = buildOrderFilter(req.query);
 
-    // If exporting profit, strictly filter for successful, paid transactions
     if (exportType === "profit") {
       filter.orderStatus = { $in: ["Confirmed", "Processing", "Shipped", "Delivered"] };
       filter.paymentStatus = { $in: ["Completed", "Partially Paid"] };
     }
 
-    // Fetch without pagination to export the entire matching dataset
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
       .populate("user", "firstName lastName email")
       .lean();
 
-    // Map data to cleanly formatted objects ready for CSV parsing
     const exportData = orders.map((order) => {
       let customerName = "Guest";
       if (order.shippingAddress?.firstName) {
@@ -140,6 +140,37 @@ export const exportOrders = async (req, res) => {
   }
 };
 
+// Get Single Order Details
+export const getOrderById = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId)
+      // Populating referenced data just in case the UI needs deeper linking
+      .populate("user", "firstName lastName email phone")
+      .populate("couponApplied", "code discountType discountValue")
+      .populate("items.product", "slug") 
+      .lean();
+
+    if (!order) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Order not found." 
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: order,
+    });
+  } catch (error) {
+    console.error("[Admin Get Order By ID Error]:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to retrieve order details.",
+    });
+  }
+};
 
 export const updateOrderStatus = async (req, res) => {
   try {
@@ -199,7 +230,6 @@ export const updateOrderStatus = async (req, res) => {
     });
   }
 };
-
 
 export const fulfillOrder = async (req, res) => {
   try {
