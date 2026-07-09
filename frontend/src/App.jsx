@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { Toaster } from 'react-hot-toast'; 
 import Navbar from './components/navbar/Navbar';
 import PageRouter from './routes/PageRouter';
 import PreFooterContact from './components/footer/PreFooterContact';
@@ -8,7 +9,6 @@ import CustomCursor from './components/global/CustomCursor';
 
 import { checkAuth } from "./store/features/authSlice";
 import { fetchUserCart, hydrateGuestCartAPI } from './store/features/cartSlice';
-// --- FIX: Import the guest wishlist hydration thunk ---
 import { fetchUserWishlist, hydrateGuestWishlistAPI } from './store/features/wishlistSlice';
 import { fetchUserRegion } from './store/features/regionSlice'; 
 
@@ -45,7 +45,7 @@ const App = () => {
       } else {
         // Guest: Send the dumb IDs to the backend to get live regional prices
         dispatch(hydrateGuestCartAPI());
-        dispatch(hydrateGuestWishlistAPI()); // <-- THE FINAL PIECE
+        dispatch(hydrateGuestWishlistAPI()); 
       }
     }
   }, [isAuthenticated, isAppReady, dispatch]);
@@ -62,7 +62,40 @@ const App = () => {
   }
 
   return (
-    <div className='wrapper w-full'>
+    <div className='wrapper w-full relative'>
+      
+      {/* --- GLOBAL TOASTER NOTIFICATION SYSTEM --- */}
+      <Toaster 
+        position="top-center"
+        reverseOrder={false}
+        containerStyle={{
+          zIndex: 999999999,
+          top: '70px',
+        }}
+        toastOptions={{
+          // FIX: Exact brand colors and sharp edges
+          style: {
+            background: '#171410', 
+            color: '#f8f8f8',
+            fontSize: '12px',
+            borderRadius: '2px',
+            letterSpacing: '0.05em'
+          },
+          success: {
+            iconTheme: {
+              primary: '#f8f8f8', // Monochrome minimal checkmark
+              secondary: '#171410',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ff4b4b',
+              secondary: '#f8f8f8',
+            },
+          },
+        }}
+      />
+      
       <CustomCursor />
       
       <header className='w-full'>

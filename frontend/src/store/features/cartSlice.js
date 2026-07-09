@@ -124,6 +124,20 @@ export const removeFromCartDB = createAsyncThunk(
   }
 );
 
+// Clear Cart in DB upon successful purchase
+export const clearCartDB = createAsyncThunk(
+  'cart/clearCartDB',
+  async (_, { dispatch, rejectWithValue }) => {
+    try {
+      await userAxios.delete('/cart/clear'); // Adjust route if your clear route differs (e.g., POST /cart/clear)
+      dispatch(fetchUserCart());
+      return true;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to clear cart');
+    }
+  }
+);
+
 export const syncGuestCartToDB = createAsyncThunk(
   'cart/syncGuestCartToDB',
   async (_, { dispatch, rejectWithValue }) => {

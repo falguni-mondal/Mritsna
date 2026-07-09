@@ -1,7 +1,7 @@
 import Order from "../../models/order.model.js";
 import { trackShipment } from "../../services/logistics.service.js";
 
-
+// Fetch Paginated Order History (Logged-in Users)
 export const getUserOrderHistory = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
@@ -9,7 +9,7 @@ export const getUserOrderHistory = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Fetch orders belonging strictly to the logged-in user's account
-    const orders = await Order.find({ user: req.user })
+    const orders = await Order.find({ user: req.user }) // Safely handle populated or unpopulated user
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -35,13 +35,16 @@ export const getUserOrderHistory = async (req, res) => {
   }
 };
 
-
+// Fetch Single Order Details (Logged-in Users)
 export const getUserOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.params;
 
     // Secure the lookup by requiring the order ID AND matching user ID
-    const order = await Order.findOne({ _id: orderId, user: req.user });
+    const order = await Order.findOne({ 
+      _id: orderId, 
+      user: req.user 
+    });
 
     if (!order) {
       return res.status(404).json({
@@ -58,7 +61,7 @@ export const getUserOrderDetails = async (req, res) => {
         liveTracking = await trackShipment(order.trackingNumber);
       } catch (trackingError) {
         console.error("[Tracking Fetch Failure]:", trackingError.message);
-        // Fallback gracefully so the base order details still load if the courier API dips
+        // Fallback gracefully so the base order details still load
         liveTracking = {
           status: order.orderStatus,
           instructions: "Live tracking data temporarily unavailable.",
@@ -81,7 +84,7 @@ export const getUserOrderDetails = async (req, res) => {
   }
 };
 
-
+// Universal Public Tracking (For Guests AND Lazy Users)
 export const trackGuestOrder = async (req, res) => {
   try {
     const { orderNumber, email } = req.body;
@@ -93,11 +96,15 @@ export const trackGuestOrder = async (req, res) => {
       });
     }
 
-    // Force strict structure validation: matching fields and verifying it's a guest entry
+    const cleanEmail = email.toString().trim().toLowerCase();
+
+    // Universal Match: Find the order by ID, and verify the email matches EITHER the guest email OR the shipping email
     const order = await Order.findOne({
       orderNumber: orderNumber.toString().trim(),
-      guestEmail: email.toString().trim().toLowerCase(),
-      isGuestCheckout: true,
+      $or: [
+        { guestEmail: cleanEmail },
+        { "shippingAddress.email": cleanEmail }
+      ]
     });
 
     if (!order) {
@@ -109,7 +116,7 @@ export const trackGuestOrder = async (req, res) => {
 
     let liveTracking = null;
 
-    // Extract real-time courier checkpoints if the package is out in the wild
+    // Extract real-time courier checkpoints
     if (order.trackingNumber) {
       try {
         liveTracking = await trackShipment(order.trackingNumber);
@@ -131,7 +138,7 @@ export const trackGuestOrder = async (req, res) => {
         shippingAddress: order.shippingAddress,
         subTotal: order.subTotal,
         discountAmount: order.discountAmount,
-        grandTotal: order.grandTotal,
+        grandTotal: order.paymentAmount || order.subTotal, // Safe fallback
         paymentOption: order.paymentOption,
         paymentStatus: order.paymentStatus,
         orderStatus: order.orderStatus,
@@ -146,7 +153,7 @@ export const trackGuestOrder = async (req, res) => {
     console.error("[Guest Order Tracking Error]:", error);
     return res.status(500).json({
       success: false,
-      message: error.message || "Failed to process guest order tracking.",
+      message: error.message || "Failed to process order tracking.",
     });
   }
 };

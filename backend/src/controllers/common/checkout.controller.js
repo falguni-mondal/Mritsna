@@ -5,6 +5,8 @@ import Order from "../../models/order.model.js";
 import Product from "../../models/product.model.js";
 import Coupon from "../../models/coupon.model.js";
 import { calculateRegionalPricing } from "../../utils/pricingEngine.js";
+import { sendEmail } from "../../utils/email.sender.js";
+
 
 // Safe JSON Import
 const require = createRequire(import.meta.url);
@@ -412,7 +414,7 @@ export const calculateCheckoutTotals = async (req, res) => {
       guestEmail,
       deviceId,
     } = req.body;
-    const userId = req.user ? req.user._id : null;
+    const userId = req.user;
 
     // FIX: Strict formatting applied before pushing into the math engine
     const safePaymentOption = paymentOption
@@ -478,7 +480,7 @@ export const createRazorpayOrder = async (req, res) => {
       guestEmail,
       deviceId,
     } = req.body;
-    const userId = req.user ? req.user._id : null;
+    const userId = req.user;
     const isGuestCheckout = !userId;
 
     // FIX: Strict formatting applied before pushing into the math engine
@@ -582,9 +584,7 @@ export const verifyRazorpayPayment = async (req, res) => {
 
     const pendingOrder = await Order.findById(db_order_id);
     if (!pendingOrder) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Order not found in database" });
+      return res.status(404).json({ success: false, message: "Order not found in database" });
     }
 
     const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -597,49 +597,118 @@ export const verifyRazorpayPayment = async (req, res) => {
 
     if (!isAuthentic) {
       pendingOrder.paymentStatus = "Failed";
-      pendingOrder.paymentErrorLog =
-        "Signature mismatch. Potential spoofing attempt.";
+      pendingOrder.paymentErrorLog = "Signature mismatch. Potential spoofing attempt.";
       await pendingOrder.save();
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid payment signature" });
+      return res.status(400).json({ success: false, message: "Invalid payment signature" });
     }
 
-    const finalPaymentStatus =
-      pendingOrder.paymentOption === "PARTIAL_COD"
-        ? "Partially Paid"
-        : "Completed";
+    // Only process if it hasn't been processed by the webhook already
+    if (pendingOrder.paymentStatus === "Pending") {
+      const finalPaymentStatus = pendingOrder.paymentOption === "PARTIAL_COD" ? "Partially Paid" : "Completed";
 
-    pendingOrder.paymentStatus = finalPaymentStatus;
-    pendingOrder.orderStatus = "Confirmed";
-    pendingOrder.paidAt = new Date();
-    pendingOrder.transactionId = razorpay_payment_id;
+      pendingOrder.paymentStatus = finalPaymentStatus;
+      pendingOrder.orderStatus = "Confirmed";
+      pendingOrder.paidAt = new Date();
+      pendingOrder.transactionId = razorpay_payment_id;
 
-    const confirmedOrder = await pendingOrder.save();
+      const confirmedOrder = await pendingOrder.save();
 
-    if (confirmedOrder.couponApplied) {
-      await Coupon.findByIdAndUpdate(confirmedOrder.couponApplied, {
-        $inc: { usedCount: 1 },
-      });
+      if (confirmedOrder.couponApplied) {
+        await Coupon.findByIdAndUpdate(confirmedOrder.couponApplied, {
+          $inc: { usedCount: 1 },
+        });
+      }
+
+      const inventoryUpdates = confirmedOrder.items.map((item) =>
+        Product.findOneAndUpdate(
+          { "variants._id": item.variantId },
+          { $inc: { "variants.$.inventory.quantity": -item.quantity } },
+        ),
+      );
+      await Promise.all(inventoryUpdates);
+
+      // --- DISPATCH HIGH-END RECEIPT & TRACKING EMAIL ---
+      const customerEmail = confirmedOrder.isGuestCheckout ? confirmedOrder.guestEmail : confirmedOrder.shippingAddress.email;
+      const customerName = confirmedOrder.shippingAddress.firstName;
+      
+      // Determine dynamic tracking link
+      const baseUrl = process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : 'http://localhost:5173';
+      const queryParams = confirmedOrder.isGuestCheckout && confirmedOrder.guestEmail ? `?email=${encodeURIComponent(customerEmail)}` : "";
+      const trackingLink = `${baseUrl}/track-order/${confirmedOrder._id}${queryParams}`;
+
+      // Build product list HTML
+      const itemsHtml = confirmedOrder.items.map(item => `
+        <tr style="border-bottom: 1px solid #EEEEEE;">
+          <td style="padding: 15px 0; width: 70px;">
+            <img src="${item.img}" alt="${item.title}" style="width: 55px; height: 70px; object-fit: cover; border-radius: 2px; background-color: #f8f8f8;" />
+          </td>
+          <td style="padding: 15px 10px; vertical-align: top;">
+            <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: #111111;">${item.title}</p>
+            <p style="margin: 0 0 3px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888888;">Color: ${item.colorName}</p>
+            <p style="margin: 0; font-size: 11px; color: #888888;">Qty: ${item.quantity}</p>
+          </td>
+          <td style="padding: 15px 0; vertical-align: top; text-align: right; font-weight: 500; font-size: 13px; color: #111111;">
+            ${confirmedOrder.paymentCurrency} ${Math.round(item.itemTotal)}
+          </td>
+        </tr>
+      `).join('');
+
+      const emailHtml = `
+        <div style="font-family: Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #111111; padding: 40px 20px;">
+          <h2 style="font-weight: 300; letter-spacing: 1px; margin-bottom: 30px; text-transform: uppercase;">Order Confirmed</h2>
+          <p style="font-size: 14px; line-height: 1.6; color: #555555;">Hello ${customerName},</p>
+          <p style="font-size: 14px; line-height: 1.6; color: #555555;">Thank you for your purchase. Your payment has been securely processed and your order is currently being prepared for dispatch.</p>
+          
+          <div style="background-color: #f8f8f8; border: 1px solid #EEEEEE; padding: 20px; margin: 30px 0; text-align: center;">
+            <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888888; margin: 0 0 5px 0;">Order Reference</p>
+            <p style="font-size: 18px; font-weight: 600; margin: 0;">${confirmedOrder.orderNumber}</p>
+          </div>
+
+          <h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888888; border-bottom: 1px solid #EEEEEE; padding-bottom: 10px; margin-top: 40px;">Order Summary</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+            ${itemsHtml}
+            <tr>
+              <td colspan="2" style="padding: 15px 10px; text-align: right; font-size: 11px; color: #888888; text-transform: uppercase; letter-spacing: 1px;">Paid Today</td>
+              <td style="padding: 15px 0; text-align: right; font-weight: bold; font-size: 15px; color: #111111;">${confirmedOrder.paymentCurrency} ${confirmedOrder.paymentAmount}</td>
+            </tr>
+          </table>
+
+          <div style="text-align: center; margin: 40px 0;">
+            <a href="${trackingLink}" style="display: inline-block; padding: 14px 30px; background-color: #171410; color: #f8f8f8; text-decoration: none; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; border-radius: 2px;">Track Your Order</a>
+          </div>
+          
+          <p style="font-size: 12px; line-height: 1.6; color: #999999; text-align: center;">Click the button above to view live logistics, download your tax invoice, and check your delivery status 24/7.</p>
+          
+          <div style="margin-top: 50px; text-align: center; font-size: 11px; color: #AAAAAA; border-top: 1px solid #EEEEEE; padding-top: 20px;">
+            <p>&copy; ${new Date().getFullYear()} Mritsna. All rights reserved.</p>
+          </div>
+        </div>
+      `;
+
+      // 1. Dispatch to Customer
+      sendEmail({
+        to: customerEmail,
+        subject: `Order Confirmed: ${confirmedOrder.orderNumber}`,
+        html: emailHtml,
+      }).catch(err => console.error("[Customer Email Error]:", err));
+
+      // 2. Dispatch to Admin (Silent CC)
+      if (process.env.ADMIN_MAIL) {
+        sendEmail({
+          to: process.env.ADMIN_MAIL,
+          subject: `🚨 NEW ORDER ALERT: ${confirmedOrder.orderNumber} - ${confirmedOrder.paymentCurrency} ${confirmedOrder.paymentAmount}`,
+          html: emailHtml, // Sends exact same receipt layout to admin
+        }).catch(err => console.error("[Admin Email Error]:", err));
+      }
     }
-
-    const inventoryUpdates = confirmedOrder.items.map((item) =>
-      Product.findOneAndUpdate(
-        { "variants._id": item.variantId },
-        { $inc: { "variants.$.inventory.quantity": -item.quantity } },
-      ),
-    );
-    await Promise.all(inventoryUpdates);
 
     return res.status(200).json({
       success: true,
       message: "Payment verified successfully",
-      data: { orderNumber: confirmedOrder.orderNumber },
+      data: { orderNumber: pendingOrder.orderNumber },
     });
   } catch (error) {
     console.error("[Payment Verification Error]", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Payment verification process failed" });
+    return res.status(500).json({ success: false, message: "Payment verification process failed" });
   }
 };

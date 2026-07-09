@@ -5,6 +5,8 @@ import cartReducer from "./features/cartSlice";
 import wishlistReducer from "./features/wishlistSlice";
 import checkoutReducer from "./features/checkoutSlice";
 import regionReducer from "./features/regionSlice";
+import orderReducer from "./features/orderSlice";
+import addressReducer from './features/addressSlice';
 
 
 export const store = configureStore({
@@ -15,6 +17,8 @@ export const store = configureStore({
     wishlist: wishlistReducer,
     checkout: checkoutReducer,
     region: regionReducer,
+    orders: orderReducer,
+    addresses: addressReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

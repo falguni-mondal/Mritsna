@@ -8,12 +8,15 @@ import About from "../pages/About";
 import Shop from "../pages/Shop";
 import Product from "../pages/Product";
 import Dashboard from "../pages/Dashboard";
+import Orders from "../pages/Orders"; 
+import TrackOrder from "../pages/TrackOrder"; // <-- IMPORT IT HERE
 import Cart from "../pages/Cart";
 import Wishlist from "../pages/Wishlist";
 import Checkout from "../pages/Checkout";
 import GuestRoute from "../components/auth/GuestRoute";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import NotFound from "../pages/NotFound";
+import Addresses from "../pages/Addresses";
 
 const PageRouter = () => {
   return (
@@ -28,6 +31,7 @@ const PageRouter = () => {
       <Route path="/cart" element={<Cart />} />
       <Route path="/wishlist" element={<Wishlist />} />
       <Route path="/checkout" element={<Checkout />} />
+      <Route path="/track-order/:orderId?" element={<TrackOrder />} />
 
       {/* ==========================================
           GUEST ROUTES (Only accessible if NOT logged in)
@@ -76,20 +80,26 @@ const PageRouter = () => {
         } 
       />
 
-
-
-      <Route path="*" element={<NotFound />} />
-      
-      {/* Example of future nested routes */}
-      {/* <Route 
+      <Route 
         path="/account/orders" 
         element={
           <ProtectedRoute requireVerification={true}>
             <Orders />
           </ProtectedRoute>
         } 
-      /> 
-      */}
+      />
+
+      <Route 
+        path="/account/addresses" 
+        element={
+          <ProtectedRoute requireVerification={true}>
+            <Addresses />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Catch-all 404 Route */}
+      <Route path="*" element={<NotFound />} />
       
     </Routes>
   );

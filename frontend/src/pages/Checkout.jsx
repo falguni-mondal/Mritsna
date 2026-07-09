@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { Country, State } from 'country-state-city'; 
 import { 
   calculateCheckoutTotals, 
   createRazorpayOrder, 
   verifyRazorpayPayment 
 } from '../store/features/checkoutSlice'; 
+import { fetchAddresses } from '../store/features/addressSlice'; 
+import { clearLocalCart, clearCartDB } from '../store/features/cartSlice'; // <-- Imported Cart Clearing Logic
+
 import CheckoutAddresses from '../components/checkout/CheckoutAddresses';
 import CheckoutForm from '../components/checkout/CheckoutForm';
 import CheckoutSummary from '../components/checkout/CheckoutSummary';
@@ -22,6 +27,7 @@ const loadRazorpayScript = () => {
 
 const Checkout = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   
   // --- REAL REDUX STATE ---
   const { user, isAuthenticated } = useSelector((state) => state.auth);
@@ -33,6 +39,9 @@ const Checkout = () => {
     guestEmail, 
     deviceId 
   } = useSelector((state) => state.checkout);
+  
+  // Pull addresses from the store
+  const { addresses, loading: addressLoading } = useSelector((state) => state.addresses);
 
   const isGuest = !isAuthenticated;
 
@@ -45,28 +54,42 @@ const Checkout = () => {
     state: '', stateCode: '' 
   });
 
-  // --- HANDOFF 1: Initial Auth Prefill ---
+  // --- HANDOFF 1: Initial Auth Prefill & Fetch Addresses ---
   useEffect(() => {
-    if (user && !isGuest) {
-      setFormData(prev => ({ 
-        ...prev, 
-        email: user.email || '' 
-      }));
+    if (isAuthenticated && !isGuest) {
+      if (user) {
+        setFormData(prev => ({ ...prev, email: user.email || '' }));
+      }
+      dispatch(fetchAddresses());
     }
-  }, [user, isGuest]);
+  }, [user, isGuest, isAuthenticated, dispatch]);
 
-  // --- Address Selection Prefill ---
+  // --- Address Selection Prefill (WITH REVERSE LOOKUP FIX) ---
   const handleAddressSelect = (address) => {
-    setSelectedAddressId(address.id);
+    setSelectedAddressId(address._id); 
+
+    // 1. Reverse lookup the Country Code
+    const allCountries = Country.getAllCountries();
+    const matchedCountry = allCountries.find(c => c.name === address.country) || allCountries.find(c => c.isoCode === 'IN');
+    const safeCountryCode = matchedCountry ? matchedCountry.isoCode : 'IN';
+
+    // 2. Reverse lookup the State Code using the found Country Code
+    const allStates = State.getStatesOfCountry(safeCountryCode);
+    const matchedState = allStates.find(s => s.name === address.state);
+    const safeStateCode = matchedState ? matchedState.isoCode : '';
+
     setFormData(prev => ({
       ...prev,
-      street: address.street,
-      city: address.city,
-      state: address.state,
-      stateCode: address.stateCode || '', 
-      pinCode: address.pinCode,
+      firstName: address.firstName || '',
+      lastName: address.lastName || '',
+      email: address.email || prev.email,
+      street: address.street || '',
+      city: address.city || '',
+      state: address.state || '',
+      stateCode: safeStateCode,       
+      pinCode: address.pinCode || '',
       country: address.country || 'India',
-      countryCode: address.countryCode || 'IN',
+      countryCode: safeCountryCode,   
       phone: address.phone || prev.phone
     }));
   };
@@ -99,20 +122,17 @@ const Checkout = () => {
 
   // --- THE RAZORPAY GATEWAY HANDLER ---
   const handleProceedToPayment = async () => {
-    // 1. Basic Frontend Validation
     if (!formData.street || !formData.city || !formData.state || !formData.firstName || !formData.phone) {
       alert("Please complete all required shipping details before paying.");
       return;
     }
 
-    // 2. Load External SDK
     const isScriptLoaded = await loadRazorpayScript();
     if (!isScriptLoaded) {
       alert("Failed to load Razorpay SDK. Please check your internet connection.");
       return;
     }
 
-    // 3. Construct the strict payload expected by Zod
     const addressPayload = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -128,7 +148,7 @@ const Checkout = () => {
     const orderPayload = {
       items: cartItems.map(item => ({ variantId: item.variantId, quantity: item.quantity })),
       shippingAddress: addressPayload,
-      billingAddress: addressPayload, // Assuming same as shipping for this flow
+      billingAddress: addressPayload, 
       couponCode: appliedCouponCode,
       paymentOption: paymentOption,
       skipAutoApply: skipAutoApply,
@@ -136,13 +156,11 @@ const Checkout = () => {
       deviceId: deviceId || 'browser-fingerprint-fallback'
     };
 
-    // 4. Dispatch Order Creation to Backend
     const resultAction = await dispatch(createRazorpayOrder(orderPayload));
 
     if (createRazorpayOrder.fulfilled.match(resultAction)) {
       const { razorpayOrderId, orderId, amount, currency, keyId } = resultAction.payload;
 
-      // 5. Initialize the Razorpay Window
       const options = {
         key: keyId,
         amount: amount,
@@ -151,7 +169,6 @@ const Checkout = () => {
         description: "Secure Checkout",
         order_id: razorpayOrderId,
         handler: async function (response) {
-          // Payment Succeeded on Gateway -> Verify Cryptographically on Backend
           const verifyPayload = {
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
@@ -162,8 +179,18 @@ const Checkout = () => {
           const verifyAction = await dispatch(verifyRazorpayPayment(verifyPayload));
           
           if (verifyRazorpayPayment.fulfilled.match(verifyAction)) {
-            alert("Payment Verified Successfully! Your order is confirmed.");
-            // Add a redirect here: navigate(`/order-confirmation/${verifyAction.payload.data.orderNumber}`)
+            // 1. WIPE THE CART (GUEST OR USER)
+            if (isGuest) {
+              dispatch(clearLocalCart());
+            } else {
+              dispatch(clearCartDB());
+            }
+
+            // 2. REDIRECT SAFELY
+            const queryParams = isGuest && formData.email ? `?email=${encodeURIComponent(formData.email)}` : "";
+            
+            // We use { replace: true } so the user can't click the "Back" button into an active checkout session
+            navigate(`/track-order/${orderId}${queryParams}`, { replace: true });
           } else {
             alert("Payment verification failed. Please contact support.");
           }
@@ -174,7 +201,7 @@ const Checkout = () => {
           contact: formData.phone
         },
         theme: {
-          color: "#000000"
+          color: "#171410" 
         }
       };
 
@@ -195,7 +222,6 @@ const Checkout = () => {
     <main className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a] pt-[100px] pb-20 selection:bg-[#1a1a1a] selection:text-white">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         
-        {/* Page Header */}
         <div className="mb-12">
           <h1 className="text-3xl font-light tracking-wide">Checkout</h1>
           <p className="text-xs text-gray-500 mt-2 tracking-widest uppercase">Secure Encrypted Transaction</p>
@@ -203,26 +229,27 @@ const Checkout = () => {
 
         <div className="flex flex-col lg:flex-row gap-16 relative">
           
-          {/* LEFT COLUMN: Logistics */}
           <div className="w-full lg:w-[60%] flex flex-col gap-12">
             <CheckoutAddresses 
-              user={user} 
               isGuest={isGuest} 
+              addresses={addresses}
+              loading={addressLoading}
               selectedAddressId={selectedAddressId} 
               onSelect={handleAddressSelect} 
             />
             
-            <hr className="border-black/5" />
+            {(!isGuest && addresses && addresses.length > 0) && (
+               <hr className="border-black/5" />
+            )}
             
             <CheckoutForm 
               formData={formData} 
               onChange={handleFormChange} 
-              setFormData={setFormData} // NEW: Passing the state setter down for complex dropdown logic
+              setFormData={setFormData} 
               isGuest={isGuest} 
             />
           </div>
 
-          {/* RIGHT COLUMN: Sticky Summary */}
           <div className="w-full lg:w-[40%]">
             <div className="sticky top-[120px]">
               <CheckoutSummary 

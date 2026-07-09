@@ -22,6 +22,7 @@ import wishlistRoutes from './routes/common/wishlist.routes.js';
 import checkoutRoutes from './routes/common/checkout.routes.js';
 import regionRoutes from './routes/common/region.routes.js';
 import orderRoutes from './routes/common/order.routes.js';
+import addressRoutes from './routes/common/address.routes.js';
 import webhookRoutes from './routes/common/webhook.routes.js';
 
 const app = express();
@@ -93,6 +94,7 @@ app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/checkout', checkoutRoutes);
 app.use('/api/v1/region', regionRoutes);
 app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/addresses', addressRoutes);
 
 
 // Global Catch-All Error Handler (MANDATORY for preventing server crashes)
