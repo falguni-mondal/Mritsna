@@ -13,10 +13,10 @@ export const inventoryCheck = async (req, res, next) => {
     }
 
     // Enforce the business logic limit of 5 per order
-    if (quantity <= 0 || quantity > 5) {
+    if (quantity <= 0 || quantity > 3) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid quantity. You can only order between 1 and 5 items.'
+        message: 'Invalid quantity. You can only order between 1 and 3 items.'
       });
     }
 
@@ -63,7 +63,7 @@ export const inventoryCheck = async (req, res, next) => {
       productId,
       variantId,
       quantity,
-      price: liveFinalPrice, // <-- Now passing the correct discounted price
+      price: liveFinalPrice,
       discountPercentage: discount,
       availableStock: stockAvailable
     };

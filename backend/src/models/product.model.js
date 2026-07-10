@@ -190,6 +190,19 @@ const productSchema = new mongoose.Schema({
     required: [true, 'A product must have at least one variant.']
   },
 
+  // --- REVIEWS & RATINGS CACHE ---
+  averageRating: {
+    type: Number,
+    default: 0,
+    min: [0, 'Rating cannot be below 0'],
+    max: [5, 'Rating cannot exceed 5']
+  },
+  totalReviews: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+
   // SEO & State
   seo: {
     metaTitle: { type: String },

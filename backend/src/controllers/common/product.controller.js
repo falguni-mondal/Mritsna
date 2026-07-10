@@ -36,7 +36,9 @@ export const getNewArrivals = async (req, res, next) => {
         originalPrice: localizedPricing.originalPrice, 
         finalPrice: localizedPricing.sellingPrice,      
         img: firstImage.baseUrl || null, 
-        altText: firstImage.altText || product.title
+        altText: firstImage.altText || product.title,
+        totalReviews: product.totalReviews || 0,
+        averageRating: product.averageRating || 0,
       };
     });
 
@@ -133,7 +135,9 @@ export const getPaginatedProducts = async (req, res, next) => {
         finalPrice: localizedPricing.sellingPrice,      
         discount: localizedPricing.discountPercentage,
         img: firstImage.baseUrl || null,
-        altText: firstImage.altText || product.title
+        altText: firstImage.altText || product.title,
+        totalReviews: product.totalReviews || 0,
+        averageRating: product.averageRating || 0,
       };
     });
 
@@ -231,7 +235,9 @@ export const getSingleProduct = async (req, res, next) => {
       dimensions: formattedDimensions,
       variants: formattedVariants,
       currencySymbol: regionData.symbol,
-      currencyCode: regionData.currencyCode
+      currencyCode: regionData.currencyCode,
+      totalReviews: product.totalReviews,
+      averageRating: product.averageRating,
     };
 
     return res.status(200).json({
@@ -306,7 +312,9 @@ export const searchProducts = async (req, res, next) => {
         originalPrice: localizedPricing.originalPrice, 
         finalPrice: localizedPricing.sellingPrice,      
         img: firstImage.baseUrl || null,
-        altText: firstImage.altText || product.title
+        altText: firstImage.altText || product.title,
+        totalReviews: product.totalReviews,
+        averageRating: product.averageRating,
       };
     });
 

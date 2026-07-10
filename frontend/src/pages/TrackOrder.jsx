@@ -106,10 +106,13 @@ const TrackOrder = () => {
     e.preventDefault();
     dispatch(clearOrderErrors());
     
-    if (isAuthenticated && inputOrderId.length === 24) {
-      dispatch(fetchUserOrderDetails(inputOrderId));
+    const cleanOrderId = inputOrderId.trim();
+    const cleanEmail = inputEmail.trim().toLowerCase();
+
+    if (isAuthenticated && cleanOrderId.length === 24) {
+      dispatch(fetchUserOrderDetails(cleanOrderId));
     } else {
-      dispatch(trackPublicOrder({ orderNumber: inputOrderId, email: inputEmail }));
+      dispatch(trackPublicOrder({ orderNumber: cleanOrderId, email: cleanEmail }));
     }
   };
 

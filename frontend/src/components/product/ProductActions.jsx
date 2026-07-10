@@ -42,7 +42,7 @@ const ProductActions = ({ product, activeVariant }) => {
   const qtyDebounceTimer = useRef(null);
 
   const { inStock, stockQuantity } = activeVariant;
-  const maxLimit = stockQuantity !== undefined ? Math.min(5, stockQuantity) : 5;
+  const maxLimit = (inStock && stockQuantity <= 0) ? 3 : Math.min(3, stockQuantity);
 
   useEffect(() => {
     setQuantity(1);

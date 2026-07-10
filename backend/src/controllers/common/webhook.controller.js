@@ -69,7 +69,6 @@ export const handleRazorpayWebhook = async (req, res) => {
     const signature = req.headers["x-razorpay-signature"];
     const payloadString = req.body.toString("utf8");
 
-    // Cryptographic Verification
     const expectedSignature = crypto
       .createHmac("sha256", webhookSecret)
       .update(payloadString)
@@ -82,7 +81,6 @@ export const handleRazorpayWebhook = async (req, res) => {
 
     const payload = JSON.parse(payloadString);
 
-    // Process Successful Payment Event
     if (payload.event === "order.paid" || payload.event === "payment.captured") {
       const paymentEntity = payload.payload.payment.entity;
       const razorpayOrderId = paymentEntity.order_id; 
@@ -94,12 +92,10 @@ export const handleRazorpayWebhook = async (req, res) => {
         return res.status(200).send("Order not found, but acknowledged.");
       }
 
-      // Prevent processing the same webhook twice
       if (order.paymentStatus !== "Pending") {
         return res.status(200).send("Order already processed.");
       }
 
-      // Update Order Status
       order.paymentStatus = order.paymentOption === "PARTIAL_COD" ? "Partially Paid" : "Completed";
       order.orderStatus = "Confirmed";
       order.paidAt = new Date();
@@ -107,26 +103,37 @@ export const handleRazorpayWebhook = async (req, res) => {
 
       console.log(`[Payment Webhook] Order ${order.orderNumber} confirmed successfully.`);
 
-      // --- DISPATCH HIGH-END RECEIPT & TRACKING EMAIL ---
       const customerEmail = order.isGuestCheckout ? order.guestEmail : order.shippingAddress.email;
       const customerName = order.shippingAddress.firstName;
       
       const baseUrl = process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : 'http://localhost:5173';
       const queryParams = order.isGuestCheckout && order.guestEmail ? `?email=${encodeURIComponent(customerEmail)}` : "";
-      const trackingLink = `${baseUrl}/track-order/${order._id}${queryParams}`;
+      const trackingLink = `${baseUrl}/track-order/${order.orderNumber}${queryParams}`;
+
+      const formatCurrency = (amount, currencyCode) => {
+        const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+        return new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode, maximumFractionDigits: 2 }).format(amount);
+      };
+
+      const getSafeImage = (url) => {
+        if (!url) return '';
+        const encodedUrl = encodeURI(url);
+        return encodedUrl.includes('?') ? `${encodedUrl}&tr=f-jpg,w-200` : `${encodedUrl}?tr=f-jpg,w-200`;
+      };
 
       const itemsHtml = order.items.map(item => `
         <tr style="border-bottom: 1px solid #EEEEEE;">
           <td style="padding: 15px 0; width: 70px;">
-            <img src="${item.img}" alt="${item.title}" style="width: 55px; height: 70px; object-fit: cover; border-radius: 2px; background-color: #f8f8f8;" />
+            <img src="${getSafeImage(item.img)}" alt="${item.title}" style="display: block; width: 55px; height: 70px; object-fit: cover; border-radius: 2px; background-color: #f8f8f8;" />
           </td>
           <td style="padding: 15px 10px; vertical-align: top;">
             <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: #111111;">${item.title}</p>
+            <p style="margin: 0 0 3px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888888;">SKU: ${item.sku || 'N/A'}</p>
             <p style="margin: 0 0 3px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888888;">Color: ${item.colorName}</p>
             <p style="margin: 0; font-size: 11px; color: #888888;">Qty: ${item.quantity}</p>
           </td>
           <td style="padding: 15px 0; vertical-align: top; text-align: right; font-weight: 500; font-size: 13px; color: #111111;">
-            ${order.paymentCurrency} ${Math.round(item.itemTotal)}
+            ${formatCurrency(item.itemTotal, order.paymentCurrency)}
           </td>
         </tr>
       `).join('');
@@ -147,7 +154,9 @@ export const handleRazorpayWebhook = async (req, res) => {
             ${itemsHtml}
             <tr>
               <td colspan="2" style="padding: 15px 10px; text-align: right; font-size: 11px; color: #888888; text-transform: uppercase; letter-spacing: 1px;">Paid Today</td>
-              <td style="padding: 15px 0; text-align: right; font-weight: bold; font-size: 15px; color: #111111;">${order.paymentCurrency} ${order.paymentAmount}</td>
+              <td style="padding: 15px 0; text-align: right; font-weight: bold; font-size: 15px; color: #111111;">
+                ${formatCurrency(order.paymentAmount, order.paymentCurrency)}
+              </td>
             </tr>
           </table>
 
@@ -163,18 +172,16 @@ export const handleRazorpayWebhook = async (req, res) => {
         </div>
       `;
 
-      // 1. Dispatch to Customer
       sendEmail({
         to: customerEmail,
         subject: `Order Confirmed: ${order.orderNumber}`,
         html: emailHtml,
       }).catch(err => console.error("[Customer Email Error]:", err));
 
-      // 2. Dispatch to Admin (Silent CC)
       if (process.env.ADMIN_MAIL) {
         sendEmail({
           to: process.env.ADMIN_MAIL,
-          subject: `🚨 NEW ORDER ALERT: ${order.orderNumber} - ${order.paymentCurrency} ${order.paymentAmount}`,
+          subject: `🚨 NEW ORDER: ${order.orderNumber} - ${order.paymentCurrency} ${order.paymentAmount}`,
           html: emailHtml,
         }).catch(err => console.error("[Admin Email Error]:", err));
       }

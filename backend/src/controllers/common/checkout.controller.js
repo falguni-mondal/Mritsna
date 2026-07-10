@@ -37,10 +37,6 @@ const getGSTRate = (hsnCode) => {
   return hsnMap["DEFAULT"].rate;
 };
 
-/**
- * Core Math & Validation Engine
- * Dynamically handles inventory safety, coupon logic, HSN item taxation, and Export Markups.
- */
 const processCheckoutMath = async (
   items,
   country,
@@ -68,9 +64,11 @@ const processCheckoutMath = async (
 
     const variant = product.variants.id(item.variantId);
 
-    if (variant.inventory.quantity < item.quantity) {
+    const isAvailable = variant.inventory.quantity >= item.quantity || variant.inventory.allowBackorder === true;
+    
+    if (!isAvailable) {
       throw new Error(
-        `Insufficient stock for ${product.title} - ${variant.colorName}`,
+        `Insufficient stock for ${product.title} - ${variant.colorName}`
       );
     }
 
@@ -87,6 +85,7 @@ const processCheckoutMath = async (
     validatedItems.push({
       product: product._id,
       variantId: variant._id,
+      sku: variant.sku || product.sku || 'N/A',
       hsnCode: product.pricing.hsnCode,
       title: product.title,
       colorName: variant.colorName,
@@ -247,7 +246,6 @@ const processCheckoutMath = async (
   const now = new Date();
 
   if (couponCode) {
-    // FIX: Check startDate and expiryDate
     const manualCoupon = await Coupon.findOne({
       code: couponCode.toUpperCase(),
       isActive: true,
@@ -266,7 +264,6 @@ const processCheckoutMath = async (
     appliedEligibleItemIds = evaluation.eligibleItemIds;
     appliedEligibleSubTotal = evaluation.eligibleSubTotal;
   } else if (!skipAutoApply) {
-    // FIX: Check startDate and expiryDate
     const autoCoupons = await Coupon.find({
       isActive: true,
       isAutoApply: true,
@@ -372,7 +369,6 @@ const processCheckoutMath = async (
   let advancePaid = grandTotal;
   let balanceDueOnDelivery = 0;
 
-  // FIX: Strict Parsing ensures partial COD string matches exactly
   const strictPaymentOption = paymentOption
     ? paymentOption.toString().trim().toUpperCase()
     : "FULL_ONLINE";
@@ -412,11 +408,11 @@ export const calculateCheckoutTotals = async (req, res) => {
       paymentOption,
       skipAutoApply,
       guestEmail,
-      deviceId,
     } = req.body;
     const userId = req.user;
 
-    // FIX: Strict formatting applied before pushing into the math engine
+    const deviceId = req.cookies.device_id || req.body.deviceId;
+
     const safePaymentOption = paymentOption
       ? paymentOption.toString().trim().toUpperCase()
       : "FULL_ONLINE";
@@ -478,12 +474,11 @@ export const createRazorpayOrder = async (req, res) => {
       paymentOption,
       skipAutoApply,
       guestEmail,
-      deviceId,
     } = req.body;
     const userId = req.user;
+    const deviceId = req.cookies.device_id || req.body.deviceId;
     const isGuestCheckout = !userId;
 
-    // FIX: Strict formatting applied before pushing into the math engine
     const safePaymentOption = paymentOption
       ? paymentOption.toString().trim().toUpperCase()
       : "FULL_ONLINE";
@@ -602,7 +597,6 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid payment signature" });
     }
 
-    // Only process if it hasn't been processed by the webhook already
     if (pendingOrder.paymentStatus === "Pending") {
       const finalPaymentStatus = pendingOrder.paymentOption === "PARTIAL_COD" ? "Partially Paid" : "Completed";
 
@@ -627,28 +621,44 @@ export const verifyRazorpayPayment = async (req, res) => {
       );
       await Promise.all(inventoryUpdates);
 
-      // --- DISPATCH HIGH-END RECEIPT & TRACKING EMAIL ---
+      // --- EMAIL ENGINE ---
       const customerEmail = confirmedOrder.isGuestCheckout ? confirmedOrder.guestEmail : confirmedOrder.shippingAddress.email;
       const customerName = confirmedOrder.shippingAddress.firstName;
       
-      // Determine dynamic tracking link
       const baseUrl = process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : 'http://localhost:5173';
       const queryParams = confirmedOrder.isGuestCheckout && confirmedOrder.guestEmail ? `?email=${encodeURIComponent(customerEmail)}` : "";
-      const trackingLink = `${baseUrl}/track-order/${confirmedOrder._id}${queryParams}`;
+      const trackingLink = `${baseUrl}/track-order/${confirmedOrder.orderNumber}${queryParams}`;
 
-      // Build product list HTML
+      // Currency Formatter
+      const formatCurrency = (amount, currencyCode) => {
+        const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+        return new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency: currencyCode,
+          maximumFractionDigits: 2
+        }).format(amount);
+      };
+
+      // Ensure URL is safe for Email Clients
+      const getSafeImage = (url) => {
+        if (!url) return '';
+        const encodedUrl = encodeURI(url);
+        return encodedUrl.includes('?') ? `${encodedUrl}&tr=f-jpg,w-200` : `${encodedUrl}?tr=f-jpg,w-200`;
+      };
+
       const itemsHtml = confirmedOrder.items.map(item => `
         <tr style="border-bottom: 1px solid #EEEEEE;">
           <td style="padding: 15px 0; width: 70px;">
-            <img src="${item.img}" alt="${item.title}" style="width: 55px; height: 70px; object-fit: cover; border-radius: 2px; background-color: #f8f8f8;" />
+            <img src="${getSafeImage(item.img)}" alt="${item.title}" style="display: block; width: 55px; height: 70px; object-fit: cover; border-radius: 2px; background-color: #f8f8f8;" />
           </td>
           <td style="padding: 15px 10px; vertical-align: top;">
             <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: #111111;">${item.title}</p>
+            <p style="margin: 0 0 3px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888888;">SKU: ${item.sku || 'N/A'}</p>
             <p style="margin: 0 0 3px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888888;">Color: ${item.colorName}</p>
             <p style="margin: 0; font-size: 11px; color: #888888;">Qty: ${item.quantity}</p>
           </td>
           <td style="padding: 15px 0; vertical-align: top; text-align: right; font-weight: 500; font-size: 13px; color: #111111;">
-            ${confirmedOrder.paymentCurrency} ${Math.round(item.itemTotal)}
+            ${formatCurrency(item.itemTotal, confirmedOrder.paymentCurrency)}
           </td>
         </tr>
       `).join('');
@@ -669,7 +679,9 @@ export const verifyRazorpayPayment = async (req, res) => {
             ${itemsHtml}
             <tr>
               <td colspan="2" style="padding: 15px 10px; text-align: right; font-size: 11px; color: #888888; text-transform: uppercase; letter-spacing: 1px;">Paid Today</td>
-              <td style="padding: 15px 0; text-align: right; font-weight: bold; font-size: 15px; color: #111111;">${confirmedOrder.paymentCurrency} ${confirmedOrder.paymentAmount}</td>
+              <td style="padding: 15px 0; text-align: right; font-weight: bold; font-size: 15px; color: #111111;">
+                ${formatCurrency(confirmedOrder.paymentAmount, confirmedOrder.paymentCurrency)}
+              </td>
             </tr>
           </table>
 
@@ -685,19 +697,17 @@ export const verifyRazorpayPayment = async (req, res) => {
         </div>
       `;
 
-      // 1. Dispatch to Customer
       sendEmail({
         to: customerEmail,
         subject: `Order Confirmed: ${confirmedOrder.orderNumber}`,
         html: emailHtml,
       }).catch(err => console.error("[Customer Email Error]:", err));
 
-      // 2. Dispatch to Admin (Silent CC)
       if (process.env.ADMIN_MAIL) {
         sendEmail({
           to: process.env.ADMIN_MAIL,
-          subject: `🚨 NEW ORDER ALERT: ${confirmedOrder.orderNumber} - ${confirmedOrder.paymentCurrency} ${confirmedOrder.paymentAmount}`,
-          html: emailHtml, // Sends exact same receipt layout to admin
+          subject: `🚨 NEW ORDER: ${confirmedOrder.orderNumber} - ${confirmedOrder.paymentCurrency} ${confirmedOrder.paymentAmount}`,
+          html: emailHtml,
         }).catch(err => console.error("[Admin Email Error]:", err));
       }
     }

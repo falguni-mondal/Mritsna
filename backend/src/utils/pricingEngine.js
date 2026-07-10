@@ -1,12 +1,3 @@
-/**
- * Core Pricing Engine for Mritsna
- * Handles domestic vs international pricing tiers, discounts, and currency conversion.
- * * @param {Number} basePriceINR - The original price set by admin in INR
- * @param {Number} discountPercentage - The discount percentage (e.g., 10 for 10%)
- * @param {Boolean} isPremium - Flag to determine if it gets the 10k or 5k export markup
- * @param {Object} regionData - The region object attached by regionMiddleware
- * @returns {Object} - Formatted pricing package for the frontend
- */
 export const calculateRegionalPricing = (basePriceINR, discountPercentage = 0, isPremium = false, regionData) => {
     // Calculate the true selling price in INR first (Base - Discount)
     let sellingPriceINR = basePriceINR;

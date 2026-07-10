@@ -179,7 +179,7 @@ const Checkout = () => {
           const verifyAction = await dispatch(verifyRazorpayPayment(verifyPayload));
           
           if (verifyRazorpayPayment.fulfilled.match(verifyAction)) {
-            // 1. WIPE THE CART (GUEST OR USER)
+            // 1. WIPE THE CART
             if (isGuest) {
               dispatch(clearLocalCart());
             } else {
@@ -187,10 +187,13 @@ const Checkout = () => {
             }
 
             // 2. REDIRECT SAFELY
-            const queryParams = isGuest && formData.email ? `?email=${encodeURIComponent(formData.email)}` : "";
+            const confirmedOrderNumber = verifyAction.payload.data.orderNumber;
             
-            // We use { replace: true } so the user can't click the "Back" button into an active checkout session
-            navigate(`/track-order/${orderId}${queryParams}`, { replace: true });
+            const trackingId = isGuest ? confirmedOrderNumber : orderId; 
+
+            const queryParams = isGuest && formData.email ? `?email=${encodeURIComponent(formData.email.toLowerCase())}` : "";
+            
+            navigate(`/track-order/${trackingId}${queryParams}`, { replace: true });
           } else {
             alert("Payment verification failed. Please contact support.");
           }

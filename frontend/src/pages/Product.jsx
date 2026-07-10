@@ -12,6 +12,7 @@ import ProductInfo from "../components/product/ProductInfo";
 import ProductSwatches from "../components/product/ProductSwatches";
 import ProductActions from "../components/product/ProductActions";
 import ProductAccordion from "../components/product/ProductAccordion";
+import ProductReviews from "../components/product/ProductReviews";
 
 const Product = () => {
   const { slug } = useParams();
@@ -141,6 +142,7 @@ const Product = () => {
         </div>
 
       </div>
+      <ProductReviews product={product} />
     </main>
   );
 };

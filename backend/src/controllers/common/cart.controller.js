@@ -25,15 +25,17 @@ export const checkStock = async (req, res, next) => {
     }
 
     const variant = product.variants[0];
-    const availableStock = variant.inventory.quantity;
-    const isAvailable = requestedQuantity <= availableStock || variant.inventory.allowBackorder;
+    const physicalStock = variant.inventory.quantity;
+    const isAvailable = requestedQuantity <= physicalStock || variant.inventory.allowBackorder;
+
+    const effectiveStock = variant.inventory.allowBackorder ? 3 : physicalStock;
 
     return res.status(200).json({
       success: true,
       data: {
-        availableStock,
+        availableStock: effectiveStock,
         isAvailable,
-        message: isAvailable ? 'In stock' : `Only ${availableStock} left in stock`
+        message: isAvailable ? 'In stock' : `Only ${physicalStock} left in stock`
       }
     });
   } catch (error) {
@@ -111,11 +113,11 @@ export const getCart = async (req, res, next) => {
         title: cartItem.product.title,
         colorName: activeVariant.colorName,
         img: activeVariant.images.find(img => img.isPrimary)?.baseUrl || activeVariant.images[0]?.baseUrl,
-        price: localizedPricing.sellingPrice, // Perfect dynamic price
+        price: localizedPricing.sellingPrice, 
         originalPrice: localizedPricing.originalPrice, 
         quantity: cartItem.quantity,
         itemTotal: itemTotalConverted, 
-        maxLimit: Math.min(5, activeVariant.inventory.quantity)
+        maxLimit: activeVariant.inventory.allowBackorder ? 3 : Math.min(3, activeVariant.inventory.quantity)
       };
     }).filter(item => item !== null); 
 
@@ -168,10 +170,10 @@ export const hydrateGuestCart = async (req, res, next) => {
       if (!activeVariant) continue;
 
       // Enforce absolute maximum limits based on DB inventory
-      const maxAllowed = Math.min(5, activeVariant.inventory.quantity);
+      const maxAllowed = activeVariant.inventory.allowBackorder ? 3 : Math.min(3, activeVariant.inventory.quantity);
       const safeQuantity = Math.min(item.quantity, maxAllowed);
 
-      if (safeQuantity <= 0 && !activeVariant.inventory.allowBackorder) continue; // Out of stock
+      if (safeQuantity <= 0 && !activeVariant.inventory.allowBackorder) continue;
 
       // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
@@ -236,7 +238,7 @@ export const addToCart = async (req, res, next) => {
 
     if (existingItemIndex > -1) {
       const newQuantity = cart.items[existingItemIndex].quantity + quantity;
-      cart.items[existingItemIndex].quantity = Math.min(newQuantity, 5, availableStock);
+      cart.items[existingItemIndex].quantity = Math.min(newQuantity, 3, availableStock);
     } else {
       cart.items.push({
         product: productId,
@@ -354,15 +356,18 @@ export const syncCart = async (req, res, next) => {
           const existingItemIndex = cart.items.findIndex(
             i => i.variantId.toString() === localItem.variantId.toString()
           );
+          
+          // FIX: Calculate effective stock for syncing bounds
+          const effectiveStock = variant.inventory.allowBackorder ? 3 : dbStock;
 
           if (existingItemIndex > -1) {
             const combinedQty = cart.items[existingItemIndex].quantity + localItem.quantity;
-            cart.items[existingItemIndex].quantity = Math.min(combinedQty, 5, dbStock);
+            cart.items[existingIndex].quantity = Math.min(combinedQty, 3, effectiveStock);
           } else {
             cart.items.push({
               product: localItem.productId,
               variantId: localItem.variantId,
-              quantity: Math.min(localItem.quantity, 5, dbStock),
+              quantity: Math.min(localItem.quantity, 3, effectiveStock),
             });
           }
         }

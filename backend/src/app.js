@@ -14,6 +14,7 @@ import adminCartRoutes from './routes/admin/admin.cart.routes.js';
 import adminWishlistRoutes from './routes/admin/admin.wishlist.routes.js';
 import adminCouponRoutes from './routes/admin/admin.coupon.routes.js';
 import adminOrderRoutes from './routes/admin/admin.order.routes.js';
+import adminReviewRoutes from './routes/admin/admin.review.routes.js';
 
 import authRouter from "./routes/common/auth.routes.js";
 import productRoutes from './routes/common/product.routes.js';
@@ -24,6 +25,7 @@ import regionRoutes from './routes/common/region.routes.js';
 import orderRoutes from './routes/common/order.routes.js';
 import addressRoutes from './routes/common/address.routes.js';
 import webhookRoutes from './routes/common/webhook.routes.js';
+import reviewRoutes from './routes/common/review.routes.js';
 
 const app = express();
 
@@ -85,6 +87,7 @@ app.use('/api/v1/admin/carts', adminCartRoutes);
 app.use('/api/v1/admin/wishlists', adminWishlistRoutes);
 app.use('/api/v1/admin/coupons', adminCouponRoutes);
 app.use('/api/v1/admin/orders', adminOrderRoutes);
+app.use('/api/v1/admin/reviews', adminReviewRoutes);
 
 //  public routes
 app.use("/api/v1/auth", authRouter);
@@ -95,6 +98,7 @@ app.use('/api/v1/checkout', checkoutRoutes);
 app.use('/api/v1/region', regionRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/addresses', addressRoutes);
+app.use('/api/v1/reviews', reviewRoutes);
 
 
 // Global Catch-All Error Handler (MANDATORY for preventing server crashes)

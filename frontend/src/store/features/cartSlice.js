@@ -64,7 +64,7 @@ export const fetchUserCart = createAsyncThunk(
   }
 );
 
-// NEW: Hydrate Cart for Guest Users
+// Hydrate Cart for Guest Users
 // Takes the dumb IDs from localStorage and gets the live math from the backend
 export const hydrateGuestCartAPI = createAsyncThunk(
   'cart/hydrateGuestCartAPI',
@@ -103,6 +103,7 @@ export const updateCartQuantityDB = createAsyncThunk(
   async (cartData, { dispatch, rejectWithValue }) => {
     try {
       await userAxios.put('/cart/update', cartData);
+      // We still fetch the cart after updating DB to ensure perfect sync
       dispatch(fetchUserCart());
       return true;
     } catch (error) {
@@ -129,7 +130,7 @@ export const clearCartDB = createAsyncThunk(
   'cart/clearCartDB',
   async (_, { dispatch, rejectWithValue }) => {
     try {
-      await userAxios.delete('/cart/clear'); // Adjust route if your clear route differs (e.g., POST /cart/clear)
+      await userAxios.delete('/cart/clear'); 
       dispatch(fetchUserCart());
       return true;
     } catch (error) {
@@ -160,14 +161,23 @@ export const syncGuestCartToDB = createAsyncThunk(
 
 
 // ==========================================
-// REDUX SLICE
+// REDUX SLICE & INSTANT MATH ENGINE
 // ==========================================
 
+// --- THE INSTANT FRONTEND MATH ENGINE ---
+// This safely recalculates totals using the backend-provided prices already cached in state.
+const recalculateLocalMath = (state) => {
+  state.subTotal = state.items.reduce((total, item) => {
+    const itemPrice = item.price || 0; 
+    item.itemTotal = itemPrice * item.quantity;
+    return total + item.itemTotal;
+  }, 0);
+};
+
 const initialState = {
-  // We initialize with empty values because we must wait for the hydration API to run
   items: [],
   subTotal: 0,
-  isLoading: false, // Will turn true on mount if there are IDs to hydrate
+  isLoading: false, 
   isError: false,
   message: '',
   currencySymbol: '₹',
@@ -178,20 +188,21 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
-    // We update local state optimistically, save the dumb IDs to storage, 
-    // but the actual visual data will be handled by the UI or a subsequent hydration call.
     addLocalItem: (state, action) => {
       const newItem = action.payload;
       const existingIndex = state.items.findIndex(item => item.variantId === newItem.variantId);
 
       if (existingIndex > -1) {
         const combinedQty = state.items[existingIndex].quantity + newItem.quantity;
-        state.items[existingIndex].quantity = Math.min(combinedQty, 5, newItem.maxLimit || 5);
+        // Strict fallback to prevent JS zero bug
+        const limit = newItem.maxLimit !== undefined ? newItem.maxLimit : 5;
+        state.items[existingIndex].quantity = Math.min(combinedQty, 5, limit);
       } else {
         state.items.push(newItem);
       }
 
       saveGuestCartIds(state.items);
+      recalculateLocalMath(state); // Fire instant math
     },
 
     updateLocalQuantity: (state, action) => {
@@ -201,6 +212,7 @@ const cartSlice = createSlice({
       if (existingItem) {
         existingItem.quantity = quantity;
         saveGuestCartIds(state.items);
+        recalculateLocalMath(state); // Fire instant math
       }
     },
 
@@ -208,13 +220,13 @@ const cartSlice = createSlice({
       const variantId = action.payload;
       state.items = state.items.filter(item => item.variantId !== variantId);
       saveGuestCartIds(state.items);
+      recalculateLocalMath(state); // Fire instant math
     },
 
     clearLocalCart: (state) => {
       state.items = [];
       state.subTotal = 0;
       localStorage.removeItem('guest_cart_ids');
-      // Also clean up the old storage key just in case a returning user has it
       localStorage.removeItem('guest_cart'); 
     },
 
@@ -257,7 +269,6 @@ const cartSlice = createSlice({
       .addCase(hydrateGuestCartAPI.fulfilled, handleCartFulfilled)
       .addCase(hydrateGuestCartAPI.rejected, (state, action) => {
         state.isLoading = false;
-        // Don't show a massive error if hydration fails, just leave it empty to prevent crashing
         console.error("Hydration failed:", action.payload); 
       })
 
