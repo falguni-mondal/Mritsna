@@ -10,7 +10,7 @@ const ProductAccordion = ({ product, variant }) => {
     ...(variant?.material && { "Material": variant.material }),
     ...(variant?.finish && { "Finish": variant.finish }),
     "Care": "Hand wash recommended. Do not microwave.",
-    "Shipping": "Free shipping on orders over ₹5,000. Ships within 3-5 business days."
+    "Shipping": "Free shipping on every order. Ships within 5-7 business days."
   };
 
   return (

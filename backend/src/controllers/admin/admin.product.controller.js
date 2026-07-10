@@ -2,9 +2,7 @@ import Product from '../../models/product.model.js';
 import slugify from 'slugify';
 import imagekit, { deleteImageKitFile } from '../../utils/imagekit.js';
 
-/**
- * Generate a unique slug for SEO
- */
+
 const generateUniqueSlug = async (title) => {
   const baseSlug = slugify(title, { lower: true, strict: true });
   let uniqueSlug = baseSlug;

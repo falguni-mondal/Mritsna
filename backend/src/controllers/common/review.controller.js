@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Review from '../../models/review.model.js';
 import Order from '../../models/order.model.js';
 import Product from '../../models/product.model.js';
+import imagekit, { deleteImageKitFile } from '../../utils/imagekit.js';
 
 export const checkEligibility = async (req, res, next) => {
   try {
@@ -46,11 +47,17 @@ export const checkEligibility = async (req, res, next) => {
     // Extract the specific item details to prefill the color variant
     const purchasedItem = matchingOrder.items.find(item => item.product.toString() === productId);
 
+    // Fetch the product to grab the exact SKU for that specific color variant
+    const productData = await Product.findById(productId).lean();
+    const matchedVariant = productData.variants?.find(v => v.colorName === purchasedItem.colorName);
+    const sku = matchedVariant ? matchedVariant.sku : (productData.variants?.[0]?.sku || 'unknown-sku');
+
     return res.status(200).json({
       success: true,
       eligibility: 'CAN_REVIEW',
       orderId: matchingOrder._id,
       colorName: purchasedItem.colorName,
+      sku: sku, // Sent to frontend for the ImageKit folder path
       guestName: matchingOrder.shippingAddress.firstName,
       guestEmail: matchingOrder.shippingAddress.email
     });
@@ -149,5 +156,37 @@ export const getProductReviews = async (req, res, next) => {
   } catch (error) {
     console.error("[Get Product Reviews Error]:", error);
     return res.status(500).json({ success: false, message: "Failed to fetch reviews" });
+  }
+};
+
+// ==========================================
+// IMAGEKIT CONTROLLERS
+// ==========================================
+
+export const getImageKitAuth = (req, res) => {
+  try {
+    const result = imagekit.getAuthenticationParameters();
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("ImageKit Auth Error:", error);
+    res.status(500).json({ success: false, message: "Failed to generate ImageKit signature" });
+  }
+};
+
+export const deleteImageKitFileRoute = async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    if (!fileId) {
+      return res.status(400).json({ success: false, message: "File ID is required" });
+    }
+
+    // Delegate to the utility function
+    await deleteImageKitFile(fileId);
+    
+    res.status(200).json({ success: true, message: "Image deletion process completed" });
+  } catch (error) {
+    console.error("ImageKit Delete Route Error:", error);
+    res.status(500).json({ success: false, message: "Server error during image deletion" });
   }
 };
