@@ -14,7 +14,6 @@ export const checkEligibility = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid product ID' });
     }
 
-    // 1. Check if they already reviewed this product
     const query = userId ? { product: productId, user: userId } : { product: productId, deviceId, isAdminGenerated: false };
     const existingReview = await Review.findOne(query);
 
@@ -26,14 +25,12 @@ export const checkEligibility = async (req, res, next) => {
       });
     }
 
-    // 2. Check if they actually bought it and it was delivered
     const orderQuery = {
       orderStatus: 'Delivered',
       'items.product': productId,
       ...(userId ? { user: userId } : { deviceId })
     };
 
-    // Sort by newest order first in case they bought it multiple times
     const matchingOrder = await Order.findOne(orderQuery).sort({ createdAt: -1 }).lean();
 
     if (!matchingOrder) {
@@ -44,10 +41,7 @@ export const checkEligibility = async (req, res, next) => {
       });
     }
 
-    // Extract the specific item details to prefill the color variant
     const purchasedItem = matchingOrder.items.find(item => item.product.toString() === productId);
-
-    // Fetch the product to grab the exact SKU for that specific color variant
     const productData = await Product.findById(productId).lean();
     const matchedVariant = productData.variants?.find(v => v.colorName === purchasedItem.colorName);
     const sku = matchedVariant ? matchedVariant.sku : (productData.variants?.[0]?.sku || 'unknown-sku');
@@ -57,7 +51,7 @@ export const checkEligibility = async (req, res, next) => {
       eligibility: 'CAN_REVIEW',
       orderId: matchingOrder._id,
       colorName: purchasedItem.colorName,
-      sku: sku, // Sent to frontend for the ImageKit folder path
+      sku: sku,
       guestName: matchingOrder.shippingAddress.firstName,
       guestEmail: matchingOrder.shippingAddress.email
     });
@@ -74,7 +68,6 @@ export const addReview = async (req, res, next) => {
     const userId = req.user;
     const deviceId = req.cookies.device_id;
 
-    // Double check eligibility to prevent API abuse
     const query = userId ? { product: productId, user: userId } : { product: productId, deviceId, isAdminGenerated: false };
     const existingReview = await Review.findOne(query);
 
@@ -110,17 +103,56 @@ export const addReview = async (req, res, next) => {
   }
 };
 
+// NEW: Update Review Controller
+export const updateReview = async (req, res, next) => {
+  try {
+    const { reviewId } = req.params;
+    const { rating, comment, images } = req.body;
+    const userId = req.user;
+    const deviceId = req.cookies.device_id;
+
+    const review = await Review.findById(reviewId);
+
+    if (!review) {
+      return res.status(404).json({ success: false, message: 'Review not found.' });
+    }
+
+    // Verify ownership
+    const isOwner = userId ? (review.user?.toString() === userId.toString()) : (review.deviceId === deviceId && !review.isAdminGenerated);
+    
+    if (!isOwner) {
+      return res.status(403).json({ success: false, message: 'You are not authorized to edit this review.' });
+    }
+
+    // Update fields and reset status to pending for safety
+    review.rating = rating;
+    review.comment = comment;
+    review.images = images || [];
+    review.status = 'pending';
+
+    await review.save();
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Review updated successfully and is pending approval.',
+      review
+    });
+
+  } catch (error) {
+    console.error("[Update Review Error]:", error);
+    return res.status(500).json({ success: false, message: "Failed to update review" });
+  }
+};
+
 export const getProductReviews = async (req, res, next) => {
   try {
     const { slug } = req.params;
     const userId = req.user;
     const deviceId = req.cookies.device_id;
 
-    // First find the product to get its exact ID
     const product = await Product.findOne({ slug }).select('_id').lean();
     if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
-    // The Magic Query: Get all approved OR get my specific pending review
     const authConditions = [];
     if (userId) authConditions.push({ user: userId });
     if (deviceId) authConditions.push({ deviceId });
@@ -134,11 +166,10 @@ export const getProductReviews = async (req, res, next) => {
     };
 
     const reviews = await Review.find(filter)
-      .sort({ createdAt: -1 }) // Newest first
+      .sort({ createdAt: -1 })
       .populate('user', 'firstName lastName') 
       .lean();
 
-    // Clean up the output names securely
     const formattedReviews = reviews.map(rev => ({
       _id: rev._id,
       rating: rev.rating,
@@ -159,10 +190,6 @@ export const getProductReviews = async (req, res, next) => {
   }
 };
 
-// ==========================================
-// IMAGEKIT CONTROLLERS
-// ==========================================
-
 export const getImageKitAuth = (req, res) => {
   try {
     const result = imagekit.getAuthenticationParameters();
@@ -181,7 +208,6 @@ export const deleteImageKitFileRoute = async (req, res) => {
       return res.status(400).json({ success: false, message: "File ID is required" });
     }
 
-    // Delegate to the utility function
     await deleteImageKitFile(fileId);
     
     res.status(200).json({ success: true, message: "Image deletion process completed" });

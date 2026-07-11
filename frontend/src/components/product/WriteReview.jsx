@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Icon } from '@iconify/react';
 import axios from 'axios';
@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
-import { submitReview } from '../../store/features/reviewSlice';
+import { submitReview, updateReview } from '../../store/features/reviewSlice';
 import { userAxios } from '../../configs/axiosInstance';
 
 const IMAGEKIT_PUBLIC_KEY = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY;
@@ -21,6 +21,8 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
   
   const { eligibilityData, isSubmittingReview, eligibilityStatus } = useSelector((state) => state.reviews);
   
+  // Local state
+  const [isEditing, setIsEditing] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]); 
@@ -32,7 +34,27 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
       { opacity: 0, y: 15 },
       { opacity: 1, y: 0, duration: 0.6, stagger: 0.1, ease: "power2.out", delay: 0.2 }
     );
-  }, { scope: formWrapperRef });
+  }, { scope: formWrapperRef, dependencies: [isEditing, eligibilityStatus] });
+
+  // Pre-fill form if user clicks "Edit"
+  useEffect(() => {
+    if (isEditing && eligibilityData?.review) {
+      const rev = eligibilityData.review;
+      setRating(rev.rating);
+      setComment(rev.comment);
+      
+      if (rev.images?.length > 0) {
+        const mappedImages = rev.images.map(img => ({
+          id: img.imagekitFileId, 
+          preview: `${img.baseUrl}?tr=w-200,h-200`,
+          isUploading: false,
+          imagekitFileId: img.imagekitFileId,
+          baseUrl: img.baseUrl
+        }));
+        setSelectedFiles(mappedImages);
+      }
+    }
+  }, [isEditing, eligibilityData]);
 
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
@@ -70,7 +92,6 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
         formData.append('expire', expire);
         formData.append('token', token);
         
-        // Dynamically save images inside the specific SKU folder
         const targetFolder = eligibilityData?.sku ? `/reviews/${eligibilityData.sku}` : `/reviews/${productSlug}`;
         formData.append('folder', targetFolder); 
 
@@ -95,7 +116,11 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
     if (!fileToDelete) return;
 
     setSelectedFiles(prev => prev.filter(f => f.id !== idToRemove));
-    if (fileToDelete.preview) URL.revokeObjectURL(fileToDelete.preview);
+    
+    // Only revoke if it's a blob (newly uploaded file), not a remote ImageKit URL
+    if (fileToDelete.preview && fileToDelete.preview.startsWith('blob:')) {
+      URL.revokeObjectURL(fileToDelete.preview);
+    }
 
     if (fileToDelete.imagekitFileId) {
       try {
@@ -122,21 +147,31 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
         baseUrl: f.baseUrl
       }));
 
-      await dispatch(submitReview({
-        productId,
-        orderId: eligibilityData?.orderId,
-        colorName: eligibilityData?.colorName,
-        guestName: eligibilityData?.guestName,
-        guestEmail: eligibilityData?.guestEmail,
-        rating,
-        comment,
-        images: finalImages
-      })).unwrap();
+      // Dynamically dispatch Update OR Submit
+      if (isEditing) {
+        await dispatch(updateReview({
+          reviewId: eligibilityData.review._id,
+          reviewData: { rating, comment, images: finalImages }
+        })).unwrap();
+        toast.success("Review updated successfully!");
+        setIsEditing(false);
+      } else {
+        await dispatch(submitReview({
+          productId,
+          orderId: eligibilityData?.orderId,
+          colorName: eligibilityData?.colorName,
+          guestName: eligibilityData?.guestName,
+          guestEmail: eligibilityData?.guestEmail,
+          rating,
+          comment,
+          images: finalImages
+        })).unwrap();
+        toast.success("Review submitted! It will be visible once approved.");
+      }
       
-      toast.success("Review submitted! It will be visible once approved.");
-      
+      // Don't revoke remote ImageKit URLs during cleanup
       selectedFiles.forEach(f => {
-        if (f.preview) URL.revokeObjectURL(f.preview);
+        if (f.preview && f.preview.startsWith('blob:')) URL.revokeObjectURL(f.preview);
       });
       setSelectedFiles([]);
       setComment('');
@@ -150,7 +185,8 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
     }
   };
 
-  if (eligibilityStatus === 'ALREADY_REVIEWED' && eligibilityData?.review) {
+  // --- UI: ALREADY REVIEWED (View Mode) ---
+  if (eligibilityStatus === 'ALREADY_REVIEWED' && eligibilityData?.review && !isEditing) {
     const rev = eligibilityData.review;
     return (
       <div ref={formWrapperRef} className="w-full">
@@ -167,23 +203,45 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
         </div>
         <p className="form-reveal text-sm text-gray-600 leading-relaxed mb-6">{rev.comment}</p>
         {rev.images?.length > 0 && (
-          <div className="form-reveal flex flex-wrap gap-4">
+          <div className="form-reveal flex flex-wrap gap-4 mb-8">
             {rev.images.map(img => (
               <img key={img.imagekitFileId} src={`${img.baseUrl}?tr=w-100,h-100,q-80`} alt="Review" className="w-20 h-20 object-cover border border-black/10" />
             ))}
           </div>
         )}
+        <div className="form-reveal pt-4 mt-2 border-t border-black/5">
+          <button 
+            onClick={() => setIsEditing(true)}
+            className="w-full bg-[#f8f8f8] text-[#1a1a1a] border border-black/10 py-4 text-xs font-bold tracking-[0.2em] uppercase hover:bg-black hover:text-white transition-colors"
+          >
+            Edit Review
+          </button>
+        </div>
       </div>
     );
   }
 
+  // --- UI: WRITE / EDIT REVIEW FORM ---
   const isAnyFileUploading = selectedFiles.some(f => f.isUploading);
 
   return (
     <div ref={formWrapperRef} className="w-full">
-      <div className="form-reveal">
-        <h3 className="text-xl font-light tracking-wide uppercase mb-2">Write a Review</h3>
-        <p className="text-[11px] text-gray-500 uppercase tracking-widest mb-8 border-b border-black/5 pb-4">
+      <div className="form-reveal flex justify-between items-start mb-2">
+        <h3 className="text-xl font-light tracking-wide uppercase">
+          {isEditing ? 'Edit Review' : 'Write a Review'}
+        </h3>
+        {isEditing && (
+          <button 
+            onClick={() => setIsEditing(false)}
+            className="text-[10px] uppercase tracking-widest text-gray-400 hover:text-black underline"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+      
+      <div className="form-reveal border-b border-black/5 pb-4 mb-8">
+        <p className="text-[11px] text-gray-500 uppercase tracking-widest">
           Purchasing: <span className="font-bold text-black">{eligibilityData?.colorName}</span>
         </p>
       </div>
@@ -198,7 +256,7 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
                 key={star} 
                 icon={star <= rating ? "ph:star-fill" : "ph:star"} 
                 width="28" 
-                className={`transition-colors ${star <= rating ? "text-[#796c52]" : "text-gray-200"}`}
+                className={`transition-colors ${star <= rating ? "text-[#C5A880]" : "text-gray-200"}`}
                 onClick={() => setRating(star)}
               />
             ))}
@@ -282,12 +340,12 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
             {isSubmittingReview ? (
               <>
                 <Icon icon="ph:spinner-gap-bold" className="animate-spin" width="16" />
-                Submitting...
+                {isEditing ? 'Updating...' : 'Submitting...'}
               </>
             ) : isAnyFileUploading ? (
               "Waiting for Uploads..."
             ) : (
-              "Submit Review"
+              isEditing ? "Update Review" : "Submit Review"
             )}
           </button>
         </div>

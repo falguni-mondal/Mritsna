@@ -1,13 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { userAxios } from '../../configs/axiosInstance';
 
-// ==========================================
-// ASYNC THUNKS
-// ==========================================
-
-/**
- * Fetch all approved reviews (plus the user's own pending review) for a product
- */
 export const fetchProductReviews = createAsyncThunk(
   'reviews/fetchProductReviews',
   async (slug, { rejectWithValue }) => {
@@ -15,16 +8,11 @@ export const fetchProductReviews = createAsyncThunk(
       const response = await userAxios.get(`/reviews/product/${slug}`);
       return response.data.data; 
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to fetch reviews'
-      );
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch reviews');
     }
   }
 );
 
-/**
- * Check if the current user/device is allowed to leave a review
- */
 export const checkReviewEligibility = createAsyncThunk(
   'reviews/checkEligibility',
   async (productId, { rejectWithValue }) => {
@@ -32,16 +20,11 @@ export const checkReviewEligibility = createAsyncThunk(
       const response = await userAxios.get(`/reviews/eligibility/${productId}`);
       return response.data; 
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to check eligibility'
-      );
+      return rejectWithValue(error.response?.data?.message || 'Failed to check eligibility');
     }
   }
 );
 
-/**
- * Submit a new product review
- */
 export const submitReview = createAsyncThunk(
   'reviews/submitReview',
   async (reviewData, { rejectWithValue }) => {
@@ -49,37 +32,34 @@ export const submitReview = createAsyncThunk(
       const response = await userAxios.post('/reviews', reviewData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to submit review'
-      );
+      return rejectWithValue(error.response?.data?.message || 'Failed to submit review');
     }
   }
 );
 
-
-// ==========================================
-// REDUX SLICE
-// ==========================================
+// NEW: Update Review Thunk
+export const updateReview = createAsyncThunk(
+  'reviews/updateReview',
+  async ({ reviewId, reviewData }, { rejectWithValue }) => {
+    try {
+      const response = await userAxios.put(`/reviews/${reviewId}`, reviewData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to update review');
+    }
+  }
+);
 
 const initialState = {
-  // Public Data
   reviews: [],
-  
-  // Eligibility State
   eligibilityStatus: 'IDLE',
   eligibilityData: null,
-  
-  // Granular Loading States for UI Polish
   isFetchingReviews: false,
   isCheckingEligibility: false,
   isSubmittingReview: false,
-  
-  // Granular Error States
   fetchError: null,
   eligibilityError: null,
   submitError: null,
-  
-  // Form Feedback
   submitSuccess: false,
 };
 
@@ -87,7 +67,6 @@ const reviewSlice = createSlice({
   name: 'reviews',
   initialState,
   reducers: {
-    // Resets form and eligibility state when unmounting or navigating away
     resetReviewState: (state) => {
       state.eligibilityStatus = 'IDLE';
       state.eligibilityData = null;
@@ -102,7 +81,6 @@ const reviewSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // --- Fetch Reviews ---
       .addCase(fetchProductReviews.pending, (state) => {
         state.isFetchingReviews = true;
         state.fetchError = null;
@@ -116,7 +94,6 @@ const reviewSlice = createSlice({
         state.fetchError = action.payload;
       })
 
-      // --- Check Eligibility ---
       .addCase(checkReviewEligibility.pending, (state) => {
         state.isCheckingEligibility = true;
         state.eligibilityError = null;
@@ -125,8 +102,6 @@ const reviewSlice = createSlice({
       .addCase(checkReviewEligibility.fulfilled, (state, action) => {
         state.isCheckingEligibility = false;
         state.eligibilityStatus = action.payload.eligibility;
-        
-        // Strip out the success/eligibility flags and store the exact data needed for the form
         const { success, eligibility, ...restData } = action.payload;
         state.eligibilityData = restData;
       })
@@ -136,7 +111,6 @@ const reviewSlice = createSlice({
         state.eligibilityStatus = 'IDLE';
       })
 
-      // --- Submit Review ---
       .addCase(submitReview.pending, (state) => {
         state.isSubmittingReview = true;
         state.submitError = null;
@@ -145,13 +119,16 @@ const reviewSlice = createSlice({
       .addCase(submitReview.fulfilled, (state, action) => {
         state.isSubmittingReview = false;
         state.submitSuccess = true;
-        state.eligibilityStatus = 'ALREADY_REVIEWED'; // Immediately lock the form from further submissions
+        state.eligibilityStatus = 'ALREADY_REVIEWED';
         
-        // Optimistic UI: Inject the newly submitted pending review directly to the top of the UI list
         if (action.payload.review) {
           const newReview = action.payload.review;
           
-          // Format it to match the unified output structure from getProductReviews
+          state.eligibilityData = {
+            ...state.eligibilityData,
+            review: newReview 
+          };
+
           const formattedReview = {
             _id: newReview._id,
             rating: newReview.rating,
@@ -159,8 +136,8 @@ const reviewSlice = createSlice({
             colorName: newReview.colorName,
             images: newReview.images,
             createdAt: newReview.createdAt,
-            status: newReview.status, // Will be 'pending'
-            author: state.eligibilityData?.guestName || 'You', // Intelligent fallback for UI update
+            status: newReview.status,
+            author: state.eligibilityData?.guestName || 'You', 
             isVerifiedBuyer: true
           };
           
@@ -171,10 +148,47 @@ const reviewSlice = createSlice({
         state.isSubmittingReview = false;
         state.submitError = action.payload;
         state.submitSuccess = false;
+      })
+
+      // --- Update Review Cases ---
+      .addCase(updateReview.pending, (state) => {
+        state.isSubmittingReview = true;
+        state.submitError = null;
+        state.submitSuccess = false;
+      })
+      .addCase(updateReview.fulfilled, (state, action) => {
+        state.isSubmittingReview = false;
+        state.submitSuccess = true;
+        
+        if (action.payload.review) {
+          const updatedReview = action.payload.review;
+          
+          // Update the personal eligibility data so the form shows the new data
+          state.eligibilityData = {
+            ...state.eligibilityData,
+            review: updatedReview 
+          };
+
+          // Update the review in the main UI list (if it exists there)
+          const index = state.reviews.findIndex(r => r._id === updatedReview._id);
+          if (index !== -1) {
+            state.reviews[index] = {
+              ...state.reviews[index],
+              rating: updatedReview.rating,
+              comment: updatedReview.comment,
+              images: updatedReview.images,
+              status: updatedReview.status // Will show 'pending' again
+            };
+          }
+        }
+      })
+      .addCase(updateReview.rejected, (state, action) => {
+        state.isSubmittingReview = false;
+        state.submitError = action.payload;
+        state.submitSuccess = false;
       });
   }
 });
 
 export const { resetReviewState, clearReviewErrors } = reviewSlice.actions;
-
 export default reviewSlice.reducer;
