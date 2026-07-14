@@ -17,7 +17,8 @@ const SplitText = ({ children, className = "" }) => {
   );
 };
 
-const ShopHeader = ({ totalProducts }) => {
+// Accept the new totalCategories prop
+const ShopHeader = ({ totalProducts, totalCategories }) => {
   const headerRef = useRef(null);
 
   useGSAP(() => {
@@ -34,10 +35,13 @@ const ShopHeader = ({ totalProducts }) => {
     );
   }, { scope: headerRef });
 
+  // Helper to ensure numbers less than 10 have a leading zero (e.g., "04", "07")
+  const formatNumber = (num) => (num < 10 ? `0${num}` : num);
+
   return (
     <div ref={headerRef} className="w-full pt-40 pb-16 px-6 lg:px-12 flex flex-col items-center text-center bg-[#f8f8f8]">
       <span className="shop-subtitle text-[0.65rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-6">
-        04 Categories — {totalProducts} Pieces
+        {formatNumber(totalCategories)} Categories — {formatNumber(totalProducts)} Pieces
       </span>
       <h1 className="head-font text-6xl md:text-8xl lg:text-[8rem] leading-none tracking-tighter">
         <SplitText>Collection</SplitText>

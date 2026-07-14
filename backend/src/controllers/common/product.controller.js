@@ -57,8 +57,6 @@ export const getNewArrivals = async (req, res, next) => {
 };
 
 
-
-
 export const getPaginatedProducts = async (req, res, next) => {
   try {
     const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
@@ -163,7 +161,6 @@ export const getPaginatedProducts = async (req, res, next) => {
     next(error);
   }
 };
-
 
 
 export const getSingleProduct = async (req, res, next) => {
@@ -327,6 +324,28 @@ export const searchProducts = async (req, res, next) => {
 
   } catch (error) {
     console.error("Error searching products:", error);
+    next(error);
+  }
+};
+
+
+export const getUniqueCategories = async (req, res, next) => {
+  try {
+    // We use .distinct('category') to let MongoDB instantly fetch 
+    // an array of all unique category names that belong to 'active' products.
+    const categories = await Product.distinct('category', { status: 'active' });
+
+    // Optional: Sort them alphabetically so they look nice in the frontend dropdown
+    categories.sort();
+
+    return res.status(200).json({
+      success: true,
+      count: categories.length,
+      data: categories
+    });
+
+  } catch (error) {
+    console.error("Error fetching unique categories:", error);
     next(error);
   }
 };

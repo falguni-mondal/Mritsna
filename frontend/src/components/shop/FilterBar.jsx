@@ -1,15 +1,18 @@
 import React, { useState, useRef, useEffect } from "react";
 
-// EXACT MATCH with backend product.model.js Schema to prevent API failures
-const categories = ["All", "Vases", "Lighting", "Dinnerware", "Decor", "Sculpture"];
+// Sort options remain static, but categories are removed from here.
 const sortOptions = ["Featured", "Price: Low to High", "Price: High to Low"];
 
-const FilterBar = ({ activeCategory, setActiveCategory, activeSort, setActiveSort }) => {
+// Destructure the new dynamic categories prop
+const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeSort, setActiveSort }) => {
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false); 
   
   const dropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null); 
+
+  // Prepend "All" to the dynamic array so users have a way to clear the filter
+  const filterOptions = ["All", ...categories];
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -30,7 +33,7 @@ const FilterBar = ({ activeCategory, setActiveCategory, activeSort, setActiveSor
         
         {/* LEFT: DESKTOP CATEGORIES */}
         <ul className="hidden lg:flex items-center gap-12 overflow-x-auto no-scrollbar flex-1">
-          {categories.map((cat) => (
+          {filterOptions.map((cat) => (
             <li key={cat} className="flex-shrink-0">
               <button
                 onClick={() => setActiveCategory(cat)}
@@ -63,7 +66,7 @@ const FilterBar = ({ activeCategory, setActiveCategory, activeSort, setActiveSor
               ${isCategoryOpen ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-95 pointer-events-none"}
             `}
           >
-            {categories.map((cat) => (
+            {filterOptions.map((cat) => (
               <button
                 key={cat}
                 onClick={() => {

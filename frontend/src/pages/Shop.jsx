@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchStoreProducts } from "../store/features/productSlice";
+// Import the new category thunk along with the product thunk
+import { fetchStoreProducts, fetchUniqueCategories } from "../store/features/productSlice";
 
 import ShopHeader from "../components/shop/ShopHeader";
 import FilterBar from "../components/shop/FilterBar";
@@ -10,8 +11,8 @@ import Pagination from "../components/shop/Pagination";
 const Shop = () => {
   const dispatch = useDispatch();
   
-  // --- FIX 1: Pull currencySymbol from Redux state ---
-  const { products, pagination, isLoading, currencySymbol } = useSelector((state) => state.product);
+  // Extract categories alongside everything else
+  const { products, pagination, isLoading, currencySymbol, categories } = useSelector((state) => state.product);
 
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeSort, setActiveSort] = useState("Featured");
@@ -27,10 +28,17 @@ const Shop = () => {
     }
   };
 
+  // Fetch unique categories once when the shop loads
+  useEffect(() => {
+    dispatch(fetchUniqueCategories());
+  }, [dispatch]);
+
+  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [activeCategory, activeSort]);
 
+  // Fetch paginated products when filters, sort, or page changes
   useEffect(() => {
     dispatch(fetchStoreProducts({
       page: currentPage,
@@ -42,9 +50,15 @@ const Shop = () => {
 
   return (
     <main className="w-full min-h-screen bg-[#f8f8f8]">
-      <ShopHeader totalProducts={pagination?.totalItems || 0} />
+      {/* Pass the length of the dynamic categories array to the header */}
+      <ShopHeader 
+        totalProducts={pagination?.totalItems || 0} 
+        totalCategories={categories?.length || 0} 
+      />
       
+      {/* Pass the dynamic categories array to the Filter Bar */}
       <FilterBar 
+        categories={categories}
         activeCategory={activeCategory} 
         setActiveCategory={setActiveCategory}
         activeSort={activeSort}          

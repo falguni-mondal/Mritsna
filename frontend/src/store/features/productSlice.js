@@ -42,10 +42,29 @@ export const fetchSingleProduct = createAsyncThunk(
   }
 );
 
+// --- NEW THUNK: Fetch Unique Categories ---
+export const fetchUniqueCategories = createAsyncThunk(
+  'product/fetchUniqueCategories',
+  async (_, thunkAPI) => {
+    try {
+      // Must exactly match the route we just created in product.routes.js
+      const response = await userAxios.get('/products/categories');
+      return response.data.data; 
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch categories';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
 const initialState = {
   newArrivals: [],
   products: [],
   singleProduct: null,
+  
+  // NEW: Store for dynamic categories
+  categories: [], 
+  
   pagination: {
     totalItems: 0,
     totalPages: 1,
@@ -55,6 +74,10 @@ const initialState = {
     hasPrevPage: false
   },
   isLoading: false,
+  
+  // NEW: Dedicated loading state for categories so it doesn't block the main products UI
+  isCategoriesLoading: false, 
+  
   isError: false,
   message: '',
   currencySymbol: '₹', 
@@ -133,6 +156,21 @@ const productSlice = createSlice({
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
+      })
+      
+      // --- Fetch Unique Categories ---
+      .addCase(fetchUniqueCategories.pending, (state) => {
+        state.isCategoriesLoading = true;
+      })
+      .addCase(fetchUniqueCategories.fulfilled, (state, action) => {
+        state.isCategoriesLoading = false;
+        state.categories = action.payload; 
+      })
+      .addCase(fetchUniqueCategories.rejected, (state, action) => {
+        state.isCategoriesLoading = false;
+        // We log it instead of setting global isError to avoid throwing a 
+        // full-page error block if just the filter dropdown fails to load.
+        console.error("Category Fetch Error:", action.payload); 
       });
   },
 });
