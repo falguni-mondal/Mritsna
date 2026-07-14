@@ -132,11 +132,17 @@ const EditProduct = () => {
                     {...methods.register('category')}
                     className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
                   >
-                    <option value="Vases">Vases</option>
-                    <option value="Lighting">Lighting</option>
-                    <option value="Dinnerware">Dinnerware</option>
+                    <option value="Vase">Vase</option>
+                    <option value="Dinnerset">Dinnerset</option>
                     <option value="Decor">Decor</option>
-                    <option value="Sculpture">Sculpture</option>
+                    <option value="Bowl">Bowl</option>
+                    <option value="Cup">Cup</option>
+                    <option value="Mug">Mug</option>
+                    <option value="Platter/tray">Platter/tray</option>
+                    <option value="Tea">Tea</option>
+                    <option value="Tealight candle">Tealight candle</option>
+                    <option value="Teapot">Teapot</option>
+                    <option value="Tumbler">Tumbler</option>
                   </select>
                   {methods.formState.errors.category && (
                     <p className="text-red-500 text-xs mt-1">{methods.formState.errors.category.message}</p>
