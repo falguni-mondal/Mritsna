@@ -28,7 +28,7 @@ const AddProduct = () => {
     resolver: zodResolver(productValidationSchema),
     defaultValues: {
       status: "active",
-      category: "Vases",
+      category: "Vase",
       isPremium: false, // NEW: Default to false
       pricing: { baseCurrency: "INR", taxClass: "standard", hsnCode: "" },
       shipping: {
