@@ -140,7 +140,7 @@ const EditProduct = () => {
                     <option value="Mug">Mug</option>
                     <option value="Platter/Tray">Platter/Tray</option>
                     <option value="Tea">Tea</option>
-                    <option value="Tealight candle">Tealight Candle</option>
+                    <option value="Tealight Candle">Tealight Candle</option>
                     <option value="Teapot">Teapot</option>
                     <option value="Tumbler">Tumbler</option>
                   </select>

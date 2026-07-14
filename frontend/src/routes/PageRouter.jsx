@@ -18,6 +18,7 @@ import ProtectedRoute from "../components/auth/ProtectedRoute";
 import NotFound from "../pages/NotFound";
 import Addresses from "../pages/Addresses";
 import Contact from "../pages/Contact";
+import Collection from "../pages/Collection";
 
 const PageRouter = () => {
   return (
@@ -34,6 +35,7 @@ const PageRouter = () => {
       <Route path="/checkout" element={<Checkout />} />
       <Route path="/track-order/:orderId?" element={<TrackOrder />} />
       <Route path="/contact" element={<Contact />} />
+      <Route path="/collection" element={<Collection />} />
 
       {/* ==========================================
           GUEST ROUTES (Only accessible if NOT logged in)

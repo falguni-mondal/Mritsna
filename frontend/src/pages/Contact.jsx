@@ -3,42 +3,63 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Icon } from "@iconify/react";
 
-// --- Utility: Masked Text Reveal ---
-// Wraps text in an overflow-hidden box so it slides UP from nothing
-const MaskedText = ({ children, className = "", delay = 0 }) => {
+// --- Utility: Split Text for GSAP Animation ---
+const SplitText = ({ children, className = "" }) => {
+  if (typeof children !== "string") return <span className={className}>{children}</span>;
   return (
-    <span className={`block overflow-hidden ${className}`}>
-      <span className="masked-line block will-change-transform" data-delay={delay}>
-        {children}
-      </span>
+    <span className={`inline-block ${className}`}>
+      {children.split(" ").map((word, index) => (
+        <span key={index} className="inline-block mr-[0.25em] whitespace-nowrap">
+          <span className="contact-title-word inline-block will-change-[transform,filter,opacity]">
+            {word}
+          </span>
+        </span>
+      ))}
     </span>
   );
 };
 
-// --- Utility: Premium Hover Link ---
-const AnimatedLink = ({ children, href, target = "_self" }) => {
+// --- Utility: Magnetic Link Component ---
+const MagneticLink = ({ children, href, className = "" }) => {
+  const linkRef = useRef(null);
+  const textRef = useRef(null);
+  
+  const { contextSafe } = useGSAP();
+
+  const handleMouseMove = contextSafe((e) => {
+    const { clientX, clientY } = e;
+    const { left, top, width, height } = linkRef.current.getBoundingClientRect();
+    const x = clientX - (left + width / 2);
+    const y = clientY - (top + height / 2);
+    
+    gsap.to(textRef.current, { 
+      x: x * 0.3, 
+      y: y * 0.3, 
+      duration: 1, 
+      ease: "power3.out" 
+    });
+  });
+
+  const handleMouseLeave = contextSafe(() => {
+    gsap.to(textRef.current, { 
+      x: 0, 
+      y: 0, 
+      duration: 1, 
+      ease: "elastic.out(1, 0.3)" 
+    });
+  });
+
   return (
     <a 
-      href={href} 
-      target={target} 
-      rel={target === "_blank" ? "noopener noreferrer" : ""}
-      className="group relative flex items-center gap-6 w-max py-2 cursor-pointer"
+      ref={linkRef}
+      href={href}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={`inline-block p-4 -m-4 ${className}`}
     >
-      <span className="head-font text-4xl md:text-5xl lg:text-7xl text-[#1a1a1a] transition-transform duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:translate-x-4">
+      <span ref={textRef} className="inline-block pointer-events-none">
         {children}
       </span>
-      
-      {/* Animated Circular Arrow */}
-      <div className="relative overflow-hidden w-10 h-10 md:w-14 md:h-14 rounded-full border border-black/20 flex items-center justify-center transition-all duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:border-black group-hover:bg-black group-hover:text-white opacity-0 -translate-x-8 group-hover:opacity-100 group-hover:translate-x-0">
-        <Icon 
-          icon="ph:arrow-up-right-light" 
-          className="text-xl md:text-2xl absolute transition-transform duration-500 -translate-x-4 translate-y-4 group-hover:translate-x-0 group-hover:translate-y-0" 
-        />
-        <Icon 
-          icon="ph:arrow-up-right-light" 
-          className="text-xl md:text-2xl absolute transition-transform duration-500 translate-x-0 translate-y-0 group-hover:translate-x-4 group-hover:-translate-y-4" 
-        />
-      </div>
     </a>
   );
 };
@@ -48,162 +69,88 @@ const Contact = () => {
   const containerRef = useRef(null);
 
   useGSAP(() => {
-    const tl = gsap.timeline({ delay: 0.1 });
+    const tl = gsap.timeline();
 
-    // 1. Hero Title Blur & Slide Reveal
+    // 1. Hero Title Blur Reveal
     tl.fromTo(
-      ".hero-title-word",
-      { yPercent: 100, filter: "blur(10px)", opacity: 0 },
-      { yPercent: 0, filter: "blur(0px)", opacity: 1, duration: 1.2, stagger: 0.1, ease: "expo.out" }
+      ".contact-title-word",
+      { opacity: 0, y: 30, filter: "blur(12px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 1, stagger: 0.08, ease: "power3.out" }
     );
 
-    // 2. Horizontal Dividers Expanding
+    // 2. Distributed Column Details Reveal
     tl.fromTo(
-      ".contact-divider",
-      { scaleX: 0 },
-      { scaleX: 1, duration: 1.5, stagger: 0.1, ease: "expo.inOut", transformOrigin: "left center" },
-      "-=0.8"
+      ".contact-detail-item",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power2.out" },
+      "-=0.5"
     );
-
-    // 3. Masked Text Sliding Up (Labels & Info)
-    const maskedLines = gsap.utils.toArray(".masked-line");
-    maskedLines.forEach((line) => {
-      const delay = parseFloat(line.getAttribute("data-delay")) || 0;
-      gsap.fromTo(
-        line,
-        { yPercent: 100 },
-        { yPercent: 0, duration: 1.2, ease: "expo.out", delay: delay + 0.5 }
-      );
-    });
-
-    // 4. Fade in the paragraph text
-    tl.fromTo(
-      ".fade-text",
-      { opacity: 0, y: 10 },
-      { opacity: 1, y: 0, duration: 1, stagger: 0.1, ease: "power2.out" },
-      "-=1"
-    );
-
   }, { scope: containerRef });
 
   return (
-    <main ref={containerRef} className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a] pt-32 lg:pt-48 pb-32 overflow-hidden">
+    <main ref={containerRef} className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a] pt-32 lg:pt-48 pb-24">
       <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
         
         {/* --- Hero Header --- */}
-        <div className="w-full mb-24 lg:mb-40">
-          <MaskedText className="mb-8">
-            <span className="inline-block text-[0.65rem] font-bold tracking-[0.3em] uppercase opacity-50">
-              Contact Us
-            </span>
-          </MaskedText>
-          
-          <h1 className="head-font text-6xl md:text-[7rem] lg:text-[11rem] leading-[0.85] tracking-tighter flex flex-wrap gap-[2vw]">
-            <span className="overflow-hidden block"><span className="hero-title-word block">Let's</span></span>
-            <span className="overflow-hidden block"><span className="hero-title-word block italic text-black/70">Create</span></span>
+        <div className="w-full mb-20 lg:mb-32">
+          <span className="contact-detail-item block text-[0.65rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-6">
+            Get in Touch
+          </span>
+          <h1 className="head-font text-6xl md:text-8xl lg:text-[9rem] leading-[0.9] tracking-tighter">
+            <SplitText>What's Up?</SplitText>
           </h1>
         </div>
 
-        {/* --- Editorial Directory Grid --- */}
-        <div className="flex flex-col w-full">
+        {/* --- Distributed Layout (3 Columns across full width) --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 lg:gap-12 w-full">
           
-          {/* Section: Email */}
-          <div className="relative py-12 lg:py-20 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-4">
-            <div className="contact-divider absolute top-0 left-0 w-full h-[1px] bg-black/15" />
-            
-            <div className="md:col-span-3 pt-2">
-              <MaskedText delay={0.1}>
-                <h3 className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-black/40">
-                  Inquiries
-                </h3>
-              </MaskedText>
-            </div>
-            
-            <div className="md:col-span-9 flex flex-col items-start">
-              <MaskedText delay={0.2}>
-                <AnimatedLink href="mailto:hello@mritsna.com">
-                  hello@mritsna.com
-                </AnimatedLink>
-              </MaskedText>
-              <p className="fade-text text-sm font-medium text-black/50 mt-6 lg:mt-10 max-w-sm leading-relaxed">
-                For customer service, press inquiries, or wholesale partnerships, please allow 24-48 hours for a response.
-              </p>
-            </div>
+          {/* Section 1: Inquiries */}
+          <div className="contact-detail-item flex flex-col">
+            <h3 className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-black/40 mb-4">
+              General Inquiries
+            </h3>
+            <MagneticLink href="mailto:hello@mritsna.com" className="head-font text-3xl lg:text-4xl hover:text-black/70 transition-colors">
+              hello@mritsna.com
+            </MagneticLink>
           </div>
 
-          {/* Section: Studio */}
-          <div className="relative py-12 lg:py-20 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-4">
-            <div className="contact-divider absolute top-0 left-0 w-full h-[1px] bg-black/15" />
-            
-            <div className="md:col-span-3 pt-2">
-              <MaskedText delay={0.2}>
-                <h3 className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-black/40">
-                  Studio
-                </h3>
-              </MaskedText>
-            </div>
-            
-            <div className="md:col-span-9 flex flex-col items-start">
-              <MaskedText delay={0.3}>
-                <div className="head-font text-4xl md:text-5xl lg:text-7xl leading-[1.1]">
-                  IIT ISM, Dhanbad
-                </div>
-              </MaskedText>
-              <MaskedText delay={0.4}>
-                <div className="head-font text-4xl md:text-5xl lg:text-7xl leading-[1.1] text-black/60 italic">
-                  Jharkhand, India
-                </div>
-              </MaskedText>
-              <MaskedText delay={0.5}>
-                <div className="head-font text-4xl md:text-5xl lg:text-7xl leading-[1.1]">
-                  826004
-                </div>
-              </MaskedText>
-
-              <div className="fade-text flex items-center gap-4 mt-8 lg:mt-12">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-black/40 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-black"></span>
-                </span>
-                <p className="text-[0.65rem] font-bold tracking-widest uppercase text-black/50">
-                  Visits by appointment only
-                </p>
-              </div>
-            </div>
+          {/* Section 2: Studio */}
+          <div className="contact-detail-item flex flex-col">
+            <h3 className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-black/40 mb-4">
+              Studio & Showroom
+            </h3>
+            <p className="text-lg lg:text-xl leading-relaxed max-w-sm font-medium">
+              IIT ISM, Dhanbad<br />
+              Jharkhand,<br />
+              India 826004
+            </p>
+            <p className="text-sm text-black/60 mt-4">
+              Visits by appointment only.
+            </p>
           </div>
 
-          {/* Section: Socials */}
-          <div className="relative py-12 lg:py-20 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-4">
-            <div className="contact-divider absolute top-0 left-0 w-full h-[1px] bg-black/15" />
-            <div className="contact-divider absolute bottom-0 left-0 w-full h-[1px] bg-black/15" />
-            
-            <div className="md:col-span-3 pt-2">
-              <MaskedText delay={0.3}>
-                <h3 className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-black/40">
-                  Socials
-                </h3>
-              </MaskedText>
-            </div>
-            
-            <div className="md:col-span-9 flex flex-col items-start gap-4">
-              <MaskedText delay={0.4}>
-                <AnimatedLink href="https://instagram.com" target="_blank">
+          {/* Section 3: Socials */}
+          <div className="contact-detail-item flex flex-col">
+            <h3 className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-black/40 mb-6">
+              Socials
+            </h3>
+            <ul className="flex flex-col gap-3">
+              <li>
+                <MagneticLink href="https://instagram.com" className="text-sm font-medium uppercase tracking-widest hover:text-black/60 transition-colors">
                   Instagram
-                </AnimatedLink>
-              </MaskedText>
-              
-              <MaskedText delay={0.5}>
-                <AnimatedLink href="https://pinterest.com" target="_blank">
+                </MagneticLink>
+              </li>
+              <li>
+                <MagneticLink href="https://pinterest.com" className="text-sm font-medium uppercase tracking-widest hover:text-black/60 transition-colors">
                   Pinterest
-                </AnimatedLink>
-              </MaskedText>
-              
-              <MaskedText delay={0.6}>
-                <AnimatedLink href="https://twitter.com" target="_blank">
+                </MagneticLink>
+              </li>
+              <li>
+                <MagneticLink href="https://twitter.com" className="text-sm font-medium uppercase tracking-widest hover:text-black/60 transition-colors">
                   Twitter (X)
-                </AnimatedLink>
-              </MaskedText>
-            </div>
+                </MagneticLink>
+              </li>
+            </ul>
           </div>
 
         </div>
