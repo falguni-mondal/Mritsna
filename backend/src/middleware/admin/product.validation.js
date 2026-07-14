@@ -68,7 +68,7 @@ export const createProductSchema = z.object({
     .min(3, "Title must be at least 3 characters")
     .max(150, "Title too long"),
   description: z.string().min(10, "Description needs more detail"),
-  category: z.enum(["Vases", "Lighting", "Dinnerware", "Decor", "Sculpture"]),
+  category: z.enum(['Vase','Dinnerset', 'Decor', 'Bowl', 'Cup', 'Mug', 'Platter/tray', 'Tea', 'Tealight candle', 'Teapot', 'Tumbler']),
   
   isPremium: z.boolean().optional().default(false),
 
