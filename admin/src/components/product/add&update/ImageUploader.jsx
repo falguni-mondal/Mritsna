@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useFormContext } from 'react-hook-form';
 import { useDispatch } from 'react-redux';
@@ -6,7 +6,6 @@ import { Icon } from '@iconify/react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// dnd-kit imports for buttery smooth drag-and-drop
 import { 
   DndContext, 
   closestCenter, 
@@ -24,12 +23,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+// Re-imported your correct Redux thunk for deletion
 import { fetchImageKitAuth, deleteProductImage } from '../../../store/slices/productSlice';
 
 const IMAGEKIT_PUBLIC_KEY = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY;
 const IMAGEKIT_UPLOAD_URL = import.meta.env.VITE_IMAGEKIT_UPLOAD_URL;
 
-// --- NEW SUB-COMPONENT: The Draggable Image Card ---
+// --- The Draggable Image Card ---
 const SortableImageCard = ({ id, image, index, onRemove }) => {
   const {
     attributes,
@@ -63,12 +63,10 @@ const SortableImageCard = ({ id, image, index, onRemove }) => {
         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
       />
       
-      {/* Overlay Actions */}
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
         <div className="flex justify-end">
           <button 
             type="button"
-            // onPointerDown stops the drag event so the click can register cleanly
             onPointerDown={(e) => e.stopPropagation()} 
             onClick={(e) => { e.stopPropagation(); onRemove(index); }}
             className="p-1.5 bg-white/90 text-red-600 rounded-md hover:bg-white transition-colors shadow-sm"
@@ -77,14 +75,12 @@ const SortableImageCard = ({ id, image, index, onRemove }) => {
           </button>
         </div>
         
-        {/* Visual Drag Indicator (Not a functional button) */}
         <div className="w-full py-1.5 bg-white/90 text-gray-700 text-xs font-medium rounded flex items-center justify-center gap-1.5 shadow-sm pointer-events-none">
           <Icon icon="lucide:move" width="14" />
           Drag to move
         </div>
       </div>
 
-      {/* Primary Badge */}
       {image.isPrimary && (
         <div className="absolute top-2 left-2 px-2 py-1 bg-black text-white text-[10px] font-bold tracking-wider uppercase rounded shadow-sm">
           Cover
@@ -98,41 +94,93 @@ const SortableImageCard = ({ id, image, index, onRemove }) => {
 // --- MAIN COMPONENT ---
 const ImageUploader = ({ variantIndex }) => {
   const dispatch = useDispatch();
-  const { watch, setValue, formState: { errors } } = useFormContext();
+  
+  const { watch, setValue, formState: { errors, isSubmitSuccessful } } = useFormContext();
   
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const currentCategory = watch('category') || 'uncategorized';
+  const sessionUploadedFiles = useRef([]);
+
+  const allVariants = watch('variants') || [];
+  const existingProductId = watch('_id');
+  const fallbackUniqueId = useRef(`prod_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`).current;
   
+  const targetFolderRef = useRef(null);
+
+  if (!targetFolderRef.current) {
+    let inheritedPath = null;
+    
+    for (const variant of allVariants) {
+      if (variant.images && variant.images.length > 0) {
+        const url = variant.images[0].baseUrl;
+        if (url) {
+          const parts = url.split('/products/');
+          if (parts.length > 1) {
+            const pathParts = parts[1].split('/');
+            pathParts.pop(); 
+            inheritedPath = pathParts.join('/'); 
+            break;
+          }
+        }
+      }
+    }
+    targetFolderRef.current = inheritedPath; 
+  }
+
+  const currentCategory = watch('category') || 'uncategorized';
   const fieldName = `variants.${variantIndex}.images`;
   const currentImages = watch(fieldName) || [];
+  
   const maxImages = 4;
+  const maxSizeBytes = 10485760; // 10MB
 
-  // Set up smart sensors. A 5px drag distance prevents accidental drags when clicking buttons.
+  // Background cleanup using your Redux Thunk
+  useEffect(() => {
+    return () => {
+      if (!isSubmitSuccessful && sessionUploadedFiles.current.length > 0) {
+        sessionUploadedFiles.current.forEach(fileId => {
+          dispatch(deleteProductImage(fileId)).catch(() => {});
+        });
+      }
+    };
+  }, [isSubmitSuccessful, dispatch]);
+
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const onDrop = useCallback(async (acceptedFiles) => {
-    if (currentImages.length + acceptedFiles.length > maxImages) {
+    if (!acceptedFiles.length) return;
+
+    const validFiles = [];
+    let hasOversizedFiles = false;
+
+    acceptedFiles.forEach(file => {
+      if (file.size > maxSizeBytes) {
+        hasOversizedFiles = true;
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (hasOversizedFiles) {
+      toast.error("One or more files exceed the 10MB limit and were removed.");
+    }
+
+    if (!validFiles.length) return;
+
+    if (currentImages.length + validFiles.length > maxImages) {
       toast.error(`Limit reached: Maximum ${maxImages} images per variant.`);
       return;
     }
 
     setIsUploading(true);
     setUploadProgress(0);
-    const successfullyUploadedImages = [];
 
     try {
-      for (let i = 0; i < acceptedFiles.length; i++) {
-        const file = acceptedFiles[i];
-
+      const uploadPromises = validFiles.map(async (file) => {
         const authData = await dispatch(fetchImageKitAuth()).unwrap();
         const { token, expire, signature } = authData;
 
@@ -144,31 +192,35 @@ const ImageUploader = ({ variantIndex }) => {
         formData.append('expire', expire);
         formData.append('token', token);
         
-        const folderPath = `/products/${currentCategory.toLowerCase()}`;
-        formData.append('folder', folderPath); 
+        const finalFolderPath = targetFolderRef.current 
+          ? `/products/${targetFolderRef.current}` 
+          : `/products/${currentCategory.toLowerCase()}/${existingProductId || fallbackUniqueId}`;
+
+        formData.append('folder', finalFolderPath); 
 
         const uploadResponse = await axios.post(IMAGEKIT_UPLOAD_URL, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setUploadProgress(percentCompleted);
-          }
+          withCredentials: false,
+          headers: { 'Content-Type': 'multipart/form-data' }
         });
 
-        const { url, fileId } = uploadResponse.data;
+        sessionUploadedFiles.current.push(uploadResponse.data.fileId);
 
-        successfullyUploadedImages.push({
-          imagekitFileId: fileId,
-          baseUrl: url,
-          altText: file.name.split('.')[0],
-          isPrimary: currentImages.length === 0 && successfullyUploadedImages.length === 0,
-          displayOrder: currentImages.length + successfullyUploadedImages.length
-        });
-      }
+        return {
+          imagekitFileId: uploadResponse.data.fileId,
+          baseUrl: uploadResponse.data.url,
+          altText: file.name.split('.')[0]
+        };
+      });
 
-      if (successfullyUploadedImages.length > 0) {
-        setValue(fieldName, [...currentImages, ...successfullyUploadedImages], { shouldValidate: true });
-      }
+      const uploadedResults = await Promise.all(uploadPromises);
+
+      const successfullyUploadedImages = uploadedResults.map((result, idx) => ({
+        ...result,
+        isPrimary: currentImages.length === 0 && idx === 0,
+        displayOrder: currentImages.length + idx
+      }));
+
+      setValue(fieldName, [...currentImages, ...successfullyUploadedImages], { shouldValidate: true });
 
     } catch (error) {
       console.error("ImageKit Upload Process Failed:", error);
@@ -177,10 +229,18 @@ const ImageUploader = ({ variantIndex }) => {
       setIsUploading(false);
       setUploadProgress(0);
     }
-  }, [currentImages, setValue, fieldName, dispatch, currentCategory]);
+  }, [currentImages, setValue, fieldName, dispatch, maxImages, maxSizeBytes, currentCategory, existingProductId, fallbackUniqueId]);
 
   const onDropRejected = useCallback((fileRejections) => {
-    toast.error(`Limit reached: You can only upload up to ${maxImages} images in total.`);
+    const isTooLarge = fileRejections.some(rejection => 
+      rejection.errors.some(e => e.code === 'file-too-large')
+    );
+
+    if (isTooLarge) {
+      toast.error("File is too large. Maximum size is 10MB per image.");
+    } else {
+      toast.error(`Limit reached: You can only upload up to ${maxImages} images in total.`);
+    }
   }, [maxImages]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -192,17 +252,24 @@ const ImageUploader = ({ variantIndex }) => {
       'image/webp': ['.webp']
     },
     maxFiles: maxImages - currentImages.length,
+    maxSize: maxSizeBytes, 
     disabled: currentImages.length >= maxImages || isUploading
   });
 
+  // --- THE FIX: Using Redux Thunk for Deletion ---
   const removeImage = async (indexToRemove) => {
     const imageToDelete = currentImages[indexToRemove];
 
-    if (imageToDelete.imagekitFileId && !imageToDelete.imagekitFileId.startsWith('temp_')) {
+    if (imageToDelete && imageToDelete.imagekitFileId) {
       try {
+        // Correctly dispatching the Redux thunk you already built
         await dispatch(deleteProductImage(imageToDelete.imagekitFileId)).unwrap();
+        
+        sessionUploadedFiles.current = sessionUploadedFiles.current.filter(
+          id => id !== imageToDelete.imagekitFileId
+        );
       } catch (error) {
-        console.error("Failed to delete from cloud:", error);
+        console.error("Failed to delete image from cloud:", error);
         toast.error("Failed to delete image from cloud storage.");
         return; 
       }
@@ -217,25 +284,20 @@ const ImageUploader = ({ variantIndex }) => {
     setValue(fieldName, updatedImages, { shouldValidate: true });
   };
 
-  // --- THE NEW DRAG HANDLER ---
   const handleDragEnd = (event) => {
     const { active, over } = event;
     
-    // If they dropped it in a new spot
     if (over && active.id !== over.id) {
       const oldIndex = currentImages.findIndex(img => img.imagekitFileId === active.id);
       const newIndex = currentImages.findIndex(img => img.imagekitFileId === over.id);
 
-      // Instantly swap the array order
       const reorderedArray = arrayMove(currentImages, oldIndex, newIndex);
 
-      // Recalculate the primary badge based on whatever is now at index 0
       const finalArray = reorderedArray.map((img, idx) => ({
         ...img,
         isPrimary: idx === 0
       }));
 
-      // Save it back to react-hook-form
       setValue(fieldName, finalArray, { shouldValidate: true });
     }
   };
@@ -247,7 +309,7 @@ const ImageUploader = ({ variantIndex }) => {
       <div className="flex justify-between items-end mb-3">
         <div>
           <label className="block text-sm font-medium text-gray-700">Variant Images</label>
-          <p className="text-xs text-gray-500 mt-0.5">Upload up to 5 images. Drag to reorder. The first image acts as the cover.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Upload up to {maxImages} images. Drag to reorder. The first image acts as the cover.</p>
         </div>
         <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded text-gray-600">
           {currentImages.length} / {maxImages}
@@ -269,15 +331,12 @@ const ImageUploader = ({ variantIndex }) => {
             width="28" 
           />
           <p className="text-sm font-medium text-gray-700 relative z-10">
-            {isUploading ? `Uploading... ${uploadProgress}%` : isDragActive ? "Drop the images here..." : "Click or drag images to upload"}
+            {isUploading ? "Uploading to secure cloud..." : isDragActive ? "Drop the images here..." : "Click or drag images to upload"}
           </p>
-          <p className="text-xs text-gray-400 mt-1 relative z-10">JPEG, PNG, or WebP (Max 5MB per file)</p>
+          <p className="text-xs text-gray-400 mt-1 relative z-10">JPEG, PNG, or WebP (Max 10MB per file)</p>
           
           {isUploading && (
-             <div 
-               className="absolute top-0 left-0 bottom-0 bg-gray-100/80 transition-all duration-300 ease-out z-0"
-               style={{ width: `${uploadProgress}%` }}
-             ></div>
+             <div className="absolute inset-0 bg-gray-50/50 transition-all duration-300 ease-out z-0"></div>
           )}
         </div>
       )}
@@ -286,14 +345,13 @@ const ImageUploader = ({ variantIndex }) => {
         <p className="text-red-500 text-xs mt-2">{imageErrors.message}</p>
       )}
 
-      {/* --- THE DRAG-AND-DROP GRID --- */}
       {currentImages.length > 0 && (
         <DndContext 
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
             <SortableContext 
               items={currentImages.map(img => img.imagekitFileId)} 
               strategy={rectSortingStrategy} 
