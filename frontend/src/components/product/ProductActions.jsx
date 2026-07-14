@@ -15,7 +15,7 @@ import {
 import {
   toggleWishlistDB,
   toggleLocalItem,
-  hydrateGuestWishlistAPI // <-- 1. Import the new hydration thunk
+  hydrateGuestWishlistAPI 
 } from "../../store/features/wishlistSlice";
 
 const ProductActions = ({ product, activeVariant }) => {
@@ -26,8 +26,6 @@ const ProductActions = ({ product, activeVariant }) => {
   const cartItems = useSelector((state) => state.cart?.items || []); 
   const wishlistItems = useSelector((state) => state.wishlist?.items || []);
 
-  const { currencySymbol, currencyCode } = useSelector((state) => state.product);
-
   const isItemInCart = cartItems.some((item) => item.variantId === activeVariant.variantId);
   const isInWishlist = wishlistItems.some(
     (item) => item.productId === product.id && item.variantId === activeVariant.variantId
@@ -36,6 +34,7 @@ const ProductActions = ({ product, activeVariant }) => {
   const [quantity, setQuantity] = useState(1);
   const [isCopied, setIsCopied] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isBuying, setIsBuying] = useState(false); // NEW: Dedicated state for Buy Now
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   
   const [isVerifyingQty, setIsVerifyingQty] = useState(false);
@@ -56,7 +55,6 @@ const ProductActions = ({ product, activeVariant }) => {
   const buyTextDarkRef = useRef(null);
   const buyTextLightRef = useRef(null);
 
-  // ... (handleQuantity remains exactly the same) ...
   const handleQuantity = (type) => {
     let newQty = quantity;
     if (type === "dec" && quantity > 1) newQty -= 1;
@@ -91,7 +89,6 @@ const ProductActions = ({ product, activeVariant }) => {
     }, 800); 
   };
 
-  // ... (handleMainButtonClick remains exactly the same) ...
   const handleMainButtonClick = async () => {
     if (isItemInCart) {
       navigate("/cart");
@@ -150,7 +147,62 @@ const ProductActions = ({ product, activeVariant }) => {
     }
   };
 
-  // --- THE FIX: The Wishlist Toggle Handler ---
+  // --- NEW: Buy Now Handler ---
+  const handleBuyNowClick = async () => {
+    if (!inStock) return;
+
+    // If it's already in the cart, jump straight to checkout
+    if (isItemInCart) {
+      navigate("/checkout");
+      return;
+    }
+
+    setIsBuying(true);
+
+    try {
+      const pingPayload = {
+        productId: product.id,
+        variantId: activeVariant.variantId,
+        requestedQuantity: quantity,
+      };
+
+      const stockCheck = await dispatch(verifyStock(pingPayload)).unwrap();
+
+      if (!stockCheck.isAvailable) {
+        alert(stockCheck.message);
+        setIsBuying(false);
+        return;
+      }
+
+      if (isAuth) {
+        await dispatch(
+          addToCartDB({
+            productId: product.id,
+            variantId: activeVariant.variantId,
+            quantity,
+          })
+        ).unwrap();
+      } else {
+        dispatch(
+          addLocalItem({
+            productId: product.id,
+            variantId: activeVariant.variantId,
+            quantity: quantity,
+            maxLimit: stockCheck.availableStock,
+          })
+        );
+        dispatch(hydrateGuestCartAPI());
+      }
+
+      // Everything succeeded, route to checkout immediately
+      navigate("/checkout");
+    } catch (error) {
+      alert(error || "An error occurred while processing your request.");
+    } finally {
+      setIsBuying(false);
+    }
+  };
+
   const handleWishlistToggle = async () => {
     if (isTogglingWishlist) return; 
 
@@ -167,13 +219,10 @@ const ProductActions = ({ product, activeVariant }) => {
         setIsTogglingWishlist(false);
       }
     } else {
-      // 2. We are now using the Dumb Architecture for the Wishlist too!
       dispatch(toggleLocalItem({
         productId: product.id,
         variantId: activeVariant.variantId,
       }));
-
-      // 3. Immediately tell Redux to ask the backend for the live prices/images
       dispatch(hydrateGuestWishlistAPI());
     }
   };
@@ -208,7 +257,7 @@ const ProductActions = ({ product, activeVariant }) => {
   const { contextSafe } = useGSAP();
 
   const handleBuyMouseEnter = contextSafe((e) => {
-    if (!inStock) return;
+    if (!inStock || isBuying || isAdding) return;
     const rect = buyBtnRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -220,7 +269,7 @@ const ProductActions = ({ product, activeVariant }) => {
   });
 
   const handleBuyMouseLeave = contextSafe((e) => {
-    if (!inStock) return;
+    if (!inStock || isBuying || isAdding) return;
     const rect = buyBtnRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -230,14 +279,17 @@ const ProductActions = ({ product, activeVariant }) => {
     gsap.to(buyTextLightRef.current, { opacity: 0, duration: 0.3, ease: "power2.out" });
   });
 
+  // Consolidated disabled state variable for cleaner markup
+  const isActionDisabled = !inStock || isAdding || isBuying || isVerifyingQty;
+
   return (
     <div className="product-info-item w-full flex flex-col gap-4 mb-12">
       <div className="flex gap-2 lg:gap-4 h-14 w-full">
         <div className="flex items-center justify-between border border-black/10 px-4 w-[100px] lg:w-32 shrink-0">
           <button
             onClick={() => handleQuantity("dec")}
-            disabled={quantity <= 1 || !inStock || isAdding || isItemInCart || isVerifyingQty}
-            className={`p-2 cursor-pointer transition-opacity ${quantity <= 1 || !inStock || isAdding || isItemInCart || isVerifyingQty ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
+            disabled={quantity <= 1 || isActionDisabled || isItemInCart}
+            className={`p-2 cursor-pointer transition-opacity ${quantity <= 1 || isActionDisabled || isItemInCart ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
           >
             <Icon icon="ph:minus" />
           </button>
@@ -248,8 +300,8 @@ const ProductActions = ({ product, activeVariant }) => {
 
           <button
             onClick={() => handleQuantity("inc")}
-            disabled={quantity >= maxLimit || !inStock || isAdding || isItemInCart || isVerifyingQty}
-            className={`p-2 cursor-pointer transition-opacity ${quantity >= maxLimit || !inStock || isAdding || isItemInCart || isVerifyingQty ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
+            disabled={quantity >= maxLimit || isActionDisabled || isItemInCart}
+            className={`p-2 cursor-pointer transition-opacity ${quantity >= maxLimit || isActionDisabled || isItemInCart ? "opacity-20 cursor-not-allowed" : "opacity-50 hover:opacity-100"}`}
           >
             <Icon icon="ph:plus" />
           </button>
@@ -257,7 +309,7 @@ const ProductActions = ({ product, activeVariant }) => {
 
         <button
           onClick={handleMainButtonClick}
-          disabled={(!inStock && !isItemInCart) || isAdding || isVerifyingQty}
+          disabled={(!inStock && !isItemInCart) || isAdding || isVerifyingQty || isBuying}
           className="flex-1 flex justify-center items-center gap-2 bg-[#1a1a1a] text-white text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isAdding || isVerifyingQty ? (
@@ -311,7 +363,8 @@ const ProductActions = ({ product, activeVariant }) => {
 
       <button
         ref={buyBtnRef}
-        disabled={!inStock || isAdding || isVerifyingQty}
+        onClick={handleBuyNowClick}
+        disabled={isActionDisabled}
         onMouseEnter={handleBuyMouseEnter}
         onMouseLeave={handleBuyMouseLeave}
         className="relative overflow-hidden w-full h-14 border border-[#1a1a1a] flex items-center justify-center group disabled:border-black/20 disabled:cursor-not-allowed cursor-pointer"
@@ -329,15 +382,15 @@ const ProductActions = ({ product, activeVariant }) => {
         />
         <span
           ref={buyTextDarkRef}
-          className={`absolute inset-0 z-10 flex items-center justify-center text-[0.65rem] font-bold tracking-[0.2em] uppercase ${!inStock ? "text-black/30" : "text-[#1a1a1a]"}`}
+          className={`absolute inset-0 z-10 flex items-center justify-center gap-2 text-[0.65rem] font-bold tracking-[0.2em] uppercase ${!inStock ? "text-black/30" : "text-[#1a1a1a]"}`}
         >
-          {inStock ? "Buy it now" : "Unavailable"}
+          {isBuying ? <><Icon icon="ph:spinner-gap-bold" className="animate-spin text-lg" /> PROCESSING...</> : inStock ? "Buy it now" : "Unavailable"}
         </span>
         <span
           ref={buyTextLightRef}
-          className="absolute inset-0 z-10 flex items-center justify-center text-[0.65rem] font-bold tracking-[0.2em] uppercase text-white opacity-0"
+          className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-[0.65rem] font-bold tracking-[0.2em] uppercase text-white opacity-0"
         >
-          Buy it now
+          {isBuying ? <><Icon icon="ph:spinner-gap-bold" className="animate-spin text-lg" /> PROCESSING...</> : "Buy it now"}
         </span>
       </button>
     </div>
