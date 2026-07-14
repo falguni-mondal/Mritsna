@@ -138,9 +138,9 @@ const EditProduct = () => {
                     <option value="Bowl">Bowl</option>
                     <option value="Cup">Cup</option>
                     <option value="Mug">Mug</option>
-                    <option value="Platter/tray">Platter/tray</option>
+                    <option value="Platter/Tray">Platter/Tray</option>
                     <option value="Tea">Tea</option>
-                    <option value="Tealight candle">Tealight candle</option>
+                    <option value="Tealight candle">Tealight Candle</option>
                     <option value="Teapot">Teapot</option>
                     <option value="Tumbler">Tumbler</option>
                   </select>

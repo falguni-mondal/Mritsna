@@ -76,7 +76,7 @@ export const productValidationSchema = z.object({
   description: z.string()
     .min(10, "Description needs more detail"),
   
-  category: z.enum(['Vase','Dinnerset', 'Decor', 'Bowl', 'Cup', 'Mug', 'Platter/tray', 'Tea', 'Tealight candle', 'Teapot', 'Tumbler'], {
+  category: z.enum(['Vase','Dinnerset', 'Decor', 'Bowl', 'Cup', 'Mug', 'Platter/Tray', 'Tea', 'Tealight Candle', 'Teapot', 'Tumbler'], {
     errorMap: () => ({ message: "Please select a valid category" })
   }),
 
