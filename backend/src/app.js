@@ -60,7 +60,7 @@ app.use(parser());
 
 // Dynamic CORS (Controlled via .env)
 // e.g., in .env: ALLOWED_ORIGINS=http://localhost:5173,https://mritsna.com
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [process.env.FRONTEND_URL, "http://localhost:5174"];
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [process.env.FRONTEND_URL, process.env.ADMIN_FRONTEND_URL];
 
 app.use(
   cors({
