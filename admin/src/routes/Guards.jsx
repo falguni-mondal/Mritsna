@@ -8,15 +8,15 @@ const AuthLoader = () => (
   </div>
 );
 
-//  Guest Guard: For /signin. If already verified, kick to dashboard.
+// 1. Guest Guard: For /signin. If already verified, kick DIRECTLY to dashboard.
 export const GuestGuard = ({ children }) => {
   const { isAuthenticated, isVerified, isInitializing } = useSelector((state) => state.auth);
 
-  // Freeze routing until the initial session check is complete
   if (isInitializing) return <AuthLoader />;
 
   if (isAuthenticated && isVerified) {
-    return <Navigate to="/" replace />;
+    // ✅ FIX: Navigate directly to the dashboard, avoiding the "/" redirect chain
+    return <Navigate to="/admin/dashboard" replace />;
   }
   if (isAuthenticated && !isVerified) {
     return <Navigate to="/verify" replace />;
@@ -24,15 +24,17 @@ export const GuestGuard = ({ children }) => {
   return children;
 };
 
-//  Verify Guard: For /verify. Must be authenticated, but NOT verified.
+// 2. Verify Guard: For /verify. Must be authenticated, but NOT verified.
 export const VerifyGuard = ({ children }) => {
   const { isAuthenticated, isVerified, isInitializing } = useSelector((state) => state.auth);
 
-  // Freeze routing until the initial session check is complete
   if (isInitializing) return <AuthLoader />;
 
   if (!isAuthenticated) return <Navigate to="/signin" replace />;
-  if (isVerified) return <Navigate to="/" replace />;
+  if (isVerified) {
+    // ✅ FIX: Direct redirect here as well
+    return <Navigate to="/admin/dashboard" replace />; 
+  }
   
   return children;
 };
@@ -41,7 +43,6 @@ export const VerifyGuard = ({ children }) => {
 export const AdminGuard = ({ children }) => {
   const { isAuthenticated, isVerified, isInitializing } = useSelector((state) => state.auth);
 
-  // Freeze routing until the initial session check is complete
   if (isInitializing) return <AuthLoader />;
 
   if (!isAuthenticated) return <Navigate to="/signin" replace />;

@@ -2,10 +2,11 @@ import "dotenv/config";
 import app from "./src/app.js";
 import connectToDB from "./src/config/db.js";
 import mongoose from "mongoose";
-import initCurrencyUpdater from './src/cron/currencyUpdater.js'; // Assuming path based on earlier checks
+import initCurrencyUpdater from './src/cron/currencyUpdater.js';
 
 const PORT = process.env.PORT || 5000;
-let server; // Declare server outside so exitHandler can access it globally
+const HOST = '0.0.0.0'; 
+let server; 
 
 // Graceful Shutdown Protocol
 const exitHandler = () => {
@@ -29,7 +30,7 @@ const exitHandler = () => {
 process.on("unhandledRejection", (err) => {
   console.error("[Unhandled Rejection] Shutting down gracefully...");
   console.error(err.name, err.message);
-  exitHandler(); // Route through your safe shutdown protocol!
+  exitHandler(); 
 });
 
 process.on("uncaughtException", (err) => {
@@ -41,13 +42,13 @@ process.on("uncaughtException", (err) => {
 // Initialize Database Connection
 connectToDB()
   .then(() => {
-    // Start HTTP Server ONLY after DB is ready
-    server = app.listen(PORT, () => {
-      console.log(`[Server] Mritsna API running on port ${PORT}`);
-      console.log(`[Environment] ${process.env.NODE_ENV}`);
+    // 2. Start HTTP Server ONLY after DB is ready, binding to 0.0.0.0
+    server = app.listen(PORT, HOST, () => {
+      console.log(`[Server] API running on http://${HOST}:${PORT}`);
+      console.log(`[Environment] ${process.env.NODE_ENV || 'development'}`);
     }); 
 
-    // Handle termination signals (Ctrl+C, Docker stop, Heroku restart)
+    // Handle termination signals (Ctrl+C, Docker stop, Heroku restart, Render deploys)
     process.on("SIGTERM", () => {
       console.log("SIGTERM received");
       exitHandler();

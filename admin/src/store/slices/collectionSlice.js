@@ -17,7 +17,7 @@ export const fetchAdminCollections = createAsyncThunk(
   'collections/fetchAll',
   async (_, thunkAPI) => {
     try {
-      const response = await axiosInstance.get('/admin/collections');
+      const response = await axiosInstance.get('/collections/');
       return response.data.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch collections';
@@ -31,7 +31,7 @@ export const fetchCollectionById = createAsyncThunk(
   'collections/fetchById',
   async (id, thunkAPI) => {
     try {
-      const response = await axiosInstance.get(`/admin/collections/${id}`);
+      const response = await axiosInstance.get(`/collections/${id}`);
       return response.data.data; 
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch collection details';
@@ -45,7 +45,7 @@ export const createNewCollection = createAsyncThunk(
   'collections/create',
   async (collectionData, thunkAPI) => {
     try {
-      const response = await axiosInstance.post('/admin/collections', collectionData);
+      const response = await axiosInstance.post('/collections', collectionData);
       return response.data;
     } catch (error) {
       const message = error.response?.data?.errors 
@@ -61,7 +61,7 @@ export const updateExistingCollection = createAsyncThunk(
   'collections/update',
   async ({ id, updateData }, thunkAPI) => {
     try {
-      const response = await axiosInstance.patch(`/admin/collections/${id}`, updateData);
+      const response = await axiosInstance.patch(`/collections/${id}`, updateData);
       return response.data;
     } catch (error) {
       const message = error.response?.data?.errors 
@@ -77,7 +77,7 @@ export const changeCollectionStatus = createAsyncThunk(
   'collections/changeStatus',
   async ({ id, status }, thunkAPI) => {
     try {
-      const response = await axiosInstance.patch(`/admin/collections/${id}/status`, { status });
+      const response = await axiosInstance.patch(`/collections/${id}/status`, { status });
       return response.data.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to change status';
@@ -91,7 +91,7 @@ export const deleteCollection = createAsyncThunk(
   'collections/delete',
   async (id, thunkAPI) => {
     try {
-      const response = await axiosInstance.delete(`/admin/collections/${id}`);
+      const response = await axiosInstance.delete(`/collections/${id}`);
       return { id, message: response.data.message };
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to delete collection';
@@ -105,7 +105,7 @@ export const deleteCollectionImage = createAsyncThunk(
   'collections/deleteImage',
   async (fileId, thunkAPI) => {
     try {
-      const response = await axiosInstance.delete(`/admin/collections/image/${fileId}`);
+      const response = await axiosInstance.delete(`/collections/image/${fileId}`);
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to delete image from cloud storage';

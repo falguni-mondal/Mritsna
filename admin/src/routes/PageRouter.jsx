@@ -23,6 +23,7 @@ import OrderDetails from "../pages/services/orders/OrderDetails";
 import Reviews from "../pages/panel/Reviews";
 import ReviewDetails from "../pages/services/reviews/ReviewDetails";
 import Collections from "../pages/panel/Collections";
+import CollectionForm from "../pages/services/collection/CollectionForm";
 // import Orders from "../pages/panel/Orders";
 // import Carts from "../pages/panel/Carts";
 // import Wishlists from "../pages/panel/Wishlists";
@@ -79,6 +80,8 @@ const PageRouter = () => {
         <Route path="reviews" element={<Reviews />} />
         <Route path="reviews/:productId" element={<ReviewDetails />} />
         <Route path="collections" element={<Collections />} />
+        <Route path="collections/new" element={<CollectionForm />} />
+        <Route path="collections/edit/:id" element={<CollectionForm />} />
 
 
         {/* <Route path="orders" element={<Orders />} /> */}

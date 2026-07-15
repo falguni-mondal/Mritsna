@@ -60,7 +60,7 @@ app.use(parser());
 
 
 // Dynamic CORS -----------------------------------------------------------------------------------------------------------------------------
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [process.env.FRONTEND_URL, process.env.ADMIN_FRONTEND_URL];
+const allowedOrigins = [process.env.FRONTEND_URL, process.env.ADMIN_FRONTEND_URL, process.env.SUB_FRONTEND_URL];
 
 app.use(
   cors({
