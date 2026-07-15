@@ -9,6 +9,7 @@ const navItems = [
   { id: "dashboard", label: "Overview", path: "/admin/dashboard", icon: "solar:widget-5-linear" },
   { id: "products", label: "Products", path: "/admin/products", icon: "lucide:package" },
   { id: "inventory", label: "Inventory", path: "/admin/inventory", icon: "lucide:archive" },
+  { id: "collections", label: "Collections", path: "/admin/collections", icon: "lucide:grid" },
   { id: "orders", label: "Orders", path: "/admin/orders", icon: "ph:truck-light" },
   { id: "carts", label: "Carts", path: "/admin/carts", icon: "carbon:shopping-cart" },
   { id: "wishlists", label: "Wishlists", path: "/admin/wishlists", icon: "mingcute:heart-line" },

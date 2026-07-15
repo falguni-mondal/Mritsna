@@ -15,6 +15,7 @@ import adminWishlistRoutes from './routes/admin/admin.wishlist.routes.js';
 import adminCouponRoutes from './routes/admin/admin.coupon.routes.js';
 import adminOrderRoutes from './routes/admin/admin.order.routes.js';
 import adminReviewRoutes from './routes/admin/admin.review.routes.js';
+import adminCollectionRoutes from './routes/admin/admin.collection.routes.js';
 
 import authRouter from "./routes/common/auth.routes.js";
 import productRoutes from './routes/common/product.routes.js';
@@ -87,6 +88,7 @@ app.use('/api/v1/admin/wishlists', adminWishlistRoutes);
 app.use('/api/v1/admin/coupons', adminCouponRoutes);
 app.use('/api/v1/admin/orders', adminOrderRoutes);
 app.use('/api/v1/admin/reviews', adminReviewRoutes);
+app.use('/api/v1/admin/collections', adminCollectionRoutes);
 
 //  public routes
 app.use("/api/v1/auth", authRouter);

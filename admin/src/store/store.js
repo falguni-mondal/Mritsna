@@ -6,6 +6,7 @@ import adminWishlistReducer from "./slices/wishlistSlice";
 import adminCouponReducer from "./slices/couponSlice";
 import adminOrderReducer from './slices/orderSlice';
 import adminReviewReducer from './slices/reviewSlice';
+import collectionReducer from './slices/collectionSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,5 +17,6 @@ export const store = configureStore({
     adminCoupon: adminCouponReducer,
     adminOrders: adminOrderReducer,
     adminReviews: adminReviewReducer,
+    adminCollection: collectionReducer,
   },
 });
