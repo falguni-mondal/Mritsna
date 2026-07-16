@@ -243,7 +243,7 @@ const About = () => {
         
         <div className="w-full aspect-[16/9] lg:aspect-[2.5/1] overflow-hidden rounded-[2px] relative parallax-wrapper mb-16">
           <img 
-            src="/studio.png" 
+            src="/studio.webp" 
             alt="Minimalist sunlit ceramics studio" 
             className="w-full h-[130%] object-cover absolute top-[-15%] left-0 will-change-transform"
           />
