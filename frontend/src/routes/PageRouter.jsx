@@ -1,5 +1,7 @@
 import React from "react";
 import { Route, Routes } from "react-router-dom";
+
+// Pages
 import SignIn from "../pages/Signin";
 import SignUp from "../pages/SignUp";
 import Verification from "../pages/Verification";
@@ -9,16 +11,21 @@ import Shop from "../pages/Shop";
 import Product from "../pages/Product";
 import Dashboard from "../pages/Dashboard";
 import Orders from "../pages/Orders"; 
-import TrackOrder from "../pages/TrackOrder"; // <-- IMPORT IT HERE
+import TrackOrder from "../pages/TrackOrder";
 import Cart from "../pages/Cart";
 import Wishlist from "../pages/Wishlist";
 import Checkout from "../pages/Checkout";
-import GuestRoute from "../components/auth/GuestRoute";
-import ProtectedRoute from "../components/auth/ProtectedRoute";
 import NotFound from "../pages/NotFound";
 import Addresses from "../pages/Addresses";
 import Contact from "../pages/Contact";
 import Collection from "../pages/Collection";
+
+// Auth Wrappers
+import GuestRoute from "../components/auth/GuestRoute";
+import ProtectedRoute from "../components/auth/ProtectedRoute";
+import ShippingPolicy from "../pages/ShippingPolicy";
+import PrivacyPolicy from "../pages/PrivacyPolicy";
+import Terms from "../pages/Terms";
 
 const PageRouter = () => {
   return (
@@ -36,6 +43,9 @@ const PageRouter = () => {
       <Route path="/track-order/:orderId?" element={<TrackOrder />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/collection" element={<Collection />} />
+      <Route path="/shipping-returns" element={<ShippingPolicy />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<Terms />} />
 
       {/* ==========================================
           GUEST ROUTES (Only accessible if NOT logged in)

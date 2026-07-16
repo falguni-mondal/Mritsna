@@ -55,82 +55,67 @@ const Footer = () => {
     });
   };
 
+  const shopCategories = ["Vase", "Decor", "Tumbler"];
+
   return (
     <footer
       ref={footerRef}
       className="relative w-full bg-[#0a0a0a] text-[#f8f8f8] overflow-hidden z-0"
     >
-      {/* The footer-inner div is the target of the parallax animation.
-        It starts shifted up and pushes down as the user scrolls, 
-        creating the "curtain" depth illusion.
-      */}
       <div className="footer-inner relative w-full pt-40 lg:pt-32 pb-6 px-6 lg:px-12 flex flex-col justify-between min-h-screen lg:min-h-[80vh]">
         <div className="max-w-[1400px] mx-auto w-full flex-grow">
           {/* TOP HALF: The Grid Layout */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 lg:gap-8 mb-20 lg:mb-32">
-            {/* Column 1: Studio */}
+            
+            {/* Column 1: Explore */}
             <div className="flex flex-col">
               <span className="footer-fade block text-[0.6rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-6">
-                Studio
+                Explore
               </span>
               <ul className="flex flex-col gap-3">
                 <li className="footer-fade">
                   <Link
-                    to="/about"
+                    to="/"
                     className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
                   >
-                    Ethos
+                    Home
                   </Link>
                 </li>
                 <li className="footer-fade">
                   <Link
-                    to="/portfolio"
+                    to="/shop"
                     className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
                   >
-                    Archive
+                    Shop
                   </Link>
                 </li>
                 <li className="footer-fade">
                   <Link
-                    to="/bespoke"
+                    to="/collection"
                     className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
                   >
-                    Bespoke
+                    Curated Sets
                   </Link>
                 </li>
               </ul>
             </div>
 
-            {/* Column 2: Collections */}
+            {/* Column 2: Categories */}
             <div className="flex flex-col">
               <span className="footer-fade block text-[0.6rem] font-bold tracking-[0.3em] uppercase opacity-50 mb-6">
-                Collections
+                Categories
               </span>
               <ul className="flex flex-col gap-3">
-                <li className="footer-fade">
-                  <Link
-                    to="/collection/vessels"
-                    className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
-                  >
-                    Vessels
-                  </Link>
-                </li>
-                <li className="footer-fade">
-                  <Link
-                    to="/collection/tableware"
-                    className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
-                  >
-                    Tableware
-                  </Link>
-                </li>
-                <li className="footer-fade">
-                  <Link
-                    to="/collection/lighting"
-                    className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
-                  >
-                    Lighting
-                  </Link>
-                </li>
+                {shopCategories.map((cat) => (
+                  <li key={cat} className="footer-fade">
+                    <Link
+                      to={`/shop?category=${encodeURIComponent(cat)}`}
+                      className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
+                    >
+                      {cat}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
 
@@ -142,19 +127,11 @@ const Footer = () => {
               <ul className="flex flex-col gap-3">
                 <li className="footer-fade">
                   <Link
-                    to="/faq"
-                    className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
-                  >
-                    Care & FAQ
-                  </Link>
-                </li>
-                <li className="footer-fade">
-                  <a
-                    href="mailto:hello@mritsna.com"
+                    to="/contact"
                     className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
                   >
                     Contact
-                  </a>
+                  </Link>
                 </li>
                 <li className="footer-fade">
                   <Link
@@ -186,12 +163,12 @@ const Footer = () => {
                   </li>
                   <li className="footer-fade">
                     <a
-                      href="https://pinterest.com"
+                      href="https://facebook.com"
                       target="_blank"
                       rel="noreferrer"
                       className="text-sm font-light tracking-widest uppercase hover:opacity-50 transition-opacity duration-300"
                     >
-                      Pinterest
+                      Facebook
                     </a>
                   </li>
                 </ul>
@@ -215,7 +192,7 @@ const Footer = () => {
           <div className="w-full overflow-hidden flex justify-center pointer-events-none select-none">
             <Link to="/">
               <img
-                className="w-[80vw]"
+                className="w-[80vw] lg:w-[70vw]"
                 src="/logo_white.svg"
                 alt="Mritsna Logo"
               />

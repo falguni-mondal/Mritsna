@@ -9,13 +9,15 @@ import {
   createNewCollection, 
   updateExistingCollection, 
   fetchCollectionById,
-  clearCollectionDetails 
+  clearCollectionDetails,
+  deleteCollectionImage
 } from '../../../store/slices/collectionSlice';
 import { fetchAdminProducts } from '../../../store/slices/productSlice';
 
 // Sub-components
 import CollectionHotspotEditor from '../../../components/collection/CollectionHotspotEditor';
 import ProductMultiSelect from '../../../components/collection/ProductMultiSelect';
+import CollectionImageUploader from '../../../components/collection/CollectionImageUploader';
 
 const CollectionForm = () => {
   const { id } = useParams();
@@ -32,7 +34,7 @@ const CollectionForm = () => {
     title: '',
     subtitle: '',
     description: '',
-    status: 'draft',
+    status: 'active',
     heroImage: null, 
     lookbook: {
       image: null,
@@ -102,6 +104,51 @@ const CollectionForm = () => {
     }));
   };
 
+  // --- Real-Time Image Upload Handlers ---
+  const onHeroUploadSuccess = ({ fileId, url, altText }) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      heroImage: { 
+        imagekitFileId: fileId, 
+        baseUrl: url, 
+        altText: formData.title || altText 
+      } 
+    }));
+  };
+
+  const onLookbookUploadSuccess = ({ fileId, url, altText }) => {
+    handleNestedChange('lookbook', 'image', { 
+      imagekitFileId: fileId, 
+      baseUrl: url, 
+      altText: formData.title ? `${formData.title} Lookbook` : altText 
+    });
+  };
+
+  const handleRemoveHeroImage = async () => {
+    if (formData.heroImage?.imagekitFileId) {
+      try {
+        await dispatch(deleteCollectionImage(formData.heroImage.imagekitFileId)).unwrap();
+        setFormData(prev => ({ ...prev, heroImage: null }));
+        toast.success("Image removed from cloud");
+      } catch (error) {
+        toast.error("Failed to remove image from cloud storage");
+      }
+    }
+  };
+
+  const handleRemoveLookbookImage = async () => {
+    if (formData.lookbook.image?.imagekitFileId) {
+      try {
+        await dispatch(deleteCollectionImage(formData.lookbook.image.imagekitFileId)).unwrap();
+        handleNestedChange('lookbook', 'image', null);
+        toast.success("Image removed from cloud");
+      } catch (error) {
+        toast.error("Failed to remove image from cloud storage");
+      }
+    }
+  };
+
+  // --- Submission ---
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -134,7 +181,6 @@ const CollectionForm = () => {
     );
   }
 
-  // Notice the pb-32 so the fixed footer doesn't cover the bottom of the form
   return (
     <div className="w-full max-w-5xl mx-auto px-6 py-12 pb-32">
       <div className="flex items-center justify-between mb-8">
@@ -220,26 +266,25 @@ const CollectionForm = () => {
             <label className="block text-xs font-bold text-black/70 uppercase tracking-widest mb-2">Hero Background Image</label>
             <p className="text-xs text-black/50 mb-4">High-resolution, landscape orientation recommended (e.g. 3200x1800).</p>
             
-            <div className="w-full aspect-[21/9] bg-[#f8f8f8] border border-dashed border-black/20 flex flex-col items-center justify-center relative overflow-hidden group">
+            <div className="w-full min-h-[300px] bg-[#f8f8f8] border border-black/10 flex flex-col items-center justify-center relative overflow-hidden group">
               {formData.heroImage ? (
                 <>
-                  <img src={formData.heroImage.baseUrl} alt="Hero" className="w-full h-full object-cover" />
+                  <img src={formData.heroImage.baseUrl} alt="Hero" className="w-full h-full object-cover aspect-[21/9]" />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button 
                       type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, heroImage: null }))}
-                      className="bg-white text-black px-4 py-2 text-xs font-bold tracking-widest uppercase"
+                      onClick={handleRemoveHeroImage}
+                      className="bg-white text-black px-4 py-2 text-xs font-bold tracking-widest uppercase hover:bg-red-50 hover:text-red-600 transition-colors"
                     >
                       Remove & Replace
                     </button>
                   </div>
                 </>
               ) : (
-                <div className="text-center">
-                  <Icon icon="ph:upload-simple-light" className="text-4xl text-black/40 mx-auto mb-2" />
-                  <span className="text-sm font-medium text-black/60">Upload ImageKit Component Here</span>
-                  <button type="button" onClick={() => setFormData(prev => ({...prev, heroImage: { imagekitFileId: 'mock123', baseUrl: 'https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=3200', altText: 'Hero' }}))} className="mt-4 text-xs underline block mx-auto">Mock Upload</button>
-                </div>
+                <CollectionImageUploader 
+                  onUploadSuccess={onHeroUploadSuccess} 
+                  label="Upload Hero Image" 
+                />
               )}
             </div>
           </div>
@@ -249,14 +294,16 @@ const CollectionForm = () => {
             
             <div className="mb-8 w-full md:w-1/2">
                {!formData.lookbook.image ? (
-                 <div className="w-full h-48 bg-[#f8f8f8] border border-dashed border-black/20 flex flex-col items-center justify-center">
-                    <span className="text-sm font-medium text-black/60">Upload Lookbook Image</span>
-                    <button type="button" onClick={() => handleNestedChange('lookbook', 'image', { imagekitFileId: 'mock456', baseUrl: 'https://images.unsplash.com/photo-1578500494198-246f612b3b6d?q=80&w=2000', altText: 'Lookbook' })} className="mt-4 text-xs underline">Mock Upload</button>
+                 <div className="w-full h-48 bg-[#f8f8f8] border border-black/10">
+                    <CollectionImageUploader 
+                      onUploadSuccess={onLookbookUploadSuccess} 
+                      label="Upload Lookbook Image" 
+                    />
                  </div>
                ) : (
                  <div className="flex justify-between items-center bg-[#f8f8f8] p-3 border border-black/10">
                     <span className="text-sm font-medium truncate">Lookbook Image Uploaded</span>
-                    <button type="button" onClick={() => handleNestedChange('lookbook', 'image', null)} className="text-xs text-red-500 font-bold tracking-widest uppercase">Remove</button>
+                    <button type="button" onClick={handleRemoveLookbookImage} className="text-xs text-red-500 font-bold tracking-widest uppercase hover:text-red-700">Remove</button>
                  </div>
                )}
             </div>
@@ -275,8 +322,6 @@ const CollectionForm = () => {
           <h2 className="text-sm font-bold uppercase tracking-[0.1em] border-b border-black/10 pb-4 mb-6">Inventory Links</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            
-            {/* Custom Grid Selector */}
             <div>
               <ProductMultiSelect
                 label="The Pieces (Asymmetric Grid)"
@@ -287,7 +332,6 @@ const CollectionForm = () => {
               />
             </div>
 
-            {/* Custom Bundle Selector */}
             <div className="flex flex-col gap-6">
               <ProductMultiSelect
                 label="The Collective (Shop the Set)"
@@ -311,10 +355,8 @@ const CollectionForm = () => {
                 </div>
               </div>
             </div>
-
           </div>
         </section>
-
       </form>
 
       {/* --- 4. The Fixed Footer Bar --- */}
@@ -338,7 +380,6 @@ const CollectionForm = () => {
           )}
         </button>
       </div>
-
     </div>
   );
 };

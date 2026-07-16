@@ -1,6 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Icon } from "@iconify/react";
+
+// Redux Actions
+import { fetchCollections } from "../store/features/collectionSlice";
 
 // Sub-components
 import CollectionHero from "../components/collection/CollectionHero";
@@ -11,37 +16,80 @@ import CollectionBundle from "../components/collection/CollectionBundle";
 // Register ScrollTrigger globally for the page
 gsap.registerPlugin(ScrollTrigger);
 
-// --- Dummy Data ---
-const collectionData = {
-  title: "The Obsidian Series",
-  subtitle: "Autumn / Winter 2026",
-  description: "A study in raw texture and minimalist form. Fired at 1600°C, each piece absorbs ambient light, rendering deep, cinematic shadows that anchor the modern dining space.",
-  heroImage: "https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=3200&auto=format&fit=crop",
-  lookbookImage: "https://images.unsplash.com/photo-1578500494198-246f612b3b6d?q=80&w=2000&auto=format&fit=crop",
-  lookbookHotspots: [
-    { id: 1, top: "45%", left: "30%", title: "Obsidian Platter", price: "₹4,500" },
-    { id: 2, top: "60%", left: "65%", title: "Matte Serving Bowl", price: "₹2,800" },
-  ],
-  products: [
-    { id: "p1", name: "Obsidian Platter", price: "₹4,500", image: "https://images.unsplash.com/photo-1613521140785-e85e427f8002?q=80&w=800&auto=format&fit=crop", offset: "mt-0" },
-    { id: "p2", name: "Tall Cylinder Vase", price: "₹5,200", image: "https://images.unsplash.com/photo-1581783342308-f792dbdd27c5?q=80&w=800&auto=format&fit=crop", offset: "lg:mt-32" },
-    { id: "p3", name: "Matte Serving Bowl", price: "₹2,800", image: "https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=800&auto=format&fit=crop", offset: "lg:mt-16" },
-  ]
-};
-
 const Collection = () => {
+  const dispatch = useDispatch();
+  
+  // Pull the massive populated array from Redux
+  const { collections, isLoading, isError, message } = useSelector((state) => state.collection);
+
+  // Fetch data on mount
+  useEffect(() => {
+    dispatch(fetchCollections());
+  }, [dispatch]);
+
+  // Handle Loading State
+  if (isLoading && collections.length === 0) {
+    return (
+      <div className="w-full min-h-screen bg-[#f8f8f8] flex flex-col items-center justify-center">
+        <Icon icon="ph:spinner-gap-light" className="animate-spin text-5xl text-black/50 mb-4" />
+        <p className="text-[0.65rem] font-bold tracking-[0.2em] uppercase text-black/40">Curating Collections</p>
+      </div>
+    );
+  }
+
+  // Handle Error State
+  if (isError) {
+    return (
+      <div className="w-full min-h-screen bg-[#f8f8f8] flex flex-col items-center justify-center text-center px-6">
+        <Icon icon="ph:warning-circle-light" className="text-5xl text-red-400 mb-4" />
+        <h2 className="head-font text-3xl mb-2">Atmosphere Unavailable</h2>
+        <p className="text-sm font-medium text-black/60 max-w-md mx-auto">{message}</p>
+      </div>
+    );
+  }
+
+  // Handle Empty State
+  if (collections.length === 0) {
+    return (
+      <div className="w-full min-h-screen bg-[#f8f8f8] flex flex-col items-center justify-center text-center px-6">
+        <h2 className="head-font text-3xl mb-2">No Active Collections</h2>
+        <p className="text-sm font-medium text-black/60 max-w-md mx-auto">Our curators are currently preparing the next series. Check back soon.</p>
+      </div>
+    );
+  }
+
   return (
     <main className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a]">
-      <CollectionHero collectionData={collectionData} />
-      
-      <CollectionLookbook 
-        lookbookImage={collectionData.lookbookImage} 
-        lookbookHotspots={collectionData.lookbookHotspots} 
-      />
-      
-      <CollectionGrid products={collectionData.products} />
-      
-      <CollectionBundle />
+      {/* Map through the array and render a complete block for each active collection */}
+      {collections.map((collection, index) => (
+        <div key={collection._id} className="relative w-full border-b-[16px] border-[#1a1a1a]">
+          
+          {/* 1. Hero Section */}
+          <CollectionHero collectionData={collection} />
+          
+          {/* 2. Interactive Lookbook (Only render if data exists) */}
+          {collection.lookbook?.image && (
+            <CollectionLookbook 
+              lookbookImage={collection.lookbook.image} 
+              lookbookHotspots={collection.lookbook.hotspots || []} 
+            />
+          )}
+          
+          {/* 3. The Asymmetric Grid */}
+          {collection.gridProducts?.length > 0 && (
+            <CollectionGrid products={collection.gridProducts} />
+          )}
+          
+          {/* 4. The Complete Bundle Upsell */}
+          {collection.bundle?.products?.length > 0 && (
+            <CollectionBundle 
+              bundleData={collection.bundle} 
+              collectionTitle={collection.title}
+            />
+          )}
+
+        </div>
+      ))}
     </main>
   );
 };

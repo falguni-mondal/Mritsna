@@ -134,7 +134,7 @@ const About = () => {
         
         <div className="hero-img-container w-full aspect-[16/9] lg:aspect-[21/9] overflow-hidden rounded-[2px] relative parallax-wrapper">
           <img 
-            src="/about_hero.png" 
+            src="/about_hero.webp" 
             alt="Hands shaping clay on a potter's wheel" 
             className="w-full h-[120%] object-cover absolute top-[-10%] left-0 will-change-transform"
           />
@@ -163,7 +163,7 @@ const About = () => {
           
           <div className="order-1 lg:order-2 w-full aspect-[4/5] overflow-hidden rounded-[2px] relative parallax-wrapper">
             <img 
-              src="/about_root.png" 
+              src="/about_root.webp" 
               alt="Rich dark soil with Sanskrit imprint" 
               className="w-full h-[120%] object-cover absolute top-[-10%] left-0 will-change-transform"
             />
@@ -178,7 +178,7 @@ const About = () => {
         <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
           <div className="w-full aspect-[4/5] overflow-hidden rounded-[2px] relative parallax-wrapper">
             <img 
-              src="/about_process.png" 
+              src="/about_process.webp" 
               alt="Glowing brick kiln mid-firing" 
               className="w-full h-[120%] object-cover absolute top-[-10%] left-0 will-change-transform"
             />
@@ -192,10 +192,10 @@ const About = () => {
               Trial by Fire.
             </h2>
             <p className="split-lines text-base font-light opacity-80 leading-relaxed mb-6">
-              Our process is intentionally slow. After being thrown on the wheel and left to dry, each piece faces the crucible of the kiln. Fired at temperatures exceeding 1200°C for over 48 hours, the raw clay undergoes a violent transformation.
+              Our process is intentionally slow. After being thrown on the wheel and left to dry, each piece faces the crucible of the kiln. Fired at temperatures exceeding 1400°C for over 48 hours, the raw clay undergoes a violent transformation.
             </p>
             <p className="split-lines text-base font-light opacity-80 leading-relaxed">
-              It is in this extreme heat that the clay vitrifies, becoming stone-like in its durability. We cannot completely control the fire; we can only guide it. The result is that no two Mritsna vessels will ever share the exact same firing marks.
+              It is in this extreme heat that the clay vitrifies, becoming stone-like in its durability. We cannot completely control the fire; we can only guide it. The result is that no two Mritsna products will ever share the exact same firing marks.
             </p>
           </div>
         </div>

@@ -158,7 +158,7 @@ const Curation = () => {
         >
           <div className="aspect-[4/5] overflow-hidden">
             <img 
-              src="/vessel.png" 
+              src="/curated1.webp" 
               alt="Tall Mritsna vessel"
               className="w-full h-full object-cover origin-center mix-blend-multiply"
             />
@@ -187,7 +187,7 @@ const Curation = () => {
         >
           <div className="aspect-square overflow-hidden shadow-sm">
             <img 
-              src="/vessel_macro.png" 
+              src="/curated2.webp" 
               alt="Intricate glaze texture detail"
               className="w-full h-full object-cover origin-center mix-blend-multiply hover:scale-105 transition-transform duration-[2s] ease-out"
             />
@@ -201,7 +201,7 @@ const Curation = () => {
         >
           <div className="aspect-video overflow-hidden">
             <img 
-              src="/bowl_sphere.png" 
+              src="/curated3.webp" 
               alt="Mritsna bowl with smooth sphere juxtaposition"
               className="w-full h-full object-cover origin-center mix-blend-multiply"
             />

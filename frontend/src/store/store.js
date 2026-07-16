@@ -8,6 +8,7 @@ import regionReducer from "./features/regionSlice";
 import orderReducer from "./features/orderSlice";
 import addressReducer from './features/addressSlice';
 import reviewReducer from './features/reviewSlice';
+import collectionReducer from './features/collectionSlice';
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     orders: orderReducer,
     addresses: addressReducer,
     reviews: reviewReducer,
+    collection: collectionReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

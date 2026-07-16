@@ -42,7 +42,7 @@ export const fetchSingleProduct = createAsyncThunk(
   }
 );
 
-// --- NEW THUNK: Fetch Unique Categories ---
+// --- Fetch Unique Categories ---
 export const fetchUniqueCategories = createAsyncThunk(
   'product/fetchUniqueCategories',
   async (_, thunkAPI) => {
@@ -62,7 +62,6 @@ const initialState = {
   products: [],
   singleProduct: null,
   
-  // NEW: Store for dynamic categories
   categories: [], 
   
   pagination: {

@@ -207,7 +207,7 @@ const Hero = () => {
   return (
     <main 
       ref={masterRef} 
-      className="relative w-full h-[100svh] bg-[#f8f8f8] flex items-center justify-center overflow-hidden" 
+      className="relative w-full h-[100dvh] lg:max-h-[880px] bg-[#f8f8f8] flex items-center justify-center overflow-hidden" 
       id="home-hero"
     >
       
@@ -219,7 +219,7 @@ const Hero = () => {
         <div 
           ref={bgRef}
           className="absolute top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat will-change-transform"
-          style={{ backgroundImage: 'url("/hero.jpeg")' }}
+          style={{ backgroundImage: 'url("/hero.webp")' }}
         />
         
         {/* Only render the video on the first visit so it doesn't drain resources */}
@@ -307,7 +307,7 @@ const Hero = () => {
           </div>
 
           <Link
-            to="/"
+            to="/product/the-patina-gourd-vase"
             ref={productCardRef}
             data-cursor="explore"
             className="relative group w-full md:w-[28rem] lg:w-[22rem] flex flex-row lg:flex-col items-center lg:items-start gap-5 lg:gap-4 txt-light pointer-events-auto"
@@ -318,7 +318,7 @@ const Hero = () => {
             >
               <img
                 className="w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105 opacity-90 group-hover:opacity-100"
-                src="/hero_product.png"
+                src="/hero_prod.webp"
                 alt="hero-product"
               />
             </div>
@@ -326,15 +326,15 @@ const Hero = () => {
             <div className="flex flex-col lg:flex-row justify-center lg:justify-between lg:items-end w-full lg:px-1 flex-1">
               <div className="flex flex-col">
                 <span className="uppercase text-[0.55rem] md:text-[0.65rem] tracking-[0.2em] font-medium opacity-60 mb-1 lg:mb-1.5">
-                  Study No. 01
+                  Vases
                 </span>
                 <h2 className="text-lg md:text-xl lg:text-xl head-font tracking-wide mb-2 lg:mb-0">
-                  Alpha Product
+                  The Patina Gourd Vase
                 </h2>
               </div>
 
               <div className="text-xs md:text-sm tracking-widest font-light border-b border-[rgba(248,248,248,0.3)] pb-1 w-fit">
-                ₹ 140.00
+                ₹ 5,000.00
               </div>
             </div>
           </Link>

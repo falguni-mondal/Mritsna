@@ -36,7 +36,7 @@ const PreFooterContact = () => {
       const tlDesk = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: "top 75%", // Triggers when section is 75% down the viewport
+          start: "top 75%", 
           toggleActions: "play none none reverse",
         }
       });
@@ -69,7 +69,7 @@ const PreFooterContact = () => {
       const tlMob = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: "top 60%", // Triggers slightly later on mobile screens
+          start: "top 60%", 
           toggleActions: "play none none reverse",
         }
       });
@@ -153,43 +153,20 @@ const PreFooterContact = () => {
               </a>
             </div>
 
-            {/* Contact Block 2: Studio & Press */}
+            {/* Contact Block 2: Wholesale & Trade */}
             <div className="relative w-full pt-8 pb-8 group">
               <div className="divider-line absolute top-0 left-0 w-full h-[1px] bg-[#f8f8f8]/20" />
-              
-              <a 
-                href="mailto:press@mritsna.com" 
-                className="contact-item flex items-center justify-between w-full outline-none"
-              >
-                <div>
-                  <span className="block text-[0.6rem] font-light tracking-[0.2em] uppercase opacity-50 mb-2">
-                    Studio & Press
-                  </span>
-                  <span className="block text-xl md:text-2xl font-light tracking-wide group-hover:opacity-70 transition-opacity duration-300">
-                    press@mritsna.com
-                  </span>
-                </div>
-                <div className="text-xl transform group-hover:translate-x-2 transition-transform duration-300 opacity-50 group-hover:opacity-100">
-                  →
-                </div>
-              </a>
-            </div>
-
-            {/* Contact Block 3: Self-Serve Utility (FAQ) */}
-            <div className="relative w-full pt-8 pb-8 group">
-              <div className="divider-line absolute top-0 left-0 w-full h-[1px] bg-[#f8f8f8]/20" />
-              <div className="divider-line absolute bottom-0 left-0 w-full h-[1px] bg-[#f8f8f8]/20" />
               
               <Link 
-                to="/faq" 
+                to="/contact" 
                 className="contact-item flex items-center justify-between w-full outline-none"
               >
                 <div>
                   <span className="block text-[0.6rem] font-light tracking-[0.2em] uppercase opacity-50 mb-2">
-                    Self-Service
+                    Partnerships
                   </span>
                   <span className="block text-xl md:text-2xl font-light tracking-wide group-hover:opacity-70 transition-opacity duration-300">
-                    Care & FAQ
+                    Wholesale & Trade
                   </span>
                 </div>
                 <div className="text-xl transform group-hover:translate-x-2 transition-transform duration-300 opacity-50 group-hover:opacity-100">
@@ -198,7 +175,30 @@ const PreFooterContact = () => {
               </Link>
             </div>
 
-            {/* Physical Location Detail (No link, just grounding info) */}
+            {/* Contact Block 3: Order Tracking */}
+            <div className="relative w-full pt-8 pb-8 group">
+              <div className="divider-line absolute top-0 left-0 w-full h-[1px] bg-[#f8f8f8]/20" />
+              <div className="divider-line absolute bottom-0 left-0 w-full h-[1px] bg-[#f8f8f8]/20" />
+              
+              <Link 
+                to="/track-order" 
+                className="contact-item flex items-center justify-between w-full outline-none"
+              >
+                <div>
+                  <span className="block text-[0.6rem] font-light tracking-[0.2em] uppercase opacity-50 mb-2">
+                    Self-Service
+                  </span>
+                  <span className="block text-xl md:text-2xl font-light tracking-wide group-hover:opacity-70 transition-opacity duration-300">
+                    Track Your Order
+                  </span>
+                </div>
+                <div className="text-xl transform group-hover:translate-x-2 transition-transform duration-300 opacity-50 group-hover:opacity-100">
+                  →
+                </div>
+              </Link>
+            </div>
+
+            {/* Physical Location Detail */}
             <div className="contact-item pt-10">
               <span className="block text-[0.6rem] font-light tracking-[0.2em] uppercase opacity-50 mb-2">
                 Location

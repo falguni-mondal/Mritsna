@@ -1,17 +1,18 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom"; 
 
-// Sort options remain static, but categories are removed from here.
 const sortOptions = ["Featured", "Price: Low to High", "Price: High to Low"];
 
-// Destructure the new dynamic categories prop
 const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeSort, setActiveSort }) => {
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false); 
   
+  // Initialize URL parameter hook
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const dropdownRef = useRef(null);
   const categoryDropdownRef = useRef(null); 
 
-  // Prepend "All" to the dynamic array so users have a way to clear the filter
   const filterOptions = ["All", ...categories];
 
   useEffect(() => {
@@ -27,6 +28,34 @@ const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeS
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // --- URL & State Sync Handlers ---
+  const handleCategoryChange = (cat) => {
+    if (cat === "All") {
+      searchParams.delete("category");
+    } else {
+      searchParams.set("category", cat);
+    }
+    // Always reset to page 1 when changing filters so they don't land on an empty page
+    searchParams.delete("page"); 
+    setSearchParams(searchParams);
+    
+    setActiveCategory(cat);
+    setIsCategoryOpen(false);
+  };
+
+  const handleSortChange = (option) => {
+    if (option === "Featured") {
+      searchParams.delete("sort");
+    } else {
+      searchParams.set("sort", option);
+    }
+    searchParams.delete("page");
+    setSearchParams(searchParams);
+
+    setActiveSort(option);
+    setIsSortOpen(false);
+  };
+
   return (
     <div className="sticky top-[53px] lg:top-[60px] z-40 w-full bg-[#f8f8f8]/80 backdrop-blur-md border-b border-black/5">
       <div className="max-w-[1600px] mx-auto px-6 lg:px-12 py-6 flex justify-between items-center gap-8">
@@ -36,7 +65,7 @@ const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeS
           {filterOptions.map((cat) => (
             <li key={cat} className="flex-shrink-0">
               <button
-                onClick={() => setActiveCategory(cat)}
+                onClick={() => handleCategoryChange(cat)}
                 className={`group text-[0.65rem] font-bold tracking-[0.2em] uppercase transition-all duration-300 relative pb-1`}
               >
                 {cat}
@@ -69,10 +98,7 @@ const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeS
             {filterOptions.map((cat) => (
               <button
                 key={cat}
-                onClick={() => {
-                  setActiveCategory(cat);
-                  setIsCategoryOpen(false);
-                }}
+                onClick={() => handleCategoryChange(cat)}
                 className={`text-left px-5 py-3 text-[0.6rem] font-bold tracking-[0.15em] uppercase transition-colors
                   ${activeCategory === cat ? "text-[#1a1a1a] bg-black/5" : "text-[#1a1a1a] hover:bg-black/5"}
                 `}
@@ -101,10 +127,7 @@ const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeS
             {sortOptions.map((option) => (
               <button
                 key={option}
-                onClick={() => {
-                  setActiveSort(option);
-                  setIsSortOpen(false);
-                }}
+                onClick={() => handleSortChange(option)}
                 className={`text-left px-5 py-3 text-[0.6rem] font-bold tracking-[0.15em] uppercase transition-colors
                   ${activeSort === option ? "text-[#1a1a1a] bg-black/5" : "text-[#1a1a1a] hover:bg-black/5"}
                 `}

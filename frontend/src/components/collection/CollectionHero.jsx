@@ -7,22 +7,28 @@ const CollectionHero = ({ collectionData }) => {
   const heroImgRef = useRef(null);
 
   useGSAP(() => {
-    const tl = gsap.timeline();
+    // 1. Text Reveal (Triggered only when this specific collection scrolls into view)
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: heroSectionRef.current,
+        start: "top 75%", // Triggers when the top of the section is 25% from the bottom of the viewport
+        toggleActions: "play none none reverse" // Replays if they scroll back up
+      }
+    });
 
-    // Text Reveal
     tl.fromTo(".hero-reveal", 
       { opacity: 0, y: 40, filter: "blur(10px)" },
       { opacity: 1, y: 0, filter: "blur(0px)", duration: 1.5, stagger: 0.2, ease: "expo.out" }
     );
 
-    // Image Parallax
+    // 2. Image Parallax (Scrubbed to the scroll position)
     gsap.to(heroImgRef.current, {
       yPercent: 30,
       ease: "none",
       scrollTrigger: {
         trigger: heroSectionRef.current,
-        start: "top top",
-        end: "80% top",
+        start: "top bottom",
+        end: "bottom top",
         scrub: true,
       }
     });
@@ -30,11 +36,13 @@ const CollectionHero = ({ collectionData }) => {
 
   return (
     <section ref={heroSectionRef} className="relative w-full h-screen overflow-hidden">
+      {/* Background Image using the real ImageKit URL from MongoDB with optimization params */}
       <div 
         ref={heroImgRef}
         className="absolute inset-[-10%] w-[120%] h-[120%] bg-cover bg-center will-change-transform"
-        style={{ backgroundImage: `url(${collectionData.heroImage})` }}
+        style={{ backgroundImage: `url(${collectionData.heroImage?.baseUrl}?tr=w-1600,q-80,f-webp)` }}
       />
+      {/* Dark overlay for text legibility */}
       <div className="absolute inset-0 bg-black/40" /> 
       
       <div className="absolute bottom-16 lg:bottom-24 left-6 lg:left-12 text-white z-10 max-w-4xl">
@@ -54,6 +62,7 @@ const CollectionHero = ({ collectionData }) => {
           Scroll
         </span>
         <div className="w-[1px] h-12 bg-white/50 overflow-hidden">
+          {/* Ensure you have `animate-scroll-line` defined in your tailwind config/CSS */}
           <div className="w-full h-full bg-white animate-scroll-line origin-top" />
         </div>
       </div>

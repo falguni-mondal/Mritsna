@@ -25,31 +25,45 @@ const SplitText = ({ children, className = "" }) => {
 const categories = [
   {
     id: "01",
-    title: "Vessels",
+    title: "Vase",
     subtitle: "Tall forms & centerpieces",
-    image: "/cat_1.png",
-    link: "/collection/vessels",
+    image: "/vase.webp",
+    link: `/shop?category=${encodeURIComponent("Vase")}`,
   },
   {
     id: "02",
-    title: "Tableware",
-    subtitle: "Plates, bowls & dining",
-    image: "/cat_2.png",
-    link: "/collection/tableware",
+    title: "Tealight Candle",
+    subtitle: "Ambient glowing fixtures",
+    image: "/tealight_candle.webp",
+    link: `/shop?category=${encodeURIComponent("Tealight Candle")}`,
   },
   {
     id: "03",
-    title: "Sculpture",
-    subtitle: "Abstract & decorative forms",
-    image: "/cat_3.png",
-    link: "/collection/sculpture",
+    title: "Mug",
+    subtitle: "Comforting handled forms",
+    image: "/mug.webp",
+    link: `/shop?category=${encodeURIComponent("Mug")}`,
   },
   {
     id: "04",
-    title: "Lighting",
-    subtitle: "Pendants & ambient fixtures",
-    image: "/cat_4.png",
-    link: "/collection/lighting",
+    title: "Decor",
+    subtitle: "Abstract & sculptural forms",
+    image: "/decor.webp",
+    link: `/shop?category=${encodeURIComponent("Decor")}`,
+  },
+  {
+    id: "05",
+    title: "Tumbler",
+    subtitle: "Handleless drinking vessels",
+    image: "/tumbler.webp", // Reusing image style, update if you have specific assets
+    link: `/shop?category=${encodeURIComponent("Tumbler")}`,
+  },
+  {
+    id: "06",
+    title: "Cup",
+    subtitle: "Everyday essentials",
+    image: "/cup.webp", 
+    link: `/shop?category=${encodeURIComponent("Cup")}`,
   },
 ];
 
@@ -69,7 +83,6 @@ const CategoryIndex = () => {
     // ==========================================
     mm.add("(min-width: 1024px)", () => {
       
-      // -- Reveal Animations --
       const deskWords = gsap.utils.toArray(".reveal-word", centerCardRef.current);
       gsap.fromTo(deskWords,
         { opacity: 0, y: 30, filter: "blur(8px)" },
@@ -166,11 +179,11 @@ const CategoryIndex = () => {
       </div>
       <div className="flex flex-col">
         <span className="text-[0.6rem] font-bold tracking-[0.2em] uppercase opacity-50 mb-2">
-          0{cat.id.replace('0', '')} — {cat.subtitle}
+          {cat.id} — {cat.subtitle}
         </span>
         <div className="flex items-center gap-4">
-          <h3 className="head-font text-4xl lg:text-5xl lowercase tracking-tight">
-            {cat.title}
+          <h3 className="head-font text-4xl lg:text-5xl tracking-tight">
+            {cat.title}s
           </h3>
           <span className="opacity-0 -translate-x-4 transition-all duration-500 ease-out group-hover:opacity-100 group-hover:translate-x-0">
             →

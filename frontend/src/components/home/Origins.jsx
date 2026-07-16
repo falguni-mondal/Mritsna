@@ -125,7 +125,7 @@ const Origins = () => {
       <div className="w-full lg:w-1/2 h-[60vh] lg:h-screen overflow-hidden relative flex items-center justify-center">
         <img
           ref={imageRef}
-          src="/originBW.png" 
+          src="/pottery_bw.webp" 
           alt="The crafting process"
           className="w-full h-[120%] object-cover absolute top-0 left-0"
         />
