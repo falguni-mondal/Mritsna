@@ -137,7 +137,7 @@ const BespokeRegistry = () => {
           <div className="lg:col-span-5 flex flex-col mt-10 lg:mt-0">
             <div className="w-full aspect-[4/5] overflow-hidden mb-8 relative group">
               <img 
-                src="/bespoke.webp" 
+                src="/bespoke.jpg" 
                 alt="Ceramist working on raw clay"
                 className="studio-img w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105"
               />

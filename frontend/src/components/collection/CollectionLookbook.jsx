@@ -1,10 +1,12 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Link } from "react-router-dom";
 
 // The Dynamic Hotspot UI
-const Hotspot = ({ topPercentage, leftPercentage, product }) => {
+const Hotspot = ({ topPercentage, leftPercentage, product, isActive, onToggle }) => {
+  const hotspotRef = useRef(null);
+
   // Fail-safe: if the linked product was deleted from the database, hide the pin
   if (!product) return null;
 
@@ -18,29 +20,57 @@ const Hotspot = ({ topPercentage, leftPercentage, product }) => {
     maximumFractionDigits: 0
   }).format(livePrice);
 
+  // Click outside listener to close the popup on mobile when tapping elsewhere
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isActive && hotspotRef.current && !hotspotRef.current.contains(event.target)) {
+        onToggle(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside); // For mobile
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [isActive, onToggle]);
+
   return (
     <div 
-      className="absolute group z-10 -translate-x-1/2 -translate-y-1/2" 
+      ref={hotspotRef}
+      className="absolute z-10 -translate-x-1/2 -translate-y-1/2" 
       style={{ top: `${topPercentage}%`, left: `${leftPercentage}%` }}
+      // Use React events to handle both hover (desktop) and touch (mobile)
+      onMouseEnter={() => window.innerWidth > 1024 && onToggle(true)}
+      onMouseLeave={() => window.innerWidth > 1024 && onToggle(false)}
+      onClick={() => window.innerWidth <= 1024 && onToggle(!isActive)}
     >
       {/* The Pulsing Pin */}
       <div className="relative flex items-center justify-center w-6 h-6 cursor-pointer">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-white transition-transform group-hover:scale-150"></span>
+        <span className={`relative inline-flex rounded-full h-2 w-2 bg-white transition-transform duration-300 ${isActive ? 'scale-150' : 'scale-100'}`}></span>
       </div>
       
-      {/* The Hover Popover */}
-      <div className="absolute top-1/2 left-8 -translate-y-1/2 bg-white/95 backdrop-blur-sm px-4 py-3 min-w-[160px] opacity-0 -translate-x-4 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto shadow-xl">
+      {/* The Popover (Driven by React State instead of CSS :hover) */}
+      <div 
+        className={`absolute top-1/2 left-8 md:left-auto md:top-auto md:bottom-full md:-translate-y-2 lg:top-1/2 lg:bottom-auto lg:left-8 lg:-translate-y-1/2 bg-white/95 backdrop-blur-sm px-4 py-3 min-w-[160px] md:min-w-[180px] shadow-xl transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)]
+          ${isActive ? 'opacity-100 translate-x-0 md:translate-y-0 pointer-events-auto' : 'opacity-0 -translate-x-4 md:translate-x-0 md:translate-y-4 pointer-events-none'}
+        `}
+      >
         <h4 className="head-font text-lg text-black leading-none mb-1 truncate">
           {product.title}
         </h4>
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center justify-between mt-2 gap-4">
           <p className="text-[0.65rem] font-bold tracking-widest text-black/60">
             {formattedPrice}
           </p>
           <Link 
             to={`/product/${product.slug}`}
-            className="text-[0.6rem] uppercase tracking-widest font-bold border-b border-black hover:text-black/60 transition-colors"
+            className="text-[0.6rem] uppercase tracking-widest font-bold border-b border-black hover:text-black/60 transition-colors shrink-0"
+            // Prevent the Link click from bubbling up and triggering the hotspot toggle again
+            onClick={(e) => e.stopPropagation()}
           >
             View Piece
           </Link>
@@ -52,6 +82,10 @@ const Hotspot = ({ topPercentage, leftPercentage, product }) => {
 
 const CollectionLookbook = ({ lookbookImage, lookbookHotspots }) => {
   const lookbookRef = useRef(null);
+  
+  // State to track which hotspot is currently open. 
+  // Storing the ID ensures only one popover can be open at a time on mobile.
+  const [activeHotspotId, setActiveHotspotId] = useState(null);
 
   useGSAP(() => {
     gsap.fromTo(".lookbook-img",
@@ -73,7 +107,7 @@ const CollectionLookbook = ({ lookbookImage, lookbookHotspots }) => {
           We photograph our collections precisely as they are meant to be experienced. Interacting with the raw textures and cinematic lighting reveals the true weight of each piece in a living space.
         </p>
         <span className="text-[0.65rem] font-bold tracking-widest uppercase opacity-40 flex items-center gap-2">
-          Hover over image to explore pieces
+          Tap or hover over image to explore pieces
         </span>
       </div>
 
@@ -83,13 +117,15 @@ const CollectionLookbook = ({ lookbookImage, lookbookHotspots }) => {
           style={{ backgroundImage: `url(${lookbookImage?.baseUrl}?tr=w-1600,q-80,f-webp)` }}
         />
         
-        {/* Map the hotspots and pass the deep-populated product data */}
+        {/* Map the hotspots and pass the active state logic */}
         {lookbookHotspots && lookbookHotspots.map(hotspot => (
           <Hotspot 
             key={hotspot._id} 
             topPercentage={hotspot.topPercentage} 
             leftPercentage={hotspot.leftPercentage}
             product={hotspot.product} 
+            isActive={activeHotspotId === hotspot._id}
+            onToggle={(isOpen) => setActiveHotspotId(isOpen ? hotspot._id : null)}
           />
         ))}
       </div>

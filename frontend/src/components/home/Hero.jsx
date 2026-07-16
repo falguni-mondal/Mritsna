@@ -207,7 +207,7 @@ const Hero = () => {
   return (
     <main 
       ref={masterRef} 
-      className="relative w-full h-[100dvh] lg:max-h-[880px] bg-[#f8f8f8] flex items-center justify-center overflow-hidden" 
+      className="relative w-full h-[100svh] lg:max-h-[880px] bg-[#f8f8f8] flex items-center justify-center overflow-hidden" 
       id="home-hero"
     >
       
@@ -317,7 +317,7 @@ const Hero = () => {
               id="hero-product-img"
             >
               <img
-                className="w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                className="w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105"
                 src="/hero_prod.webp"
                 alt="hero-product"
               />
