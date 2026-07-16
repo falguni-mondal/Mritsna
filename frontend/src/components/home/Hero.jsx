@@ -207,7 +207,7 @@ const Hero = () => {
   return (
     <main 
       ref={masterRef} 
-      className="relative w-full h-[100svh] lg:max-h-[880px] bg-[#f8f8f8] flex items-center justify-center overflow-hidden" 
+      className="relative w-full min-h-[100svh] h-fit lg:h-[100vh] lg:max-h-[880px] bg-[#f8f8f8] flex items-center justify-center overflow-hidden" 
       id="home-hero"
     >
       

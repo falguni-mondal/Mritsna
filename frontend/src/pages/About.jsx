@@ -221,7 +221,7 @@ const About = () => {
 
           <div className="lg:col-span-7 w-full aspect-[4/3] overflow-hidden rounded-[2px] relative parallax-wrapper">
             <img 
-              src="/about_material.png" 
+              src="/about_material.webp" 
               alt="Raw and glazed ceramic shards on linen" 
               className="w-full h-[120%] object-cover absolute top-[-10%] left-0 will-change-transform"
             />

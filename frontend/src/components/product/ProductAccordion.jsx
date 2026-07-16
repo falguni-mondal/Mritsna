@@ -9,7 +9,7 @@ const ProductAccordion = ({ product, variant }) => {
     "Dimensions": product?.dimensions || "Dimensions unavailable",
     ...(variant?.material && { "Material": variant.material }),
     ...(variant?.finish && { "Finish": variant.finish }),
-    "Care": "Hand wash recommended. Do not microwave.",
+    "Care": "Microwave and Dish washer safe.",
     "Shipping": "Free shipping on every order. Ships within 5-7 business days."
   };
 

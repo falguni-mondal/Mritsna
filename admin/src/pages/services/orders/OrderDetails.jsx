@@ -26,7 +26,7 @@ const OrderDetails = () => {
   const storeUrl = import.meta.env.VITE_STORE_URL || "www.mritsna.com";
   const warehouseAdd = import.meta.env.VITE_PICKUP_ADD || "Registered Dispatch Facility";
   const warehouseCity = import.meta.env.VITE_PICKUP_CITY || "Jharkhand";
-  const gstin = import.meta.env.VITE_GSTIN || "19BNYPG7506F1ZJ";
+  const gstin = import.meta.env.VITE_GSTIN || "20AAFCF1838H1Z0";
 
   useEffect(() => {
     if (orderId) {

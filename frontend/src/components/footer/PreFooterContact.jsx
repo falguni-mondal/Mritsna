@@ -205,7 +205,7 @@ const PreFooterContact = () => {
               </span>
               <p className="text-sm font-light opacity-70 leading-relaxed max-w-xs">
                 Available by appointment only.<br />
-                IIT ISM, Dhanbad, Jharkhand, India - 826004
+                Dhanbad, Jharkhand, India - 826004
               </p>
             </div>
 

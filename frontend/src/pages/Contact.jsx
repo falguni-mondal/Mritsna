@@ -120,7 +120,7 @@ const Contact = () => {
               Studio & Showroom
             </h3>
             <p className="text-lg lg:text-xl leading-relaxed max-w-sm font-medium">
-              IIT ISM, Dhanbad<br />
+              Dhanbad<br />
               Jharkhand,<br />
               India 826004
             </p>
@@ -141,13 +141,8 @@ const Contact = () => {
                 </MagneticLink>
               </li>
               <li>
-                <MagneticLink href="https://pinterest.com" className="text-sm font-medium uppercase tracking-widest hover:text-black/60 transition-colors">
-                  Pinterest
-                </MagneticLink>
-              </li>
-              <li>
-                <MagneticLink href="https://twitter.com" className="text-sm font-medium uppercase tracking-widest hover:text-black/60 transition-colors">
-                  Twitter (X)
+                <MagneticLink href="https://facebook.com" className="text-sm font-medium uppercase tracking-widest hover:text-black/60 transition-colors">
+                  Facebook
                 </MagneticLink>
               </li>
             </ul>
