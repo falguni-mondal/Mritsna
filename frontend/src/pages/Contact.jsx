@@ -112,6 +112,10 @@ const Contact = () => {
             <MagneticLink href="mailto:hello@mritsna.com" className="head-font text-3xl lg:text-4xl hover:text-black/70 transition-colors">
               hello@mritsna.com
             </MagneticLink>
+
+            <p className="head-font text-2xl lg:text-3xl hover:text-black/70 transition-colors mt-5">
+              +91 7717799097
+            </p>
           </div>
 
           {/* Section 2: Studio */}
