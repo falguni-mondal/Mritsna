@@ -66,7 +66,7 @@ const ShippingPolicy = () => {
             </p>
             <ul className="list-disc pl-5 text-sm font-light opacity-80 leading-relaxed space-y-2">
               <li>
-                <strong>Fully Prepaid Orders:</strong> We will issue a refund to your original payment method, minus a<strong>strict deduction</strong> to cover the two-way shipping, packaging, and handling costs incurred by our studio.
+                <strong>Fully Prepaid Orders:</strong> We will issue a refund to your original payment method, minus a <strong>strict deduction</strong> to cover the two-way shipping, packaging, and handling costs incurred by our studio.
               </li>
               <li>
                 <strong>Advance Payment (COD) Orders:</strong> If your order was placed using the partial advance payment method for Cash on Delivery, <strong>the advance payment is strictly non-refundable</strong> if the package is unreceived or rejected by the customer.
