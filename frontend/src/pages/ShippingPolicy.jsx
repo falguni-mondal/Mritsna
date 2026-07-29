@@ -39,7 +39,7 @@ const ShippingPolicy = () => {
               1. Order Processing & Dispatch
             </h2>
             <p className="text-sm font-light opacity-80 leading-relaxed">
-              Every Mritsna piece is carefully inspected and securely packaged by our studio team to ensure its safe transit. Orders are typically processed and dispatched within 5 to 7 business days. Once your order has left our atelier, you will receive a confirmation email containing tracking details. 
+              Every Mritsna piece is carefully inspected and securely packaged by our studio team to ensure its safe transit. Orders are typically processed and dispatched within 2 days and delivered within 5 to 7 business days. Once your order has left our atelier, you will receive a confirmation email containing tracking details. 
             </p>
             <p className="text-sm font-light opacity-80 leading-relaxed">
               Please note that transit times vary depending on the destination and the courier service. We are not liable for delays caused by carrier disruptions or unforeseen weather conditions.
@@ -66,7 +66,7 @@ const ShippingPolicy = () => {
             </p>
             <ul className="list-disc pl-5 text-sm font-light opacity-80 leading-relaxed space-y-2">
               <li>
-                <strong>Fully Prepaid Orders:</strong> We will issue a refund to your original payment method, minus a strict <strong>10% deduction</strong> to cover the two-way shipping, packaging, and handling costs incurred by our studio.
+                <strong>Fully Prepaid Orders:</strong> We will issue a refund to your original payment method, minus a<strong>strict deduction</strong> to cover the two-way shipping, packaging, and handling costs incurred by our studio.
               </li>
               <li>
                 <strong>Advance Payment (COD) Orders:</strong> If your order was placed using the partial advance payment method for Cash on Delivery, <strong>the advance payment is strictly non-refundable</strong> if the package is unreceived or rejected by the customer.
@@ -90,10 +90,10 @@ const ShippingPolicy = () => {
               5. Damages in Transit
             </h2>
             <p className="text-sm font-light opacity-80 leading-relaxed">
-              We take exceptional care in wrapping our ceramics. However, in the rare event that your piece arrives damaged or broken due to courier mishandling, you must notify us within <strong>24 hours of delivery</strong>. 
+              We take exceptional care in wrapping our ceramics. However, in the rare event that your piece arrives damaged or broken due to courier mishandling, you must notify us within <strong>30 minutes of delivery</strong>. 
             </p>
             <p className="text-sm font-light opacity-80 leading-relaxed">
-              Please email <strong>hello@mritsna.com</strong> with your order number and clear photographic evidence of both the broken item and the original packaging. Claims made after 24 hours of delivery, or without proper documentation, will not be accepted. Valid claims will be compensated with a replacement (if available) or a full refund at our discretion.
+              Please email <strong>hello@mritsna.com</strong> with your order number and clear photographic evidence of both the broken item and the original packaging. Claims made after 30 minutes of delivery, or without proper documentation, will not be accepted. Valid claims will be compensated with a replacement (if available) or a full refund at our discretion.
             </p>
           </section>
 
