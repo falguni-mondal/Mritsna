@@ -12,22 +12,24 @@ const Shop = () => {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Create a reference to the top of the component
   const shopTopRef = useRef(null);
 
   const { products, pagination, isLoading, currencySymbol, categories } = useSelector((state) => state.product);
 
   const activeCategory = searchParams.get("category") || "All";
-  const activeSort = searchParams.get("sort") || "Featured";
+  // Updated default fallback label
+  const activeSort = searchParams.get("sort") || "Terracotta";
   const currentPage = parseInt(searchParams.get("page")) || 1;
 
+  // Updated mappings for the shorter UI names
   const getApiSortValue = (uiSort) => {
     switch (uiSort) {
+      case "Terracotta": return "material_terracotta";
+      case "Stoneware": return "material_stoneware";
       case "Price: Low to High": return "price_asc";
       case "Price: High to Low": return "price_desc";
-      case "Featured":
-      default:
-        return "newest";
+      case "Newest": return "newest";
+      default: return "material_terracotta";
     }
   };
 
@@ -44,25 +46,19 @@ const Shop = () => {
     }));
   }, [dispatch, activeCategory, activeSort, currentPage]);
 
-  // --- Bulletproof Scroll Handler ---
   const handlePageChange = (newPage) => {
     searchParams.set("page", newPage);
     setSearchParams(searchParams);
     
-    // Using a micro-timeout guarantees React has updated the DOM from the searchParams 
-    // change before the browser attempts to calculate the scroll position.
     setTimeout(() => {
-      // 1. Target the specific element to scroll into view (bypasses window scroll container issues)
       if (shopTopRef.current) {
         shopTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      // 2. Fallback window scroll just in case
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 50); 
   };
 
   return (
-    // Attach the ref directly to the main wrapper
     <main ref={shopTopRef} className="w-full min-h-screen bg-[#f8f8f8]">
       <ShopHeader 
         totalProducts={pagination?.totalItems || 0} 

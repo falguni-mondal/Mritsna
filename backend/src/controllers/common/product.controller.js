@@ -3,7 +3,6 @@ import { calculateRegionalPricing } from '../../utils/pricingEngine.js';
 
 export const getNewArrivals = async (req, res, next) => {
   try {
-    // Fallback protection just in case middleware fails
     const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
     const newArrivals = await Product.find({ 
@@ -20,7 +19,6 @@ export const getNewArrivals = async (req, res, next) => {
       const firstImage = firstVariant.images?.[0] || {};
       const pricing = firstVariant.pricing || { price: 0, discountPercentage: 0 };
 
-      // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
         pricing.price, 
         pricing.discountPercentage, 
@@ -66,56 +64,84 @@ export const getPaginatedProducts = async (req, res, next) => {
     const search = req.query.search || '';
     const category = req.query.category || '';
     const isPremium = req.query.isPremium;
-    const sortParams = req.query.sort || 'newest';
+    const sortParams = req.query.sort || 'material_terracotta'; // Changed fallback
 
     const filter = { status: 'active' };
 
     if (search) {
       filter.title = { $regex: search, $options: 'i' };
     }
-
     if (category) {
       filter.category = category;
     }
-
     if (isPremium === 'true') filter.isPremium = true;
     if (isPremium === 'false') filter.isPremium = false;
 
+    // We only use this standard strategy for non-material sorts
     let sortStrategy = {};
     switch (sortParams) {
-      case 'price_asc':
-        sortStrategy = { 'variants.pricing.price': 1 };
-        break;
-      case 'price_desc':
-        sortStrategy = { 'variants.pricing.price': -1 };
-        break;
-      case 'name_asc':
-        sortStrategy = { title: 1 };
-        break;
-      case 'newest':
-      default:
-        sortStrategy = { createdAt: -1 };
-        break;
+      case 'price_asc': sortStrategy = { 'variants.pricing.price': 1 }; break;
+      case 'price_desc': sortStrategy = { 'variants.pricing.price': -1 }; break;
+      case 'name_asc': sortStrategy = { title: 1 }; break;
+      case 'newest': sortStrategy = { createdAt: -1 }; break;
     }
 
     const skip = (page - 1) * limit;
 
-    const [products, totalCount] = await Promise.all([
-      Product.find(filter)
-        .select('title slug category isPremium variants.pricing variants.images createdAt')
-        .sort(sortStrategy)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Product.countDocuments(filter)
-    ]);
+    let products = [];
+    let totalCount = 0;
+
+    // --- THE NEW MATERIAL SORTING LOGIC ---
+    if (sortParams === 'material_terracotta' || sortParams === 'material_stoneware') {
+      
+      // We grab the material string safely, convert to lowercase
+      const safeMaterial = { $ifNull: [{ $toLower: { $arrayElemAt: ["$variants.attributes.material", 0] } }, ""] };
+      
+      // Using indexOfCP is much faster and safer than regex for simple substring matching
+      const isTerracotta = { 
+        $or: [
+          { $ne: [{ $indexOfCP: [safeMaterial, "teracotta"] }, -1] },
+          { $ne: [{ $indexOfCP: [safeMaterial, "terracotta"] }, -1] }
+        ] 
+      };
+      
+      const isStoneware = { $ne: [{ $indexOfCP: [safeMaterial, "stoneware"] }, -1] };
+
+      // Assign hidden priority scores (1 is first, 3 is last)
+      const scoreLogic = sortParams === 'material_terracotta'
+        ? { $cond: [isTerracotta, 1, { $cond: [isStoneware, 2, 3] }] }
+        : { $cond: [isStoneware, 1, { $cond: [isTerracotta, 2, 3] }] };
+
+      [products, totalCount] = await Promise.all([
+        Product.aggregate([
+          { $match: filter },
+          { $addFields: { materialScore: scoreLogic } },
+          { $sort: { materialScore: 1, createdAt: -1 } }, // Sort by score, then newest
+          { $skip: skip },
+          { $limit: limit },
+          { $project: { title: 1, slug: 1, category: 1, isPremium: 1, 'variants.pricing': 1, 'variants.images': 1, createdAt: 1 } }
+        ]),
+        Product.countDocuments(filter)
+      ]);
+
+    } else {
+      // --- STANDARD SORTING LOGIC (Preserved perfectly) ---
+      [products, totalCount] = await Promise.all([
+        Product.find(filter)
+          .select('title slug category isPremium variants.pricing variants.images createdAt')
+          .sort(sortStrategy)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Product.countDocuments(filter)
+      ]);
+    }
 
     const formattedProducts = products.map((product) => {
       const firstVariant = product.variants?.[0] || {};
       const firstImage = firstVariant.images?.[0] || {};
       const pricing = firstVariant.pricing || { price: 0, discountPercentage: 0 };
 
-      // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
         pricing.price, 
         pricing.discountPercentage, 
@@ -189,7 +215,6 @@ export const getSingleProduct = async (req, res, next) => {
       const basePriceINR = variant.pricing?.price || 0;
       const discount = variant.pricing?.discountPercentage || 0;
       
-      // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
         basePriceINR, 
         discount, 
@@ -253,17 +278,13 @@ export const searchProducts = async (req, res, next) => {
   try {
     const query = req.query.q || '';
     
-    // If the user clears the input, return an empty array immediately without hitting the DB
     if (!query.trim()) {
       return res.status(200).json({ success: true, data: [] });
     }
 
     const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
-
-    // Case-insensitive search regex
     const searchRegex = new RegExp(query, 'i');
 
-    // Search across Title, Category, OR Variant Color Name
     const filter = {
       status: 'active',
       $or: [
@@ -275,14 +296,12 @@ export const searchProducts = async (req, res, next) => {
 
     const products = await Product.find(filter)
       .select('title slug category isPremium variants.pricing variants.images variants.colorName')
-      .limit(6) // Keep it limited for a snappy dropdown UI
+      .limit(6) 
       .lean();
 
     const formattedProducts = products.map((product) => {
-      // Find the specific variant that matches the color search (if applicable), or just use the first one
       let matchingVariant = product.variants?.[0] || {};
       
-      // If they searched for a specific color (like "Blue"), try to show that specific colored variant image
       const colorMatch = product.variants?.find(v => v.colorName.match(searchRegex));
       if (colorMatch) {
         matchingVariant = colorMatch;
@@ -291,7 +310,6 @@ export const searchProducts = async (req, res, next) => {
       const firstImage = matchingVariant.images?.[0] || {};
       const pricing = matchingVariant.pricing || { price: 0, discountPercentage: 0 };
 
-      // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
         pricing.price, 
         pricing.discountPercentage, 
@@ -331,11 +349,7 @@ export const searchProducts = async (req, res, next) => {
 
 export const getUniqueCategories = async (req, res, next) => {
   try {
-    // We use .distinct('category') to let MongoDB instantly fetch 
-    // an array of all unique category names that belong to 'active' products.
     const categories = await Product.distinct('category', { status: 'active' });
-
-    // Optional: Sort them alphabetically so they look nice in the frontend dropdown
     categories.sort();
 
     return res.status(200).json({

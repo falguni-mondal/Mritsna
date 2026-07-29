@@ -1,13 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom"; 
 
-const sortOptions = ["Featured", "Price: Low to High", "Price: High to Low"];
+// Shortened Sort Options
+const sortOptions = [
+  "Newest", 
+  "Price: Low to High", 
+  "Price: High to Low",
+  "Terracotta", 
+  "Stoneware", 
+];
 
 const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeSort, setActiveSort }) => {
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false); 
   
-  // Initialize URL parameter hook
   const [searchParams, setSearchParams] = useSearchParams();
 
   const dropdownRef = useRef(null);
@@ -28,14 +34,12 @@ const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeS
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- URL & State Sync Handlers ---
   const handleCategoryChange = (cat) => {
     if (cat === "All") {
       searchParams.delete("category");
     } else {
       searchParams.set("category", cat);
     }
-    // Always reset to page 1 when changing filters so they don't land on an empty page
     searchParams.delete("page"); 
     setSearchParams(searchParams);
     
@@ -44,7 +48,8 @@ const FilterBar = ({ categories = [], activeCategory, setActiveCategory, activeS
   };
 
   const handleSortChange = (option) => {
-    if (option === "Featured") {
+    // Treat "Terracotta" as the clean URL default
+    if (option === "Terracotta") {
       searchParams.delete("sort");
     } else {
       searchParams.set("sort", option);
