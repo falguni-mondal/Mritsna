@@ -24,9 +24,9 @@ const imageSchema = new mongoose.Schema({
   }
 });
 
-// Custom validator to enforce the 4-image maximum
+// Custom validator to enforce the 5-image maximum
 function imageLimit(val) {
-  return val.length <= 4;
+  return val.length <= 5;
 }
 
 // Sub-Schema: Color Variants ---

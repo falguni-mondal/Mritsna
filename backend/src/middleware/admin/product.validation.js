@@ -39,7 +39,7 @@ const variantSchema = z.object({
     allowBackorder: z.boolean().optional().default(false),
   }),
   
-  images: z.array(imageSchema).max(4, "A variant cannot exceed 4 images"),
+  images: z.array(imageSchema).max(5, "A variant cannot exceed 5 images"),
 }).superRefine((data, ctx) => {
   // The Cross-Field Validation Logic
   if (!data.isMulticolor) {
