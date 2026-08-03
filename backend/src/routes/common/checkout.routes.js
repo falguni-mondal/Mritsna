@@ -13,6 +13,7 @@ import {
 import { optionalAuth } from "../../middleware/common/auth/auth.middleware.js"; 
 import { validateRequest } from "../../middleware/common/checkout/validate.request.js";
 import { regionMiddleware } from "../../middleware/common/regionMiddleware.js";
+import { strictLimiter } from "../../middleware/common/rateLimiter.js";
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.post(
 );
 
 router.post(
-  "/create-order",
+  "/create-order", strictLimiter,
   optionalAuth,
   regionMiddleware,
   validateRequest(createOrderSchema),
@@ -33,7 +34,7 @@ router.post(
 );
 
 router.post(
-  "/verify-payment",
+  "/verify-payment", strictLimiter,
   optionalAuth,
   validateRequest(verifyPaymentSchema),
   verifyRazorpayPayment

@@ -9,6 +9,7 @@ import {
 
 // === FIX: Import isAdmin instead of isValidUser ===
 import { isAdmin } from "../../middleware/common/auth/auth.middleware.js";
+import { strictLimiter } from "../../middleware/common/rateLimiter.js";
 
 const router = express.Router();
 
@@ -17,12 +18,12 @@ const router = express.Router();
 // ==========================================
 
 // Step 1: Submit email and password to receive OTP
-router.post("/signin", adminSignIn);
+router.post("/signin", strictLimiter, adminSignIn);
 
-router.post("/resend-otp", adminResendOTP);
+router.post("/resend-otp", strictLimiter, adminResendOTP);
 
 // Step 2: Submit email and OTP to establish a secure session
-router.post("/verify", adminVerifyOTP);
+router.post("/verify", strictLimiter, adminVerifyOTP);
 
 // ==========================================
 // PROTECTED ROUTES (Requires Active Session)

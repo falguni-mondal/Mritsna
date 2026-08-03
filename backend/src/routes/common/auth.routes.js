@@ -12,6 +12,7 @@ import {
 } from "../../controllers/common/auth.controller.js";
 import { isValidUser } from "../../middleware/common/auth/auth.middleware.js";
 import { validateLogin, validateRegister } from "../../middleware/user/auth.validation.js";
+import { strictLimiter } from "../../middleware/common/rateLimiter.js";
 
 const router = express.Router();
 
@@ -23,10 +24,10 @@ const router = express.Router();
 router.get("/check-auth", isValidUser, checkAuth);
 
 // Handles both brand new users and Guests claiming their Silent Accounts
-router.post("/register", validateRegister, register);
+router.post("/register", strictLimiter, validateRegister, register);
 
 // Establishes the 30-day absolute session
-router.post("/login", validateLogin, login);
+router.post("/login", strictLimiter, validateLogin, login);
 
 
 // ==========================================
@@ -43,12 +44,12 @@ router.post("/logout-all", isValidUser, logoutAllOtherDevices);
 router.post("/deactivate", isValidUser, deactivateAccount);
 
 // Generates a 6-digit OTP and sends it via email
-router.post("/send-verification", isValidUser, sendVerificationEmail);
+router.post("/send-verification", strictLimiter, isValidUser, sendVerificationEmail);
 
 // Verifies the provided 6-digit OTP
-router.post("/verify-email", isValidUser, verifyEmail);
+router.post("/verify-email", strictLimiter, isValidUser, verifyEmail);
 
-router.post("/change-email", isValidUser, changeEmailAndResendOtp);
+router.post("/change-email", strictLimiter, isValidUser, changeEmailAndResendOtp);
 
 
 export default router;

@@ -3,6 +3,7 @@ import parser from "cookie-parser";
 import cors from "cors";
 
 // Custom Middlewares & Utils
+import { globalLimiter } from "./middleware/common/rateLimiter.js";
 // import noCache from "./middlewares/global/no-cache.js";
 // import LeakyLimiter from "./utils/leaky-limiter.js";
 // import UserLimiter from "./utils/user-limiter.js";
@@ -31,21 +32,9 @@ import collectionRoutes from './routes/common/collection.routes.js';
 
 const app = express();
 
-// 1. Trust Proxy (Crucial for Rate Limiters behind Load Balancers/Render)
+// Trust Proxy (Crucial for Rate Limiters behind Load Balancers/Render)
+// This ensures the rate limiter blocks the attacker's IP, not Render's internal IP.
 app.set("trust proxy", true);
-
-// 2. Security & Limiters (Uncomment when you bring your utils over)
-// const globalLimiter = new LeakyLimiter(50);
-// const userLimiter = new UserLimiter(40, 10000); 
-// setInterval(() => userLimiter.cleanup(), 60000);
-
-// app.use((req, res, next) => {
-//   if (!userLimiter.check(req.ip)) {
-//     return res.status(429).json({ success: false, message: "Too many requests!" });
-//   }
-//   next();
-// });
-// app.use(async (req, res, next) => { await globalLimiter.wait(); next(); });
 
 
 // Webhook Specific Parser (Stripe/Payment Gateways need raw buffers)
@@ -55,9 +44,15 @@ app.use('/api/v1/webhooks', webhookRoutes);
 
 
 // Standard Body Parsers & Cookies
-app.use(express.json({ limit: "10mb" })); // Added a limit to prevent payload DOS attacks
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// RAM SHIELD: Lowered from 10mb to 2mb. 10mb JSON payloads can easily crash a 512MB RAM server via a DoS attack.
+app.use(express.json({ limit: "2mb" })); 
+app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(parser());
+
+
+// GLOBAL RATE LIMITER
+// Applied here so it protects all standard API routes below, but allows Webhooks above to bypass it.
+app.use(globalLimiter);
 
 
 // Dynamic CORS -----------------------------------------------------------------------------------------------------------------------------
@@ -82,6 +77,7 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ success: true, message: "Server is healthy." });
 });
 
+// Admin Routes
 app.use("/api/v1/admin/auth", adminAuthRoutes);
 app.use('/api/v1/admin/products', adminProductRoutes);
 app.use('/api/v1/admin/carts', adminCartRoutes);
@@ -91,7 +87,7 @@ app.use('/api/v1/admin/orders', adminOrderRoutes);
 app.use('/api/v1/admin/reviews', adminReviewRoutes);
 app.use('/api/v1/admin/collections', adminCollectionRoutes);
 
-//  public routes
+// Public Routes
 app.use("/api/v1/auth", authRouter);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/cart', cartRoutes);
