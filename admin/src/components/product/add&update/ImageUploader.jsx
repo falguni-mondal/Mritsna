@@ -144,7 +144,7 @@ const ImageUploader = ({ variantIndex }) => {
         formData.append('expire', expire);
         formData.append('token', token);
         
-        const folderPath = `/products/${currentCategory.toLowerCase()}`;
+        const folderPath = `/products/${currentCategory.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
         formData.append('folder', folderPath); 
 
         const uploadResponse = await axios.post(IMAGEKIT_UPLOAD_URL, formData, {
