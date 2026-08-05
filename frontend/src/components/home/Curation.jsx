@@ -202,7 +202,7 @@ const Curation = () => {
           <div className="aspect-video overflow-hidden">
             <img 
               src="/curated3.webp" 
-              alt="Mritsna bowl with smooth sphere juxtaposition"
+              alt="Mritsna Matsya teal wall plate paired with a smooth white plate to showcase textural contrast"
               className="w-full h-full object-cover origin-center mix-blend-multiply"
             />
           </div>
@@ -214,10 +214,10 @@ const Curation = () => {
            data-speed="3" 
         >
            <span className="block head-font lg:text-lg font-bold tracking-[0.1em] uppercase mb-3">
-             Study No. 04
+             Textural Duality
            </span>
            <p className="text-xs font-light leading-loose opacity-70">
-             The interplay of raw earth and polished stone. A study in texture and absolute permanence.
+             A striking dialogue between intricately sculpted motion and pure, unblemished stillness.
            </p>
         </div>
 

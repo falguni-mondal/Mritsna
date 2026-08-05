@@ -192,7 +192,7 @@ const About = () => {
               Trial by Fire.
             </h2>
             <p className="split-lines text-base font-light opacity-80 leading-relaxed mb-6">
-              Our process is intentionally slow. After being thrown on the wheel and left to dry, each piece faces the crucible of the kiln. Fired at temperatures exceeding 1400°C for over 48 hours, the raw clay undergoes a violent transformation.
+              Our process is intentionally slow. After being thrown on the wheel and left to dry, each piece faces the crucible of the kiln. Fired at temperatures exceeding 1200°C for over 24 hours, the raw clay undergoes a violent transformation.
             </p>
             <p className="split-lines text-base font-light opacity-80 leading-relaxed">
               It is in this extreme heat that the clay vitrifies, becoming stone-like in its durability. We cannot completely control the fire; we can only guide it. The result is that no two Mritsna products will ever share the exact same firing marks.

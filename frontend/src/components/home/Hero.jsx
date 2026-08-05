@@ -302,7 +302,7 @@ const Hero = () => {
         <div className="hero-right flex flex-col lg:items-end justify-end mt-16 md:mt-20 lg:mt-0 mb-2 lg:mb-12 pointer-events-none">
           <div className="mb-4 lg:mb-6">
             <h2 ref={exclusiveTextRef} className="uppercase text-[0.6rem] md:text-[0.7rem] lg:text-[0.65rem] font-bold tracking-[0.3em] txt-light opacity-60">
-              Exclusive of this month
+              Exclusive from this month
             </h2>
           </div>
 
