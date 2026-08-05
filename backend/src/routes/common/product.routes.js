@@ -3,7 +3,7 @@ import {
   getNewArrivals, 
   getPaginatedProducts,
   getSingleProduct,
-  getUniqueCategories,
+  getFilterOptions,
   searchProducts
 } from '../../controllers/common/product.controller.js';
 
@@ -15,7 +15,7 @@ router.get('/new-arrivals', regionMiddleware, getNewArrivals);
 
 router.get('/search', regionMiddleware, searchProducts);
 
-router.get('/categories', getUniqueCategories);
+router.get('/filter-options', getFilterOptions);
 
 router.get('/', regionMiddleware, getPaginatedProducts);
 

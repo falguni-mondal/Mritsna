@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom"; 
-import { fetchStoreProducts, fetchUniqueCategories } from "../store/features/productSlice";
+import { fetchStoreProducts, fetchFilterOptions } from "../store/features/productSlice";
 
 import ShopHeader from "../components/shop/ShopHeader";
 import FilterBar from "../components/shop/FilterBar";
@@ -14,37 +14,44 @@ const Shop = () => {
   
   const shopTopRef = useRef(null);
 
-  const { products, pagination, isLoading, currencySymbol, categories } = useSelector((state) => state.product);
+  const { products, pagination, isLoading, currencySymbol, categories, materials } = useSelector((state) => state.product);
 
-  const activeCategory = searchParams.get("category") || "All";
-  // Updated default fallback label
-  const activeSort = searchParams.get("sort") || "Terracotta";
+  // Read URL parameters. If empty, default to empty string (which means "All" for our backend)
+  const activeCategoriesStr = searchParams.get("category") || "";
+  const activeMaterialsStr = searchParams.get("material") || "";
+  // UPDATED: Default sort is now "None"
+  const activeSort = searchParams.get("sort") || "None";
   const currentPage = parseInt(searchParams.get("page")) || 1;
 
-  // Updated mappings for the shorter UI names
+  // Convert comma-separated strings to arrays so FilterBar can easily check what is selected
+  const activeCategories = activeCategoriesStr ? activeCategoriesStr.split(',') : [];
+  const activeMaterials = activeMaterialsStr ? activeMaterialsStr.split(',') : [];
+
+  // UPDATED: Added "None" which triggers the Category Grouping in the backend
   const getApiSortValue = (uiSort) => {
     switch (uiSort) {
-      case "Terracotta": return "material_terracotta";
-      case "Stoneware": return "material_stoneware";
       case "Price: Low to High": return "price_asc";
       case "Price: High to Low": return "price_desc";
       case "Newest": return "newest";
-      default: return "material_terracotta";
+      case "None": return "none";
+      default: return "none";
     }
   };
 
   useEffect(() => {
-    dispatch(fetchUniqueCategories());
+    // Fetch both categories and materials in one call
+    dispatch(fetchFilterOptions());
   }, [dispatch]);
 
   useEffect(() => {
     dispatch(fetchStoreProducts({
       page: currentPage,
       limit: 12, 
-      category: activeCategory === "All" ? "" : activeCategory,
+      category: activeCategoriesStr, // Pass the raw comma-separated string to backend
+      material: activeMaterialsStr,  // Pass the raw comma-separated string to backend
       sort: getApiSortValue(activeSort)
     }));
-  }, [dispatch, activeCategory, activeSort, currentPage]);
+  }, [dispatch, activeCategoriesStr, activeMaterialsStr, activeSort, currentPage]);
 
   const handlePageChange = (newPage) => {
     searchParams.set("page", newPage);
@@ -67,10 +74,10 @@ const Shop = () => {
       
       <FilterBar 
         categories={categories}
-        activeCategory={activeCategory} 
+        materials={materials}
+        activeCategories={activeCategories} 
+        activeMaterials={activeMaterials}
         activeSort={activeSort}          
-        setActiveCategory={() => {}} 
-        setActiveSort={() => {}}     
       />
       
       <ProductGrid 

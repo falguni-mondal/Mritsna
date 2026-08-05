@@ -63,8 +63,9 @@ export const getPaginatedProducts = async (req, res, next) => {
     const limit = Math.max(1, parseInt(req.query.limit) || 12);
     const search = req.query.search || '';
     const category = req.query.category || '';
+    const material = req.query.material || '';
     const isPremium = req.query.isPremium;
-    const sortParams = req.query.sort || 'material_terracotta'; // Changed fallback
+    const sortParams = req.query.sort || 'none';
 
     const filter = { status: 'active' };
 
@@ -72,74 +73,79 @@ export const getPaginatedProducts = async (req, res, next) => {
       filter.title = { $regex: search, $options: 'i' };
     }
     if (category) {
-      filter.category = category;
+      filter.category = { $in: category.split(',').map(c => c.trim()) };
+    }
+    if (material) {
+      filter['variants.attributes.material'] = { $in: material.split(',').map(m => m.trim()) };
     }
     if (isPremium === 'true') filter.isPremium = true;
     if (isPremium === 'false') filter.isPremium = false;
 
-    // We only use this standard strategy for non-material sorts
-    let sortStrategy = {};
+    // --- TRUE GLOBAL SORTING STRATEGY ---
+    let sortStrategy = {}; 
+    
     switch (sortParams) {
-      case 'price_asc': sortStrategy = { 'variants.pricing.price': 1 }; break;
-      case 'price_desc': sortStrategy = { 'variants.pricing.price': -1 }; break;
-      case 'name_asc': sortStrategy = { title: 1 }; break;
-      case 'newest': sortStrategy = { createdAt: -1 }; break;
+      case 'price_asc': 
+        sortStrategy = { sortPrice: 1, createdAt: -1 }; 
+        break;
+      case 'price_desc': 
+        sortStrategy = { sortPrice: -1, createdAt: -1 }; 
+        break;
+      case 'name_asc': 
+        sortStrategy = { title: 1, createdAt: -1 }; 
+        break;
+      case 'newest': 
+        sortStrategy = { createdAt: -1 }; 
+        break;
+      case 'none':
+      default: 
+        // Only group by category if 'None' is explicitly selected by the user
+        sortStrategy = { category: 1, createdAt: -1 }; 
+        break;
     }
 
     const skip = (page - 1) * limit;
 
-    let products = [];
-    let totalCount = 0;
-
-    // --- THE NEW MATERIAL SORTING LOGIC ---
-    if (sortParams === 'material_terracotta' || sortParams === 'material_stoneware') {
-      
-      // We grab the material string safely, convert to lowercase
-      const safeMaterial = { $ifNull: [{ $toLower: { $arrayElemAt: ["$variants.attributes.material", 0] } }, ""] };
-      
-      // Using indexOfCP is much faster and safer than regex for simple substring matching
-      const isTerracotta = { 
-        $or: [
-          { $ne: [{ $indexOfCP: [safeMaterial, "teracotta"] }, -1] },
-          { $ne: [{ $indexOfCP: [safeMaterial, "terracotta"] }, -1] }
-        ] 
-      };
-      
-      const isStoneware = { $ne: [{ $indexOfCP: [safeMaterial, "stoneware"] }, -1] };
-
-      // Assign hidden priority scores (1 is first, 3 is last)
-      const scoreLogic = sortParams === 'material_terracotta'
-        ? { $cond: [isTerracotta, 1, { $cond: [isStoneware, 2, 3] }] }
-        : { $cond: [isStoneware, 1, { $cond: [isTerracotta, 2, 3] }] };
-
-      [products, totalCount] = await Promise.all([
-        Product.aggregate([
-          { $match: filter },
-          { $addFields: { materialScore: scoreLogic } },
-          { $sort: { materialScore: 1, createdAt: -1 } }, // Sort by score, then newest
-          { $skip: skip },
-          { $limit: limit },
-          { $project: { title: 1, slug: 1, category: 1, isPremium: 1, 'variants.pricing': 1, 'variants.images': 1, createdAt: 1 } }
-        ]),
-        Product.countDocuments(filter)
-      ]);
-
-    } else {
-      // --- STANDARD SORTING LOGIC (Preserved perfectly) ---
-      [products, totalCount] = await Promise.all([
-        Product.find(filter)
-          .select('title slug category isPremium variants.pricing variants.images createdAt')
-          .sort(sortStrategy)
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        Product.countDocuments(filter)
-      ]);
-    }
+    // The robust Aggregation Pipeline ensures we calculate discounts before sorting, 
+    // overriding any natural Mongoose array sorting quirks.
+    const [products, totalCount] = await Promise.all([
+      Product.aggregate([
+        { $match: filter },
+        { 
+          $addFields: {
+            firstVariant: { $arrayElemAt: ["$variants", 0] }
+          }
+        },
+        {
+          $addFields: {
+            rawPrice: { $ifNull: ["$firstVariant.pricing.price", 0] },
+            discount: { $ifNull: ["$firstVariant.pricing.discountPercentage", 0] }
+          }
+        },
+        {
+          $addFields: {
+            // Calculates: price - (price * (discount / 100))
+            sortPrice: {
+              $subtract: [
+                "$rawPrice",
+                { $multiply: ["$rawPrice", { $divide: ["$discount", 100] }] }
+              ]
+            }
+          }
+        },
+        { $sort: sortStrategy },
+        { $skip: skip },
+        { $limit: limit },
+        { $project: { title: 1, slug: 1, category: 1, isPremium: 1, 'variants.pricing': 1, 'variants.images': 1, createdAt: 1 } }
+      ]),
+      Product.countDocuments(filter)
+    ]);
 
     const formattedProducts = products.map((product) => {
-      const firstVariant = product.variants?.[0] || {};
-      const firstImage = firstVariant.images?.[0] || {};
+      const variants = product.variants || [];
+      const firstVariant = variants[0] || {};
+      const images = firstVariant.images || [];
+      const firstImage = images[0] || {};
       const pricing = firstVariant.pricing || { price: 0, discountPercentage: 0 };
 
       const localizedPricing = calculateRegionalPricing(
@@ -347,19 +353,26 @@ export const searchProducts = async (req, res, next) => {
 };
 
 
-export const getUniqueCategories = async (req, res, next) => {
+export const getFilterOptions = async (req, res, next) => {
   try {
-    const categories = await Product.distinct('category', { status: 'active' });
-    categories.sort();
+    const [categories, materials] = await Promise.all([
+      Product.distinct('category', { status: 'active' }),
+      Product.distinct('variants.attributes.material', { status: 'active' })
+    ]);
+
+    const cleanCategories = categories.filter(Boolean).sort();
+    const cleanMaterials = materials.filter(Boolean).sort();
 
     return res.status(200).json({
       success: true,
-      count: categories.length,
-      data: categories
+      data: {
+        categories: cleanCategories,
+        materials: cleanMaterials
+      }
     });
 
   } catch (error) {
-    console.error("Error fetching unique categories:", error);
+    console.error("Error fetching filter options:", error);
     next(error);
   }
 };

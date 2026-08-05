@@ -42,16 +42,15 @@ export const fetchSingleProduct = createAsyncThunk(
   }
 );
 
-// --- Fetch Unique Categories ---
-export const fetchUniqueCategories = createAsyncThunk(
-  'product/fetchUniqueCategories',
+// --- Fetch Filter Options (Categories & Materials together) ---
+export const fetchFilterOptions = createAsyncThunk(
+  'product/fetchFilterOptions',
   async (_, thunkAPI) => {
     try {
-      // Must exactly match the route we just created in product.routes.js
-      const response = await userAxios.get('/products/categories');
-      return response.data.data; 
+      const response = await userAxios.get('/products/filter-options');
+      return response.data.data;
     } catch (error) {
-      const message = error.response?.data?.message || error.message || 'Failed to fetch categories';
+      const message = error.response?.data?.message || error.message || 'Failed to fetch filter options';
       return thunkAPI.rejectWithValue(message);
     }
   }
@@ -63,6 +62,7 @@ const initialState = {
   singleProduct: null,
   
   categories: [], 
+  materials: [], // NEW: State to hold dynamic materials
   
   pagination: {
     totalItems: 0,
@@ -74,8 +74,8 @@ const initialState = {
   },
   isLoading: false,
   
-  // NEW: Dedicated loading state for categories so it doesn't block the main products UI
-  isCategoriesLoading: false, 
+  // Renamed to reflect it loads both options
+  isFilterOptionsLoading: false, 
   
   isError: false,
   message: '',
@@ -157,19 +157,19 @@ const productSlice = createSlice({
         state.message = action.payload;
       })
       
-      // --- Fetch Unique Categories ---
-      .addCase(fetchUniqueCategories.pending, (state) => {
-        state.isCategoriesLoading = true;
+      // --- Fetch Filter Options ---
+      .addCase(fetchFilterOptions.pending, (state) => {
+        state.isFilterOptionsLoading = true;
       })
-      .addCase(fetchUniqueCategories.fulfilled, (state, action) => {
-        state.isCategoriesLoading = false;
-        state.categories = action.payload; 
+      .addCase(fetchFilterOptions.fulfilled, (state, action) => {
+        state.isFilterOptionsLoading = false;
+        state.categories = action.payload.categories || [];
+        state.materials = action.payload.materials || []; 
       })
-      .addCase(fetchUniqueCategories.rejected, (state, action) => {
-        state.isCategoriesLoading = false;
-        // We log it instead of setting global isError to avoid throwing a 
-        // full-page error block if just the filter dropdown fails to load.
-        console.error("Category Fetch Error:", action.payload); 
+      .addCase(fetchFilterOptions.rejected, (state, action) => {
+        state.isFilterOptionsLoading = false;
+        // Log it instead of throwing a full-page error
+        console.error("Filter Options Fetch Error:", action.payload); 
       });
   },
 });
