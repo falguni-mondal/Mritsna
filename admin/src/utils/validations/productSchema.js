@@ -14,7 +14,7 @@ const variantSchema = z.object({
   // Boolean flag for multicolor
   isMulticolor: z.boolean().optional().default(false),
 
-  colorName: z.string().min(1, "Color name is required (e.g., Obsidian)"),
+  colorName: z.string().min(3, "Color name is required (e.g., Obsidian)"),
   
   // Relaxed base validation to allow empty/missing values 
   // before the superRefine cross-check runs.
@@ -30,9 +30,12 @@ const variantSchema = z.object({
 
   // Variant-level attributes validation
   attributes: z.object({
-    material: z.string().min(1, "Material is required (e.g., Ceramic)"),
+    material: z.string().min(3, "Material is required (e.g., Ceramic)"),
     finish: z.string().optional(),
   }),
+
+  // Frontend validation for Care Instructions
+  careInstructions: z.string().min(10, "Care instructions are required for this variant"),
 
   inventory: z.object({
     // z.coerce instantly transforms form string inputs to actual numbers

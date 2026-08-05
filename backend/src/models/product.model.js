@@ -85,6 +85,12 @@ const variantSchema = new mongoose.Schema({
     }
   },
 
+  // Care Instructions
+  careInstructions: {
+    type: String,
+    required: [true, 'Care instruction is required for this variant']
+  },
+
   inventory: {
     quantity: {
       type: Number,

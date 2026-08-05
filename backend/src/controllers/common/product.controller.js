@@ -106,8 +106,6 @@ export const getPaginatedProducts = async (req, res, next) => {
 
     const skip = (page - 1) * limit;
 
-    // The robust Aggregation Pipeline ensures we calculate discounts before sorting, 
-    // overriding any natural Mongoose array sorting quirks.
     const [products, totalCount] = await Promise.all([
       Product.aggregate([
         { $match: filter },
@@ -124,7 +122,6 @@ export const getPaginatedProducts = async (req, res, next) => {
         },
         {
           $addFields: {
-            // Calculates: price - (price * (discount / 100))
             sortPrice: {
               $subtract: [
                 "$rawPrice",
@@ -241,6 +238,7 @@ export const getSingleProduct = async (req, res, next) => {
         discountPercentage: localizedPricing.discountPercentage,
         material: variant.attributes?.material,
         finish: variant.attributes?.finish,
+        careInstructions: variant.careInstructions,
         stockQuantity: stockQuantity, 
         
         inStock: stockQuantity > 0 || (variant.inventory?.allowBackorder || false),

@@ -14,12 +14,13 @@ const VariantManager = () => {
 
   const addVariant = () => {
     append({
-      isMulticolor: false, // <-- NEW: Default to false
+      isMulticolor: false,
       colorName: '',
       colorHex: '#000000',
       sku: '',
       pricing: { price: 0, discountPercentage: 0 },
       attributes: { material: '', finish: '' },
+      careInstructions: '',
       inventory: { quantity: 0, lowStockThreshold: 3, allowBackorder: false },
       images: []
     });
@@ -69,7 +70,7 @@ const VariantManager = () => {
                   Variant {index + 1}
                 </h3>
                 
-                {/* --- NEW: THE MULTICOLOR TOGGLE --- */}
+                {/* THE MULTICOLOR TOGGLE */}
                 <label className="flex items-center gap-2 cursor-pointer mr-8 bg-white px-3 py-1.5 rounded border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors">
                   <input 
                     type="checkbox" 
@@ -208,6 +209,17 @@ const VariantManager = () => {
                   {errors.variants?.[index]?.attributes?.finish && <p className="text-red-500 text-xs mt-1">{errors.variants[index].attributes.finish.message}</p>}
                 </div>
 
+                {/* NEW: Variant Care Instructions */}
+                <div className="md:col-span-2 mt-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Care Instructions <span className="text-red-500">*</span></label>
+                  <textarea 
+                    {...register(`variants.${index}.careInstructions`)} 
+                    placeholder="e.g. Wash with liquid soap and wipe with a dry cloth. Microwave safe."
+                    rows="2"
+                    className="w-full p-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-black/5 resize-none"
+                  />
+                  {errors.variants?.[index]?.careInstructions && <p className="text-red-500 text-xs mt-1">{errors.variants[index].careInstructions.message}</p>}
+                </div>
               </div>
 
               <hr className="border-gray-200 mb-5" />
