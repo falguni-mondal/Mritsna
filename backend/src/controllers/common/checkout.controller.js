@@ -374,7 +374,7 @@ const processCheckoutMath = async (
     : "FULL_ONLINE";
 
   if (strictPaymentOption === "PARTIAL_COD") {
-    paymentAmount = Math.max(1, Math.round(grandTotal * 0.1));
+    paymentAmount = Math.max(1, Math.round(grandTotal * 0.2));
     advancePaid = paymentAmount;
     balanceDueOnDelivery = grandTotal - advancePaid;
   }

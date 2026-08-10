@@ -226,8 +226,8 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
                 className="w-4 h-4 text-black focus:ring-black mt-1" 
               />
               <div>
-                <span className="text-sm font-medium block">10% Advance (COD)</span>
-                <span className="text-xs text-gray-500 mt-1 block">Pay 10% now to confirm. Pay the rest on delivery.</span>
+                <span className="text-sm font-medium block">20% Advance (COD)</span>
+                <span className="text-xs text-gray-500 mt-1 block">Pay 20% now to confirm. Pay the rest on delivery.</span>
               </div>
             </div>
           </label>
@@ -235,7 +235,7 @@ const CheckoutSummary = ({ cartItems, shippingState, currencySymbol, currencyCod
 
         {paymentOption === 'PARTIAL_COD' && (
            <div className="mt-4 p-4 bg-orange-50 border border-orange-100 rounded-lg text-sm text-orange-900 flex justify-between items-center">
-             <span>Due Today (10%):</span>
+             <span>Due Today (20%):</span>
              <span className="font-bold text-lg">{formatPrice(financials.advancePaid)}</span>
            </div>
         )}
