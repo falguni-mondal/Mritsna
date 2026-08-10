@@ -87,13 +87,19 @@ const ShippingPolicy = () => {
           {/* Section 5: Damages in Transit */}
           <section className="policy-element flex flex-col gap-4">
             <h2 className="text-sm font-bold tracking-[0.1em] uppercase border-b border-[#1a1a1a]/10 pb-2 mb-2">
-              5. Damages in Transit
+              5. Damages in Transit & Unboxing
             </h2>
             <p className="text-sm font-light opacity-80 leading-relaxed">
               We take exceptional care in wrapping our ceramics. However, in the rare event that your piece arrives damaged or broken due to courier mishandling, you must notify us within <strong>30 minutes of delivery</strong>. 
             </p>
+            
+            {/* NEW BOLD TEXT ADDED HERE */}
+            <p className="text-sm leading-relaxed text-[#1a1a1a]">
+              <strong>Please make sure to do a video of unboxing to get a refund or return the product, or even if the product reaches broken.</strong>
+            </p>
+
             <p className="text-sm font-light opacity-80 leading-relaxed">
-              Please email <strong>hello@mritsna.com</strong> with your order number and clear photographic evidence of both the broken item and the original packaging. Claims made after 30 minutes of delivery, or without proper documentation, will not be accepted. Valid claims will be compensated with a replacement (if available) or a full refund at our discretion.
+              Please email <strong>hello@mritsna.com</strong> with your order number, the unboxing video, and clear photographic evidence of both the broken item and the original packaging. Claims made after 30 minutes of delivery, or without proper documentation, will not be accepted. Valid claims will be compensated with a replacement (if available) or a full refund at our discretion.
             </p>
           </section>
 
