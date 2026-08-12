@@ -525,7 +525,7 @@ const TrackOrder = () => {
                 <p className="font-bold text-black uppercase mb-1">
                   PAYMENT METHOD: {order.paymentOption === 'PARTIAL_COD' ? 'PARTIAL COD' : 'ONLINE'}
                 </p>
-                <p className="text-xs text-gray-600 max-w-lg">Returns Policy: Items can be returned within 7 days of delivery. Keep the products intact.</p>
+                <p className="text-xs text-gray-600 max-w-lg">Returns Policy: Items can be returned within 24 hours of delivery. Keep the products intact and make sure to record a video of the unboxing process.</p>
               </div>
               <div className="text-right text-xs text-gray-500 font-mono">
                 <p>This is a computer-generated invoice.</p>

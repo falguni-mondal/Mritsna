@@ -314,7 +314,7 @@ const OrderDetails = () => {
               <p className="font-bold text-black uppercase mb-1">
                 PAYMENT METHOD: {order.paymentOption === 'PARTIAL_COD' ? 'PARTIAL COD' : 'ONLINE'}
               </p>
-              <p className="text-xs text-gray-600 max-w-lg">Returns Policy: Items can not be returned after delivery. Advance payments are non-refundable.</p>
+              <p className="text-xs text-gray-600 max-w-lg">Returns Policy: Items can be returned within 24 hours of delivery. Keep the products intact and make sure to record a video of the unboxing process.</p>
             </div>
             <div className="text-right text-xs text-gray-500 font-mono">
               <p>This is a computer-generated invoice.</p>
