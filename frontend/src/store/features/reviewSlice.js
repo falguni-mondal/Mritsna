@@ -37,7 +37,6 @@ export const submitReview = createAsyncThunk(
   }
 );
 
-// NEW: Update Review Thunk
 export const updateReview = createAsyncThunk(
   'reviews/updateReview',
   async ({ reviewId, reviewData }, { rejectWithValue }) => {
@@ -137,8 +136,16 @@ const reviewSlice = createSlice({
             images: newReview.images,
             createdAt: newReview.createdAt,
             status: newReview.status,
-            author: state.eligibilityData?.guestName || 'You', 
-            isVerifiedBuyer: true
+            
+            // --- PREVIOUS LOGIC ---
+            // author: state.eligibilityData?.guestName || 'You', 
+            // isVerifiedBuyer: true
+            
+            // --- NEW LOGIC ---
+            // Grab the name directly from the newly created review object.
+            // If they are logged in, we just say 'You' for immediate UI feedback.
+            author: newReview.guestName || 'You', 
+            isVerifiedBuyer: newReview.order ? true : false 
           };
           
           state.reviews.unshift(formattedReview);

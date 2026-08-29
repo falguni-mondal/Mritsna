@@ -142,7 +142,8 @@ const Product = () => {
         </div>
 
       </div>
-      <ProductReviews product={product} />
+      {/* NEW LOGIC: Pass activeVariant down so the form knows what color they are looking at */}
+      <ProductReviews product={product} activeVariant={activeVariant} />
     </main>
   );
 };

@@ -8,7 +8,8 @@ import { useGSAP } from '@gsap/react';
 import { fetchProductReviews, checkReviewEligibility } from '../../store/features/reviewSlice';
 import WriteReview from './WriteReview';
 
-const ProductReviews = ({ product }) => {
+// NEW LOGIC: Receive activeVariant
+const ProductReviews = ({ product, activeVariant }) => {
   const dispatch = useDispatch();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const containerRef = useRef(null);
@@ -128,11 +129,12 @@ const ProductReviews = ({ product }) => {
               {reviews.map((review) => (
                 <div key={review._id} className="bg-white p-8 border border-black/5 relative">
                   
-                  {review.status === 'pending' && (
+                  {/* --- PREVIOUS LOGIC: PENDING BADGE --- */}
+                  {/* {review.status === 'pending' && (
                     <span className="absolute top-8 right-8 text-[9px] bg-[#f8f8f8] text-gray-600 px-3 py-1 uppercase tracking-widest border border-black/5">
                       Pending Approval
                     </span>
-                  )}
+                  )} */}
 
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
                     {renderStars(review.rating)}
@@ -201,7 +203,8 @@ const ProductReviews = ({ product }) => {
             <div className="overflow-y-auto overscroll-contain flex-1 w-full p-8 lg:p-10 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10 hover:[&::-webkit-scrollbar-thumb]:bg-black/20 [&::-webkit-scrollbar-track]:bg-transparent">
               <WriteReview 
                 productId={product.id} 
-                productSlug={product.slug} // Passed the slug down here!
+                productSlug={product.slug} 
+                activeColorName={activeVariant?.colorName} // <-- NEW LOGIC: Pass the color into the form
                 onClose={handleCloseModal} 
               />
             </div>

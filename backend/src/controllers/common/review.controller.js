@@ -17,6 +17,7 @@ export const checkEligibility = async (req, res, next) => {
     const query = userId ? { product: productId, user: userId } : { product: productId, deviceId, isAdminGenerated: false };
     const existingReview = await Review.findOne(query);
 
+    // If they already reviewed, we still block a duplicate review
     if (existingReview) {
       return res.status(200).json({
         success: true,
@@ -25,6 +26,8 @@ export const checkEligibility = async (req, res, next) => {
       });
     }
 
+    // --- PREVIOUS LOGIC: STRICT ORDER CHECKING (COMMENTED OUT) ---
+    /*
     const orderQuery = {
       orderStatus: 'Delivered',
       'items.product': productId,
@@ -55,6 +58,15 @@ export const checkEligibility = async (req, res, next) => {
       guestName: matchingOrder.shippingAddress.firstName,
       guestEmail: matchingOrder.shippingAddress.email
     });
+    */
+
+    // --- NEW LOGIC: ANYONE CAN REVIEW ---
+    // Since there's no existing review, everyone is eligible immediately!
+    // We no longer pass orderId, guestName, etc., as the frontend will collect them manually.
+    return res.status(200).json({
+      success: true,
+      eligibility: 'CAN_REVIEW'
+    });
 
   } catch (error) {
     console.error("[Review Eligibility Error]:", error);
@@ -77,7 +89,13 @@ export const addReview = async (req, res, next) => {
 
     const newReview = new Review({
       product: productId,
-      order: orderId,
+      
+      // --- PREVIOUS LOGIC ---
+      // order: orderId,
+      
+      // --- NEW LOGIC: OPTIONALLY ADD ORDER IF IT EXISTS ---
+      ...(orderId && { order: orderId }), 
+      
       colorName,
       user: userId || null,
       guestName: userId ? undefined : guestName,
@@ -103,7 +121,6 @@ export const addReview = async (req, res, next) => {
   }
 };
 
-// NEW: Update Review Controller
 export const updateReview = async (req, res, next) => {
   try {
     const { reviewId } = req.params;
@@ -157,6 +174,7 @@ export const getProductReviews = async (req, res, next) => {
     if (userId) authConditions.push({ user: userId });
     if (deviceId) authConditions.push({ deviceId });
 
+    // It fetches approved reviews OR pending reviews that belong ONLY to the current user/device
     const filter = {
       product: product._id,
       $or: [
@@ -179,7 +197,14 @@ export const getProductReviews = async (req, res, next) => {
       createdAt: rev.createdAt,
       status: rev.status, 
       author: rev.user ? `${rev.user.firstName} ${rev.user.lastName[0]}.` : rev.guestName,
-      isVerifiedBuyer: rev.isAdminGenerated ? false : true 
+      
+      // --- PREVIOUS LOGIC ---
+      // isVerifiedBuyer: rev.isAdminGenerated ? false : true
+      
+      // --- NEW LOGIC ---
+      // Without strict order checking, we can't definitively call them a "verified buyer"
+      // Unless they have an order attached. For now, we will mark false unless there is an order.
+      isVerifiedBuyer: rev.order ? true : false 
     }));
 
     return res.status(200).json({ success: true, data: formattedReviews });

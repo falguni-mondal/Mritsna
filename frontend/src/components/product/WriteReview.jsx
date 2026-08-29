@@ -14,7 +14,8 @@ const IMAGEKIT_UPLOAD_URL = import.meta.env.VITE_IMAGEKIT_UPLOAD_URL;
 const IMAGEKIT_AUTH_ENDPOINT = '/reviews/imagekit/auth'; 
 const IMAGEKIT_DELETE_ENDPOINT = '/reviews/imagekit'; 
 
-const WriteReview = ({ productId, productSlug, onClose }) => {
+// NEW LOGIC: Accept activeColorName as a prop
+const WriteReview = ({ productId, productSlug, activeColorName, onClose }) => {
   const dispatch = useDispatch();
   const fileInputRef = useRef(null);
   const formWrapperRef = useRef(null);
@@ -25,6 +26,11 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  
+  // NEW LOGIC: Local state to capture guest identity manually
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+
   const [selectedFiles, setSelectedFiles] = useState([]); 
   
   const maxImages = 3;
@@ -42,6 +48,7 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
       const rev = eligibilityData.review;
       setRating(rev.rating);
       setComment(rev.comment);
+      // We don't need to pre-fill guestName/Email here because you can't edit identity, only the review payload.
       
       if (rev.images?.length > 0) {
         const mappedImages = rev.images.map(img => ({
@@ -92,7 +99,12 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
         formData.append('expire', expire);
         formData.append('token', token);
         
-        const targetFolder = eligibilityData?.sku ? `/reviews/${eligibilityData.sku}` : `/reviews/${productSlug}`;
+        // --- PREVIOUS LOGIC ---
+        // const targetFolder = eligibilityData?.sku ? `/reviews/${eligibilityData.sku}` : `/reviews/${productSlug}`;
+        
+        // --- NEW LOGIC ---
+        // We just use the productSlug as the folder name since we don't strictly have an order SKU anymore
+        const targetFolder = `/reviews/${productSlug}`;
         formData.append('folder', targetFolder); 
 
         const uploadRes = await axios.post(IMAGEKIT_UPLOAD_URL, formData, {
@@ -133,6 +145,12 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // NEW LOGIC: Validate Name input for new reviews
+    if (!isEditing && guestName.trim().length < 2) {
+      return toast.error("Please enter your name.");
+    }
+
     if (comment.trim().length < 10) {
       return toast.error("Please write a review of at least 10 characters.");
     }
@@ -158,10 +176,18 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
       } else {
         await dispatch(submitReview({
           productId,
-          orderId: eligibilityData?.orderId,
-          colorName: eligibilityData?.colorName,
-          guestName: eligibilityData?.guestName,
-          guestEmail: eligibilityData?.guestEmail,
+          
+          // --- PREVIOUS LOGIC ---
+          // orderId: eligibilityData?.orderId,
+          // colorName: eligibilityData?.colorName,
+          // guestName: eligibilityData?.guestName,
+          // guestEmail: eligibilityData?.guestEmail,
+
+          // --- NEW LOGIC ---
+          colorName: activeColorName, // From the currently selected swatch
+          guestName: guestName,       // From the new text input
+          guestEmail: guestEmail,     // From the new text input
+
           rating,
           comment,
           images: finalImages
@@ -176,6 +202,8 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
       setSelectedFiles([]);
       setComment('');
       setRating(5);
+      setGuestName('');
+      setGuestEmail('');
       
       if (onClose) onClose();
 
@@ -192,6 +220,7 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
       <div ref={formWrapperRef} className="w-full">
         <h3 className="form-reveal text-lg font-light uppercase tracking-widest mb-6 flex items-center justify-between">
           Your Review 
+          {/* We keep the pending badge here ONLY for the author to see their own status */}
           <span className="text-[10px] bg-[#f8f8f8] text-black px-3 py-1 border border-black/10 tracking-widest">
             {rev.status}
           </span>
@@ -242,11 +271,46 @@ const WriteReview = ({ productId, productSlug, onClose }) => {
       
       <div className="form-reveal border-b border-black/5 pb-4 mb-8">
         <p className="text-[11px] text-gray-500 uppercase tracking-widest">
-          Purchasing: <span className="font-bold text-black">{eligibilityData?.colorName}</span>
+          {/* --- PREVIOUS LOGIC --- */}
+          {/* Purchasing: <span className="font-bold text-black">{eligibilityData?.colorName}</span> */}
+          
+          {/* --- NEW LOGIC --- */}
+          Reviewing: <span className="font-bold text-black">{isEditing ? eligibilityData?.review?.colorName : activeColorName}</span>
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+
+        {/* NEW LOGIC: Ask for Identity if writing a NEW review */}
+        {!isEditing && (
+          <div className="form-reveal grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-[11px] uppercase tracking-widest text-gray-500 mb-2">
+                Your Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                placeholder="Jane Doe"
+                className="w-full bg-[#f8f8f8] border border-transparent p-3 text-sm focus:outline-none focus:border-black/20 focus:bg-white transition-colors rounded-sm"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] uppercase tracking-widest text-gray-500 mb-2">
+                Your Email <span className="lowercase normal-case opacity-60">(optional)</span>
+              </label>
+              <input
+                type="email"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                placeholder="jane@example.com"
+                className="w-full bg-[#f8f8f8] border border-transparent p-3 text-sm focus:outline-none focus:border-black/20 focus:bg-white transition-colors rounded-sm"
+              />
+            </div>
+          </div>
+        )}
         
         <div className="form-reveal">
           <label className="block text-[11px] uppercase tracking-widest text-gray-500 mb-3">Overall Rating</label>

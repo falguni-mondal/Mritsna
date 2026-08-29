@@ -24,14 +24,17 @@ const reviewSchema = new mongoose.Schema({
     required: [true, 'Review must be associated with a product'],
     index: true
   },
+  
   order: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
-    // Required unless the admin is manually seeding a review
-    required: [
-      function() { return !this.isAdminGenerated; }, 
-      'Review must be linked to a verified order'
-    ]
+    // --- PREVIOUS LOGIC: STRICT ORDER REQUIREMENT ---
+    // required: [
+    //   function() { return !this.isAdminGenerated; }, 
+    //   'Review must be linked to a verified order'
+    // ]
+    // --- NEW LOGIC: OPTIONAL ORDER ---
+    required: false
   },
   
   // Helpful to show other customers exactly what version they bought
