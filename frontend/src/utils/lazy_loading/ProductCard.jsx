@@ -12,6 +12,9 @@ const ProductCard = ({ product, currencySymbol = "₹" }) => {
     return `${currencySymbol} ${price.toLocaleString(locale)}`;
   };
 
+  // --- NEW LOGIC: Calculate the mock original price assuming current price is 85% ---
+  const calculatedOriginalPrice = Math.round(product.finalPrice / 0.85);
+
   return (
     <Link
       to={`/product/${product.slug}`}
@@ -36,7 +39,8 @@ const ProductCard = ({ product, currencySymbol = "₹" }) => {
         <h3 className="line-clamp-1">{product.name}</h3>
         <div className="flex items-center gap-2 mt-1">
           
-          {/* --- DYNAMIC PRICING DISPLAY --- */}
+          {/* --- OLD DYNAMIC PRICING DISPLAY (COMMENTED OUT) --- */}
+          {/* 
           <span className="text-xs lg:text-sm font-medium text-[#1a1a1a]">
             {formatPrice(product.finalPrice)}.00
           </span>
@@ -45,7 +49,16 @@ const ProductCard = ({ product, currencySymbol = "₹" }) => {
             <span className="text-[10px] lg:text-xs text-gray-400 line-through">
               {formatPrice(product.originalPrice)}.00
             </span>
-          )}
+          )} 
+          */}
+
+          {/* --- NEW CALCULATED PRICING DISPLAY --- */}
+          <span className="text-xs lg:text-sm font-medium text-[#1a1a1a]">
+            {formatPrice(product.finalPrice)}.00
+          </span>
+          <span className="text-[10px] lg:text-xs text-gray-400 line-through">
+            {formatPrice(calculatedOriginalPrice)}.00
+          </span>
 
         </div>
       </div>

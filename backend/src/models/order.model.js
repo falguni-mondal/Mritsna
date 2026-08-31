@@ -14,7 +14,7 @@ const addressSchema = new mongoose.Schema({
 
 const orderItemSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  variantId: { type: String, required: true },
+  variantId: { type: mongoose.Schema.Types.ObjectId, required: true },
   title: { type: String, required: true },
   colorName: { type: String, required: true },
   slug: { type: String, required: true },

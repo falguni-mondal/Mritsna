@@ -10,6 +10,9 @@ const ProductInfo = ({ product, activeVariant, currencySymbol = "₹", currencyC
     return `${currencySymbol} ${price.toLocaleString(locale, { maximumFractionDigits: 0 })}`;
   };
 
+  // --- NEW LOGIC: Calculate the mock original price assuming current price is 85% ---
+  const calculatedOriginalPrice = Math.round(activeVariant.finalPrice / 0.85);
+
   return (
     <>
       {/* Breadcrumbs */}
@@ -33,17 +36,28 @@ const ProductInfo = ({ product, activeVariant, currencySymbol = "₹", currencyC
       
       {/* Dynamic Pricing */}
       <div className="product-info-item text-lg tracking-widest font-light mb-8 flex items-center gap-3">
-        {/* Final Active Price */}
+        
+        {/* --- OLD DYNAMIC PRICING DISPLAY (COMMENTED OUT) --- */}
+        {/* 
         <span className="font-medium text-[#1a1a1a]">
           {formatPrice(activeVariant.finalPrice)}.00
         </span>
         
-        {/* Crossed-out Original Price (Only shows if there is a discount) */}
         {activeVariant.discountPercentage > 0 && (
           <span className="text-sm text-gray-400 line-through">
             {formatPrice(activeVariant.originalPrice)}.00
           </span>
-        )}
+        )} 
+        */}
+
+        {/* --- NEW CALCULATED PRICING DISPLAY --- */}
+        <span className="font-medium text-[#1a1a1a]">
+          {formatPrice(activeVariant.finalPrice)}.00
+        </span>
+        <span className="text-sm text-gray-400 line-through">
+          {formatPrice(calculatedOriginalPrice)}.00
+        </span>
+        
       </div>
 
       {/* Description */}

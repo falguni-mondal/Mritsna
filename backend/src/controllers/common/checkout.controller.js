@@ -58,7 +58,7 @@ const processCheckoutMath = async (
     safeCountry.toLowerCase() !== "india" && safeCountry.toLowerCase() !== "in";
 
   for (const item of items) {
-    const product = await Product.findOne({ "variants._id": item.variantId });
+    const product = await Product.findOne({ "variants._id": item.variantId }).exec();
     if (!product)
       throw new Error(`Product containing variant ${item.variantId} not found`);
 
@@ -613,11 +613,12 @@ export const verifyRazorpayPayment = async (req, res) => {
         });
       }
 
+      // --- Add product ID for accuracy and .exec() to properly trigger the Promise ---
       const inventoryUpdates = confirmedOrder.items.map((item) =>
         Product.findOneAndUpdate(
-          { "variants._id": item.variantId },
+          { _id: item.product, "variants._id": item.variantId },
           { $inc: { "variants.$.inventory.quantity": -item.quantity } },
-        ),
+        ).exec() // Force execution of Mongoose query
       );
       await Promise.all(inventoryUpdates);
 
