@@ -146,6 +146,12 @@ export const trackGuestOrder = async (req, res) => {
         courierPartner: order.courierPartner,
         trackingNumber: order.trackingNumber,
         createdAt: order.createdAt,
+        shippingCost: order.shippingCost,
+        taxDetails: order.taxDetails,
+        totalTaxAmount: order.totalTaxAmount,
+        baseRevenue: order.baseRevenue,
+        advancePaid: order.advancePaid,
+        paymentCurrency: order.paymentCurrency
       },
       liveTracking,
     });

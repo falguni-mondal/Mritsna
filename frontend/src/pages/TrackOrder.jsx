@@ -295,7 +295,7 @@ const TrackOrder = () => {
                           {order.paymentOption === 'PARTIAL_COD' ? 'Partial COD' : 'Prepaid Online'}
                         </p>
                         <p className="flex items-center gap-2">
-                          Gateway Status: <span className="text-black font-medium">{order.paymentStatus}</span>
+                          Payment Status: <span className="text-black font-medium">{order.paymentStatus}</span>
                         </p>
                         
                         {order.paymentOption === 'PARTIAL_COD' && order.balanceDueOnDelivery > 0 && (
@@ -357,7 +357,7 @@ const TrackOrder = () => {
                       )}
                       <div className="flex justify-between text-gray-600">
                         <span>Shipping</span>
-                        <span>{order.shippingCost === 0 ? "Free" : formatCurrency(order.shippingCost, order.paymentCurrency)}</span>
+                        <span>{(!order.shippingCost || order.shippingCost === 0) ? "Free" : formatCurrency(order.shippingCost, order.paymentCurrency)}</span>
                       </div>
                       
                       <div className="border-t border-black/10 pt-4 mt-4">
@@ -455,9 +455,9 @@ const TrackOrder = () => {
                       <p className="text-xs text-gray-600 mt-1">Color: {item.colorName} | Variant ID: <span className="font-mono text-gray-500">{item.variantId}</span></p>
                     </td>
                     <td className="py-4 px-4 text-center align-top text-black font-medium border-r border-gray-300">{item.quantity}</td>
-                    <td className="py-4 px-4 text-right align-top text-black border-r border-gray-300">₹{Math.round(item.priceAtPurchase || item.itemTotal/item.quantity)}</td>
+                    <td className="py-4 px-4 text-right align-top text-black border-r border-gray-300">₹{Math.round(item.priceAtPurchase || (item.itemTotal/item.quantity) || 0)}</td>
                     <td className="py-4 px-4 text-center align-top text-black border-r border-gray-300">{gstRate}%</td>
-                    <td className="py-4 px-4 text-right font-bold text-black align-top">₹{Math.round(item.itemTotal)}</td>
+                    <td className="py-4 px-4 text-right font-bold text-black align-top">₹{Math.round(item.itemTotal || 0)}</td>
                   </tr>
                 );
               })}
@@ -469,7 +469,7 @@ const TrackOrder = () => {
             <div className="w-1/2 md:w-1/3 text-sm">
               <div className="flex justify-between py-1.5 text-gray-800">
                 <span>Taxable Subtotal</span>
-                <span>₹{Math.round(order.baseRevenue || order.subTotal)}</span>
+                <span>₹{Math.round(order.baseRevenue || order.subTotal || 0)}</span>
               </div>
 
               {order.taxDetails && order.taxDetails.map((tax, i) => (
@@ -493,7 +493,7 @@ const TrackOrder = () => {
 
               <div className="flex justify-between py-1.5 text-black">
                 <span>Shipping Charges</span>
-                <span>{order.shippingCost === 0 ? 'Free' : `₹${order.shippingCost}`}</span>
+                <span>{(!order.shippingCost || order.shippingCost === 0) ? 'Free' : `₹${order.shippingCost}`}</span>
               </div>
 
               <div className="flex justify-between py-4 text-lg font-black text-black border-t-2 border-gray-800 mt-2 bg-gray-50 px-3">
