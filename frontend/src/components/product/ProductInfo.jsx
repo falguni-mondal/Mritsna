@@ -11,7 +11,7 @@ const ProductInfo = ({ product, activeVariant, currencySymbol = "₹", currencyC
   };
 
   // --- NEW LOGIC: Calculate the mock original price assuming current price is 85% ---
-  const calculatedOriginalPrice = Math.round(activeVariant.finalPrice / 0.85);
+  const calculatedOriginalPrice = Math.round(activeVariant.finalPrice / 0.70);
 
   return (
     <>
@@ -54,6 +54,7 @@ const ProductInfo = ({ product, activeVariant, currencySymbol = "₹", currencyC
         <span className="font-medium text-[#1a1a1a]">
           {formatPrice(activeVariant.finalPrice)}.00
         </span>
+        
         <span className="text-sm text-gray-400 line-through">
           {formatPrice(calculatedOriginalPrice)}.00
         </span>

@@ -13,7 +13,7 @@ const ProductCard = ({ product, currencySymbol = "₹" }) => {
   };
 
   // --- NEW LOGIC: Calculate the mock original price assuming current price is 85% ---
-  const calculatedOriginalPrice = Math.round(product.finalPrice / 0.85);
+  const calculatedOriginalPrice = Math.round(product.finalPrice / 0.70);
 
   return (
     <Link

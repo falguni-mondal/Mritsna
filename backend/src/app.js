@@ -10,6 +10,7 @@ import { globalLimiter } from "./middleware/common/rateLimiter.js";
 
 // Routes
 import adminAuthRoutes from "./routes/admin/admin.auth.routes.js";
+import adminDashboardRoutes from "./routes/admin/admin.dashboard.routes.js";
 import adminProductRoutes from './routes/admin/admin.product.routes.js';
 import adminCartRoutes from './routes/admin/admin.cart.routes.js';
 import adminWishlistRoutes from './routes/admin/admin.wishlist.routes.js';
@@ -79,6 +80,7 @@ app.get("/api/health", (req, res) => {
 
 // Admin Routes
 app.use("/api/v1/admin/auth", adminAuthRoutes);
+app.use("/api/v1/admin/dashboard", adminDashboardRoutes);
 app.use('/api/v1/admin/products', adminProductRoutes);
 app.use('/api/v1/admin/carts', adminCartRoutes);
 app.use('/api/v1/admin/wishlists', adminWishlistRoutes);

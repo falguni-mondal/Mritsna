@@ -8,8 +8,11 @@ import {
 } from '../../controllers/common/product.controller.js';
 
 import { regionMiddleware } from '../../middleware/common/regionMiddleware.js';
+import { trackVisit } from '../../middleware/user/trackVisit.middleware.js';
 
 const router = express.Router();
+
+router.use(trackVisit);
 
 router.get('/new-arrivals', regionMiddleware, getNewArrivals);
 

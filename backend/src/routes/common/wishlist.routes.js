@@ -9,6 +9,7 @@ import {
 
 import { isValidUser } from '../../middleware/common/auth/auth.middleware.js'; 
 import { regionMiddleware } from '../../middleware/common/regionMiddleware.js';
+import { trackVisit } from '../../middleware/user/trackVisit.middleware.js';
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ router.post('/hydrate', regionMiddleware, hydrateGuestWishlist);
 // PROTECTED ROUTES (For Authenticated Users)
 // ==========================================
 
-router.get('/', isValidUser, regionMiddleware, getWishlist);
+router.get('/', trackVisit, isValidUser, regionMiddleware, getWishlist);
 
 router.post('/toggle', isValidUser, toggleWishlistItem);
 router.post('/sync', isValidUser, syncWishlist);

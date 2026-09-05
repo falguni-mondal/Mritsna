@@ -14,11 +14,9 @@ export const userAxios = axios.create({
 });
 
 // --- REQUEST INTERCEPTOR ---
-// Automatically injects the user's location into every API request
 userAxios.interceptors.request.use(
   (config) => {
     try {
-      // FIX: Only inject the header if it hasn't been manually set by the API call!
       if (!config.headers["x-user-region"]) {
         const storedRegion = localStorage.getItem("user_region");
         if (storedRegion) {
@@ -28,8 +26,29 @@ userAxios.interceptors.request.use(
           }
         }
       }
+
+      // 2. UTM Parameter Extraction & Injection
+      // We only inject these into GET requests so we don't accidentally bloat POST/PUT payloads
+      if (config.method?.toLowerCase() === 'get' && typeof window !== 'undefined') {
+        const searchParams = new URLSearchParams(window.location.search);
+        
+        const utmSource = searchParams.get('utm_source');
+        const utmMedium = searchParams.get('utm_medium');
+        const utmCampaign = searchParams.get('utm_campaign');
+
+        // If any UTM parameter exists in the browser URL, attach it to the Axios request
+        if (utmSource || utmMedium || utmCampaign) {
+          // Ensure config.params exists before assigning to it
+          config.params = config.params || {};
+          
+          if (utmSource) config.params.utm_source = utmSource;
+          if (utmMedium) config.params.utm_medium = utmMedium;
+          if (utmCampaign) config.params.utm_campaign = utmCampaign;
+        }
+      }
+
     } catch (error) {
-      console.warn("[User HTTP] Failed to parse region for headers:", error);
+      console.warn("[User HTTP] Failed to parse request modifiers:", error);
     }
     return config;
   },

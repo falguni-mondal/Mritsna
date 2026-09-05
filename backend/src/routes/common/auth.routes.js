@@ -13,6 +13,7 @@ import {
 import { isValidUser } from "../../middleware/common/auth/auth.middleware.js";
 import { validateLogin, validateRegister } from "../../middleware/user/auth.validation.js";
 import { strictLimiter } from "../../middleware/common/rateLimiter.js";
+import { trackVisit } from "../../middleware/user/trackVisit.middleware.js";
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ const router = express.Router();
 // ==========================================
 
 // Immediately checks the user's session status on app load
-router.get("/check-auth", isValidUser, checkAuth);
+router.get("/check-auth", trackVisit, isValidUser, checkAuth);
 
 // Handles both brand new users and Guests claiming their Silent Accounts
 router.post("/register", strictLimiter, validateRegister, register);

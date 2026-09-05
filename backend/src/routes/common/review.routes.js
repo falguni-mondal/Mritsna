@@ -9,14 +9,15 @@ import {
 } from '../../controllers/common/review.controller.js';
 
 import { optionalAuth } from '../../middleware/common/auth/auth.middleware.js';
+import { trackVisit } from '../../middleware/user/trackVisit.middleware.js';
 
 const router = express.Router();
 
-router.get('/imagekit/auth', optionalAuth, getImageKitAuth);
+router.get('/imagekit/auth', trackVisit, optionalAuth, getImageKitAuth);
 router.delete('/imagekit/:fileId', optionalAuth, deleteImageKitFileRoute);
 
-router.get('/product/:slug', optionalAuth, getProductReviews);
-router.get('/eligibility/:productId', optionalAuth, checkEligibility);
+router.get('/product/:slug', trackVisit, optionalAuth, getProductReviews);
+router.get('/eligibility/:productId', trackVisit, optionalAuth, checkEligibility);
 
 router.post('/', optionalAuth, addReview);
 

@@ -4,10 +4,8 @@ import { Icon } from '@iconify/react';
 
 // Your quick-reference dictionary for the UI
 const COMMON_HSN_CODES = [
-  { label: 'Vases (Ceramic)', code: '6912' },
-  { label: 'Lighting (Lamps)', code: '9405' },
-  { label: 'Wood Decor', code: '4420' },
-  { label: 'Glassware', code: '7013' }
+  { label: 'Stoneware', code: '6912' },
+  { label: 'Terracotta', code: '69120040' },
 ];
 
 const PricingSection = () => {

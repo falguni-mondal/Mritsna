@@ -233,7 +233,7 @@ const OrderDetails = () => {
           </thead>
           <tbody className="divide-y divide-gray-300">
             {order.items.map((item, idx) => {
-              const gstRate = order.taxDetails && order.taxDetails.length > 0 ? order.taxDetails[0].rate : '0';
+              const gstRate = order.taxDetails?.reduce((acc, tax) => acc + (tax.rate || 0), 0) || 0;
 
               return (
                 <tr key={idx} className="border-b border-gray-300 bg-white">

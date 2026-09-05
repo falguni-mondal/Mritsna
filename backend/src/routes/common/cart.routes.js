@@ -15,6 +15,7 @@ import { isValidUser } from '../../middleware/common/auth/auth.middleware.js';
 
 // --- Import our Region Middleware ---
 import { regionMiddleware } from '../../middleware/common/regionMiddleware.js';
+import { trackVisit } from '../../middleware/user/trackVisit.middleware.js';
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.post('/hydrate', regionMiddleware, hydrateGuestCart);
 
 // Attaching regionMiddleware only to the GET route
 // This ensures the frontend receives the converted prices, but the DB stays in INR.
-router.get('/', isValidUser, regionMiddleware, getCart);
+router.get('/', trackVisit, isValidUser, regionMiddleware, getCart);
 
 router.post('/sync', isValidUser, syncCart);
 router.post('/add', isValidUser, inventoryCheck, addToCart);
