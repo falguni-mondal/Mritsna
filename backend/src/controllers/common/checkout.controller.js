@@ -652,6 +652,8 @@ export const verifyRazorpayPayment = async (req, res) => {
           const variant = product.variants.id(item.variantId);
           if (variant) {
             variant.inventory.quantity = Math.max(0, variant.inventory.quantity - item.quantity);
+            product.markModified('variants'); 
+            
             await product.save();
           }
         }
