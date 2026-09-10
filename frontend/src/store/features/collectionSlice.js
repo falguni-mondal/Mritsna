@@ -3,6 +3,8 @@ import { userAxios } from '../../configs/axiosInstance';
 
 const initialState = {
   collections: [], // Holds the fully populated master array
+  currencyCode: 'INR',
+  currencySymbol: '₹',
   isLoading: false,
   isError: false,
   message: '',
@@ -18,7 +20,7 @@ export const fetchCollections = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const response = await userAxios.get('/collections');
-      return response.data.data; 
+      return response.data; 
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to load collections';
       return thunkAPI.rejectWithValue(message);
@@ -32,7 +34,7 @@ export const fetchCollectionBySlug = createAsyncThunk(
   async (slug, thunkAPI) => {
     try {
       const response = await userAxios.get(`/collections/${slug}`);
-      return response.data.data;
+      return response.data;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to load collection details';
       return thunkAPI.rejectWithValue(message);
@@ -64,7 +66,9 @@ const collectionSlice = createSlice({
       })
       .addCase(fetchCollections.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.collections = action.payload;
+        state.collections = action.payload.data;
+        state.currencyCode = action.payload.currencyCode || 'INR';
+        state.currencySymbol = action.payload.currencySymbol || '₹';
       })
       .addCase(fetchCollections.rejected, (state, action) => {
         state.isLoading = false;
@@ -79,8 +83,11 @@ const collectionSlice = createSlice({
       })
       .addCase(fetchCollectionBySlug.fulfilled, (state, action) => {
         state.isLoading = false;
-        // If a single slug is fetched, we can safely overwrite or update the array.
-        const fetchedCollection = action.payload;
+
+        state.currencyCode = action.payload.currencyCode || state.currencyCode;
+        state.currencySymbol = action.payload.currencySymbol || state.currencySymbol;
+
+        const fetchedCollection = action.payload.data;
         const exists = state.collections.find(c => c._id === fetchedCollection._id);
         
         if (!exists) {
