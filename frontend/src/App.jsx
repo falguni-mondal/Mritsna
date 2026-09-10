@@ -6,6 +6,7 @@ import PageRouter from './routes/PageRouter';
 import PreFooterContact from './components/footer/PreFooterContact';
 import Footer from './components/footer/Footer';
 import CustomCursor from './components/global/CustomCursor';
+import RouteTracker from './components/RouteTracker';
 
 import { checkAuth } from "./store/features/authSlice";
 import { fetchUserCart, hydrateGuestCartAPI } from './store/features/cartSlice';
@@ -63,6 +64,8 @@ const App = () => {
 
   return (
     <div className='wrapper w-full relative'>
+      
+      <RouteTracker />
       
       {/* --- GLOBAL TOASTER NOTIFICATION SYSTEM --- */}
       <Toaster 

@@ -6,6 +6,9 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Icon } from "@iconify/react";
 
+// Meta Pixel Utility
+import { trackViewContent } from "../utils/metaPixel";
+
 // Sub-components
 import ProductGallery from "../components/product/ProductGallery";
 import ProductInfo from "../components/product/ProductInfo";
@@ -19,6 +22,9 @@ const Product = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
   const containerRef = useRef(null);
+  
+  // Guard ref to prevent duplicate ViewContent fires on color changes
+  const hasTrackedView = useRef(false);
 
   const [desktopZoom, setDesktopZoom] = useState({ show: false, img: "", x: 0, y: 0 });
   const [activeVariant, setActiveVariant] = useState(null);
@@ -35,6 +41,8 @@ const Product = () => {
 
   // Fetch the product when the component mounts or the slug changes
   useEffect(() => {
+    // Reset tracking flag when looking at a new product
+    hasTrackedView.current = false; 
     dispatch(fetchSingleProduct(slug));
     return () => { dispatch(clearSingleProduct()); };
   }, [dispatch, slug]);
@@ -49,6 +57,20 @@ const Product = () => {
       setActiveVariant(matchedVariant || product.variants[0]);
     }
   }, [product, searchParams]);
+
+  // --- META PIXEL VIEW CONTENT TRACKING ---
+  useEffect(() => {
+    // Only fire if data is ready AND we haven't tracked this specific product view yet
+    if (product && activeVariant && !hasTrackedView.current) {
+      trackViewContent(
+        product.title,
+        product.id,
+        activeVariant.finalPrice,
+        currencyCode || "INR"
+      );
+      hasTrackedView.current = true; // Lock it so it doesn't fire again on re-renders
+    }
+  }, [product, activeVariant, currencyCode]);
 
   // Handle when a user clicks a color swatch
   const handleVariantChange = (variant) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Country, State } from 'country-state-city'; 
@@ -8,11 +8,14 @@ import {
   verifyRazorpayPayment 
 } from '../store/features/checkoutSlice'; 
 import { fetchAddresses } from '../store/features/addressSlice'; 
-import { clearLocalCart, clearCartDB } from '../store/features/cartSlice'; // <-- Imported Cart Clearing Logic
+import { clearLocalCart, clearCartDB } from '../store/features/cartSlice'; 
 
 import CheckoutAddresses from '../components/checkout/CheckoutAddresses';
 import CheckoutForm from '../components/checkout/CheckoutForm';
 import CheckoutSummary from '../components/checkout/CheckoutSummary';
+
+// --- META PIXEL UTILITY ---
+import { trackInitiateCheckout } from '../utils/metaPixel';
 
 // Helper to dynamically load the Razorpay SDK
 const loadRazorpayScript = () => {
@@ -53,6 +56,21 @@ const Checkout = () => {
     country: 'India', countryCode: 'IN', // Default to India
     state: '', stateCode: '' 
   });
+
+  // --- META PIXEL INITIATE CHECKOUT TRACKING ---
+  const hasTrackedCheckout = useRef(false);
+
+  useEffect(() => {
+    if (cartItems && cartItems.length > 0 && !hasTrackedCheckout.current) {
+      const cartTotal = cartItems.reduce(
+        (total, item) => total + ((item.finalPrice || item.price || 0) * item.quantity), 
+        0
+      );
+
+      trackInitiateCheckout(cartTotal, currencyCode || 'INR');
+      hasTrackedCheckout.current = true;
+    }
+  }, [cartItems, currencyCode]);
 
   // --- HANDOFF 1: Initial Auth Prefill & Fetch Addresses ---
   useEffect(() => {

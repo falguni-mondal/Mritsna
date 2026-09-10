@@ -18,6 +18,9 @@ import {
   hydrateGuestWishlistAPI 
 } from "../../store/features/wishlistSlice";
 
+// --- 1. IMPORT THE META PIXEL UTILITY ---
+import { trackAddToCart } from "../../utils/metaPixel";
+
 const ProductActions = ({ product, activeVariant }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate(); 
@@ -25,6 +28,9 @@ const ProductActions = ({ product, activeVariant }) => {
   const isAuth = useSelector((state) => state.auth?.isAuthenticated);
   const cartItems = useSelector((state) => state.cart?.items || []); 
   const wishlistItems = useSelector((state) => state.wishlist?.items || []);
+  
+  // --- 2. PULL CURRENCY CODE FROM REDUX ---
+  const currencyCode = useSelector((state) => state.product?.currencyCode) || "INR";
 
   const isItemInCart = cartItems.some((item) => item.variantId === activeVariant.variantId);
   const isInWishlist = wishlistItems.some(
@@ -34,7 +40,7 @@ const ProductActions = ({ product, activeVariant }) => {
   const [quantity, setQuantity] = useState(1);
   const [isCopied, setIsCopied] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
-  const [isBuying, setIsBuying] = useState(false); // NEW: Dedicated state for Buy Now
+  const [isBuying, setIsBuying] = useState(false); 
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   
   const [isVerifyingQty, setIsVerifyingQty] = useState(false);
@@ -139,6 +145,14 @@ const ProductActions = ({ product, activeVariant }) => {
         dispatch(hydrateGuestCartAPI());
       }
 
+      // --- FIRE ADD TO CART PIXEL EVENT (Standard Add) ---
+      trackAddToCart(
+        product.title,
+        product.id,
+        activeVariant.finalPrice * quantity, // Calculate total value added
+        currencyCode
+      );
+
       setQuantity(1);
     } catch (error) {
       alert(error || "An error occurred while adding to cart.");
@@ -147,11 +161,9 @@ const ProductActions = ({ product, activeVariant }) => {
     }
   };
 
-  // --- NEW: Buy Now Handler ---
   const handleBuyNowClick = async () => {
     if (!inStock) return;
 
-    // If it's already in the cart, jump straight to checkout
     if (isItemInCart) {
       navigate("/checkout");
       return;
@@ -194,7 +206,14 @@ const ProductActions = ({ product, activeVariant }) => {
         dispatch(hydrateGuestCartAPI());
       }
 
-      // Everything succeeded, route to checkout immediately
+      // --- 3B. FIRE ADD TO CART PIXEL EVENT (Buy Now) ---
+      trackAddToCart(
+        product.title,
+        product.id,
+        activeVariant.finalPrice * quantity, 
+        currencyCode
+      );
+
       navigate("/checkout");
     } catch (error) {
       alert(error || "An error occurred while processing your request.");
@@ -279,7 +298,6 @@ const ProductActions = ({ product, activeVariant }) => {
     gsap.to(buyTextLightRef.current, { opacity: 0, duration: 0.3, ease: "power2.out" });
   });
 
-  // Consolidated disabled state variable for cleaner markup
   const isActionDisabled = !inStock || isAdding || isBuying || isVerifyingQty;
 
   return (

@@ -6,6 +6,7 @@ import Product from "../../models/product.model.js";
 import Coupon from "../../models/coupon.model.js";
 import { calculateRegionalPricing } from "../../utils/pricingEngine.js";
 import { sendEmail } from "../../utils/email.sender.js";
+import { sendMetaPurchaseEvent } from "../../utils/meta.service.js";
 
 
 // Safe JSON Import
@@ -607,6 +608,37 @@ export const verifyRazorpayPayment = async (req, res) => {
 
       const confirmedOrder = await pendingOrder.save();
 
+      // =================================================================
+      // --- META CONVERSIONS API: FIRE SECURE SERVER-SIDE PURCHASE ---
+      // =================================================================
+      try {
+        const userData = {
+          email: confirmedOrder.isGuestCheckout ? confirmedOrder.guestEmail : confirmedOrder.shippingAddress.email,
+          phone: confirmedOrder.shippingAddress.phone,
+          firstName: confirmedOrder.shippingAddress.firstName,
+          lastName: confirmedOrder.shippingAddress.lastName,
+        };
+
+        const orderData = {
+          currency: confirmedOrder.paymentCurrency,
+          totalAmount: confirmedOrder.paymentAmount + (confirmedOrder.balanceDueOnDelivery || 0),
+          orderId: confirmedOrder.orderNumber, 
+          contents: confirmedOrder.items.map(item => ({
+            id: item.product.toString(),
+            quantity: item.quantity,
+            item_price: item.priceAtPurchase
+          }))
+        };
+
+        // Fire asynchronously (no await) to prevent blocking the checkout response
+        sendMetaPurchaseEvent(req, orderData, userData).catch(err => 
+          console.error("[Meta CAPI Error in Controller]:", err)
+        );
+      } catch (metaErr) {
+        console.error("[Meta CAPI Extraction Error]:", metaErr);
+      }
+      // =================================================================
+
       if (confirmedOrder.couponApplied) {
         await Coupon.findByIdAndUpdate(confirmedOrder.couponApplied, {
           $inc: { usedCount: 1 },
@@ -618,7 +650,7 @@ export const verifyRazorpayPayment = async (req, res) => {
         Product.findOneAndUpdate(
           { _id: item.product, "variants._id": item.variantId },
           { $inc: { "variants.$.inventory.quantity": -item.quantity } },
-        ).exec() // Force execution of Mongoose query
+        ).exec() 
       );
       await Promise.all(inventoryUpdates);
 
