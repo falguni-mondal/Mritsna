@@ -281,19 +281,29 @@ export const updateVariantStock = async (req, res, next) => {
       });
     }
 
-    // Find the specific product AND the specific variant inside it, then update its stock
-    const product = await Product.findOneAndUpdate(
-      { _id: productId, "variants._id": variantId },
-      { $set: { "variants.$.inventory.quantity": newStock } },
-      { returnDocument: 'after' }
-    );
-
+    const product = await Product.findById(productId);
+    
     if (!product) {
       return res.status(404).json({ 
         success: false, 
-        message: 'Product or specific variant could not be found' 
+        message: 'Product could not be found' 
       });
     }
+
+    const variant = product.variants.id(variantId);
+    
+    if (!variant) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Specific variant could not be found' 
+      });
+    }
+
+    // Directly assign the new stock value
+    variant.inventory.quantity = newStock;
+    
+    // Triggers native Mongoose validation and forces the deep write
+    await product.save();
 
     return res.status(200).json({
       success: true,

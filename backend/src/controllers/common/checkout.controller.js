@@ -646,12 +646,16 @@ export const verifyRazorpayPayment = async (req, res) => {
       }
 
       // --- Add product ID for accuracy and .exec() to properly trigger the Promise ---
-      const inventoryUpdates = confirmedOrder.items.map((item) =>
-        Product.findOneAndUpdate(
-          { _id: item.product, "variants._id": item.variantId },
-          { $inc: { "variants.$.inventory.quantity": -item.quantity } },
-        ).exec() 
-      );
+      const inventoryUpdates = confirmedOrder.items.map(async (item) => {
+        const product = await Product.findById(item.product);
+        if (product) {
+          const variant = product.variants.id(item.variantId);
+          if (variant) {
+            variant.inventory.quantity = Math.max(0, variant.inventory.quantity - item.quantity);
+            await product.save();
+          }
+        }
+      });
       await Promise.all(inventoryUpdates);
 
       // --- EMAIL ENGINE ---
