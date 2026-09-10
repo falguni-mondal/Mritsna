@@ -57,7 +57,7 @@ export const getActiveCollections = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       count: collections.length,
-      currencySymbol: regionData.symbol, // Sent down to format the UI properly
+      currencySymbol: regionData.symbol,
       currencyCode: regionData.currencyCode,
       data: collections
     });

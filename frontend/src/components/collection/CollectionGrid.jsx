@@ -3,7 +3,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Link } from "react-router-dom";
 
-const CollectionGrid = ({ products = [] }) => {
+const CollectionGrid = ({ products = [], currencyCode }) => {
   const gridRef = useRef(null);
 
   useGSAP(() => {
@@ -16,12 +16,11 @@ const CollectionGrid = ({ products = [] }) => {
     );
   }, { scope: gridRef });
 
-  // Dynamically calculate the asymmetrical masonry offset based on the column index
   const getOffsetClass = (index) => {
     const columnPosition = index % 3;
-    if (columnPosition === 0) return "mt-0";        // Left column
-    if (columnPosition === 1) return "lg:mt-32";    // Middle column
-    return "lg:mt-16";                              // Right column
+    if (columnPosition === 0) return "mt-0";        
+    if (columnPosition === 1) return "lg:mt-32";    
+    return "lg:mt-16";                              
   };
 
   return (
@@ -35,15 +34,16 @@ const CollectionGrid = ({ products = [] }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-16 xl:gap-24">
         {products.map((product, index) => {
-          // Safe data extraction from the populated MongoDB structure
           const livePrice = product.variants?.[0]?.pricing?.price || 0;
-          const formattedPrice = new Intl.NumberFormat('en-IN', {
+          
+          // --- DYNAMIC CURRENCY FORMATTER ---
+          const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+          const formattedPrice = new Intl.NumberFormat(locale, {
             style: 'currency',
-            currency: 'INR',
+            currency: currencyCode || 'INR',
             maximumFractionDigits: 0
           }).format(livePrice);
           
-          // Grab the first image of the first variant (fallback to a placeholder grey box if missing)
           const primaryImage = product.variants?.[0]?.images?.[0]?.baseUrl;
 
           return (
@@ -55,7 +55,7 @@ const CollectionGrid = ({ products = [] }) => {
               <div className="relative w-full aspect-[4/5] overflow-hidden mb-6 bg-[#f0f0f0]">
                 {primaryImage ? (
                   <img 
-                    src={`${primaryImage}?tr=w-1200,q-80,f-webp`} // ImageKit optimization parameters updated
+                    src={`${primaryImage}?tr=w-1200,q-80,f-webp`} 
                     alt={product.title}
                     className="w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:scale-105"
                   />

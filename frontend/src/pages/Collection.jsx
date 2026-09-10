@@ -19,8 +19,8 @@ gsap.registerPlugin(ScrollTrigger);
 const Collection = () => {
   const dispatch = useDispatch();
   
-  // Pull the massive populated array from Redux
-  const { collections, isLoading, isError, message } = useSelector((state) => state.collection);
+  // Pull the massive populated array AND the dynamic currency from Redux
+  const { collections, currencyCode = "INR", isLoading, isError, message } = useSelector((state) => state.collection);
 
   // Fetch data on mount
   useEffect(() => {
@@ -67,17 +67,21 @@ const Collection = () => {
           {/* 1. Hero Section */}
           <CollectionHero collectionData={collection} />
           
-          {/* 2. Interactive Lookbook (Only render if data exists) */}
+          {/* 2. Interactive Lookbook */}
           {collection.lookbook?.image && (
             <CollectionLookbook 
               lookbookImage={collection.lookbook.image} 
-              lookbookHotspots={collection.lookbook.hotspots || []} 
+              lookbookHotspots={collection.lookbook.hotspots || []}
+              currencyCode={currencyCode} 
             />
           )}
           
           {/* 3. The Asymmetric Grid */}
           {collection.gridProducts?.length > 0 && (
-            <CollectionGrid products={collection.gridProducts} />
+            <CollectionGrid 
+              products={collection.gridProducts} 
+              currencyCode={currencyCode} 
+            />
           )}
           
           {/* 4. The Complete Bundle Upsell */}
@@ -85,6 +89,7 @@ const Collection = () => {
             <CollectionBundle 
               bundleData={collection.bundle} 
               collectionTitle={collection.title}
+              currencyCode={currencyCode}
             />
           )}
 

@@ -4,23 +4,21 @@ import { useGSAP } from "@gsap/react";
 import { Link } from "react-router-dom";
 
 // The Dynamic Hotspot UI
-const Hotspot = ({ topPercentage, leftPercentage, product, isActive, onToggle }) => {
+const Hotspot = ({ topPercentage, leftPercentage, product, isActive, onToggle, currencyCode }) => {
   const hotspotRef = useRef(null);
 
-  // Fail-safe: if the linked product was deleted from the database, hide the pin
   if (!product) return null;
 
-  // Extract the live price from the first variant
   const livePrice = product.variants?.[0]?.pricing?.price || 0;
   
-  // Format the price (assuming Indian Rupees based on your dummy data)
-  const formattedPrice = new Intl.NumberFormat('en-IN', {
+  // --- DYNAMIC CURRENCY FORMATTER ---
+  const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+  const formattedPrice = new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'INR',
+    currency: currencyCode || 'INR',
     maximumFractionDigits: 0
   }).format(livePrice);
 
-  // Click outside listener to close the popup on mobile when tapping elsewhere
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (isActive && hotspotRef.current && !hotspotRef.current.contains(event.target)) {
@@ -29,7 +27,7 @@ const Hotspot = ({ topPercentage, leftPercentage, product, isActive, onToggle })
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside); // For mobile
+    document.addEventListener("touchstart", handleClickOutside); 
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -42,7 +40,6 @@ const Hotspot = ({ topPercentage, leftPercentage, product, isActive, onToggle })
       ref={hotspotRef}
       className="absolute z-10 -translate-x-1/2 -translate-y-1/2" 
       style={{ top: `${topPercentage}%`, left: `${leftPercentage}%` }}
-      // Use React events to handle both hover (desktop) and touch (mobile)
       onMouseEnter={() => window.innerWidth > 1024 && onToggle(true)}
       onMouseLeave={() => window.innerWidth > 1024 && onToggle(false)}
       onClick={() => window.innerWidth <= 1024 && onToggle(!isActive)}
@@ -53,7 +50,7 @@ const Hotspot = ({ topPercentage, leftPercentage, product, isActive, onToggle })
         <span className={`relative inline-flex rounded-full h-2 w-2 bg-white transition-transform duration-300 ${isActive ? 'scale-150' : 'scale-100'}`}></span>
       </div>
       
-      {/* The Popover (Driven by React State instead of CSS :hover) */}
+      {/* The Popover */}
       <div 
         className={`absolute top-1/2 left-8 md:left-auto md:top-auto md:bottom-full md:-translate-y-2 lg:top-1/2 lg:bottom-auto lg:left-8 lg:-translate-y-1/2 bg-white/95 backdrop-blur-sm px-4 py-3 min-w-[160px] md:min-w-[180px] shadow-xl transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)]
           ${isActive ? 'opacity-100 translate-x-0 md:translate-y-0 pointer-events-auto' : 'opacity-0 -translate-x-4 md:translate-x-0 md:translate-y-4 pointer-events-none'}
@@ -69,7 +66,6 @@ const Hotspot = ({ topPercentage, leftPercentage, product, isActive, onToggle })
           <Link 
             to={`/product/${product.slug}`}
             className="text-[0.6rem] uppercase tracking-widest font-bold border-b border-black hover:text-black/60 transition-colors shrink-0"
-            // Prevent the Link click from bubbling up and triggering the hotspot toggle again
             onClick={(e) => e.stopPropagation()}
           >
             View Piece
@@ -80,11 +76,8 @@ const Hotspot = ({ topPercentage, leftPercentage, product, isActive, onToggle })
   );
 };
 
-const CollectionLookbook = ({ lookbookImage, lookbookHotspots }) => {
+const CollectionLookbook = ({ lookbookImage, lookbookHotspots, currencyCode }) => {
   const lookbookRef = useRef(null);
-  
-  // State to track which hotspot is currently open. 
-  // Storing the ID ensures only one popover can be open at a time on mobile.
   const [activeHotspotId, setActiveHotspotId] = useState(null);
 
   useGSAP(() => {
@@ -117,7 +110,7 @@ const CollectionLookbook = ({ lookbookImage, lookbookHotspots }) => {
           style={{ backgroundImage: `url(${lookbookImage?.baseUrl}?tr=w-1600,q-80,f-webp)` }}
         />
         
-        {/* Map the hotspots and pass the active state logic */}
+        {/* Pass currencyCode down to the Hotspot */}
         {lookbookHotspots && lookbookHotspots.map(hotspot => (
           <Hotspot 
             key={hotspot._id} 
@@ -126,6 +119,7 @@ const CollectionLookbook = ({ lookbookImage, lookbookHotspots }) => {
             product={hotspot.product} 
             isActive={activeHotspotId === hotspot._id}
             onToggle={(isOpen) => setActiveHotspotId(isOpen ? hotspot._id : null)}
+            currencyCode={currencyCode}
           />
         ))}
       </div>

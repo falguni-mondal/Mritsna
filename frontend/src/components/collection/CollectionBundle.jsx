@@ -6,11 +6,10 @@ import toast from "react-hot-toast";
 // Redux Actions
 import { verifyStock, addToCartDB, addLocalItem } from "../../store/features/cartSlice";
 
-const CollectionBundle = ({ bundleData, collectionTitle }) => {
+const CollectionBundle = ({ bundleData, collectionTitle, currencyCode }) => {
   const dispatch = useDispatch();
   const [isAddingSet, setIsAddingSet] = useState(false);
 
-  // Adjust this selector depending on what you named your Auth slice
   const { user } = useSelector((state) => state.auth || {}); 
   const isAuthenticated = Boolean(user);
 
@@ -24,36 +23,34 @@ const CollectionBundle = ({ bundleData, collectionTitle }) => {
     }
 
     bundleData.products.forEach(product => {
-      // Safely access the first variant
       const variant = product.variants?.[0];
       
-      // Check inventory
       const quantity = variant?.inventory?.quantity || 0;
       if (quantity < 1) {
         outOfStock = true;
       }
 
-      // Add to base price
       base += variant?.pricing?.price || 0;
     });
 
-    // Apply the bundle discount percentage
     const discount = bundleData.discountPercentage || 0;
     const finalPrice = base - (base * (discount / 100));
 
     return { basePrice: base, discountedPrice: finalPrice, isOutOfStock: outOfStock };
   }, [bundleData]);
 
-  // Format currency
-  const formattedPrice = new Intl.NumberFormat('en-IN', {
+  // --- DYNAMIC CURRENCY FORMATTER ---
+  const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+  
+  const formattedPrice = new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'INR',
+    currency: currencyCode || 'INR',
     maximumFractionDigits: 0
   }).format(discountedPrice);
 
-  const formattedBase = new Intl.NumberFormat('en-IN', {
+  const formattedBase = new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'INR',
+    currency: currencyCode || 'INR',
     maximumFractionDigits: 0
   }).format(basePrice);
 
@@ -62,7 +59,6 @@ const CollectionBundle = ({ bundleData, collectionTitle }) => {
     setIsAddingSet(true);
     
     try {
-      // STEP 1: Live Verification & ID Check
       for (const product of bundleData.products) {
         const variant = product.variants?.[0];
         
@@ -77,24 +73,20 @@ const CollectionBundle = ({ bundleData, collectionTitle }) => {
         })).unwrap();
       }
 
-      // STEP 2: Add to Cart (Guest vs User)
       for (const product of bundleData.products) {
         const variant = product.variants[0];
         const originalPrice = variant.pricing?.price || 0;
         const itemDiscountedPrice = originalPrice - (originalPrice * ((bundleData.discountPercentage || 0) / 100));
         
-        // Find the primary image just like the backend does
         const primaryImage = variant.images?.find(img => img.isPrimary)?.baseUrl || variant.images?.[0]?.baseUrl;
 
         if (isAuthenticated) {
-          // DB Cart only needs the IDs and quantity
           await dispatch(addToCartDB({
             productId: product._id,
             variantId: variant._id,
             quantity: 1
           })).unwrap();
         } else {
-          // Guest Cart needs flattened properties to render instantly in the UI
           dispatch(addLocalItem({
             cartItemId: `guest-${variant._id}`,
             productId: product._id,
@@ -121,7 +113,6 @@ const CollectionBundle = ({ bundleData, collectionTitle }) => {
     }
   };
 
-  // Fallback if no products are in the bundle
   if (!bundleData || !bundleData.products || bundleData.products.length === 0) {
     return null; 
   }
