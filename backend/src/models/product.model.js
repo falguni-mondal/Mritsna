@@ -146,7 +146,7 @@ const productSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Vase','Dinnerset', 'Decor', 'Bowl', 'Cup', 'Mug', 'Platter/Tray', 'Tea', 'Tealight Candle', 'Teapot', 'Tumbler', "Serveware"], 
+    enum: ['Vase','Dinnerset', 'Decor', 'Bowl', 'Cup', 'Mug', 'Platter/Tray', 'Tea', 'Tealight Candle', 'Teapot', 'Tumbler', "Serveware", "Puja"], 
     required: true,
     index: true
   },
