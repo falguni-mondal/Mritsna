@@ -122,6 +122,7 @@ const AddProduct = () => {
                     <option value="Tumbler">Tumbler</option>
                     <option value="Serveware">Serveware</option>
                     <option value="Puja">Puja</option>
+                    <option value="Aromatic Candle">Aromatic Candle</option>
                   </select>
                   {methods.formState.errors.category && (
                     <p className="text-red-500 text-xs mt-1">
