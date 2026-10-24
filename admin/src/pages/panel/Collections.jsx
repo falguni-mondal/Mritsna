@@ -57,7 +57,7 @@ const Collections = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto px-6 py-12">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
@@ -143,7 +143,7 @@ const Collections = () => {
 
                     {/* Actions */}
                     <td className="p-4 align-middle text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                         <Link 
                           to={`/admin/collections/edit/${collection._id}`}
                           className="p-2 text-black/50 hover:text-black hover:bg-black/5 transition-colors"

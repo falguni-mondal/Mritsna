@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import { Icon } from "@iconify/react";
@@ -106,7 +107,9 @@ const UserDrawer = ({ isOpen, onClose, entityId, initialTab = "cart" }) => {
     },
   ];
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <>
       <div
         onClick={handleClose}
@@ -122,27 +125,29 @@ const UserDrawer = ({ isOpen, onClose, entityId, initialTab = "cart" }) => {
         `}
       >
         {/* Drawer Header */}
-        <div className="shrink-0 px-8 py-6 border-b border-black/10 flex justify-between items-center bg-[#f8f8f8]">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-bold tracking-widest uppercase">
+        <div className="shrink-0 px-4 sm:px-8 py-4 sm:py-6 border-b border-black/10 flex justify-between items-center gap-3 bg-[#f8f8f8]">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <h2 className="text-xs sm:text-sm font-bold tracking-widest uppercase truncate">
               360° Customer Intelligence
             </h2>
             {details &&
               (isVisitor ? (
-                <span className="bg-amber-100 text-amber-900 border border-amber-200 text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                <span className="shrink-0 bg-amber-100 text-amber-900 border border-amber-200 text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
                   Visitor
                 </span>
               ) : (
-                <span className="bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                <span className="shrink-0 bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
                   User
                 </span>
               ))}
           </div>
           <button
+            type="button"
             onClick={handleClose}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/10 transition-colors cursor-pointer"
+            aria-label="Close customer drawer"
+            className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-full bg-black/5 sm:bg-transparent hover:bg-black/10 active:bg-black/15 transition-colors cursor-pointer"
           >
-            <Icon icon="ph:x-light" className="text-xl" />
+            <Icon icon="ph:x-light" className="text-xl text-black" />
           </button>
         </div>
 
@@ -150,7 +155,7 @@ const UserDrawer = ({ isOpen, onClose, entityId, initialTab = "cart" }) => {
         <div
           onWheel={stopScrollPropagation}
           onTouchMove={stopScrollPropagation}
-          className="flex-1 overflow-y-auto overscroll-contain min-h-0 custom-scrollbar p-8"
+          className="flex-1 overflow-y-auto overscroll-contain min-h-0 custom-scrollbar p-4 sm:p-8"
         >
           {isDetailsLoading || !details ? (
             <div className="h-full flex flex-col items-center justify-center opacity-30">
@@ -182,10 +187,10 @@ const UserDrawer = ({ isOpen, onClose, entityId, initialTab = "cart" }) => {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm opacity-60 mt-1">{profile.email}</p>
+                    <p className="text-sm opacity-60 mt-1 break-all">{profile.email}</p>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <span className="inline-block bg-black/5 text-black text-[0.6rem] uppercase tracking-widest font-bold px-2.5 py-1 rounded-sm">
                       Region: {profile.countryCode} ({profile.currencyCode})
                     </span>
@@ -582,7 +587,8 @@ const UserDrawer = ({ isOpen, onClose, entityId, initialTab = "cart" }) => {
           )}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 };
 
