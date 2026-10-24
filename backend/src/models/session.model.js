@@ -13,7 +13,7 @@ const sessionSchema = new mongoose.Schema(
     },
     ip_address: { 
       type: String, 
-      required: true
+      default: null
     },
     user_agent: { 
       type: String

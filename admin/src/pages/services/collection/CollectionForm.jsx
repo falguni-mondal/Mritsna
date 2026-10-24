@@ -182,7 +182,7 @@ const CollectionForm = () => {
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-6 py-12 pb-32">
+    <div className="w-full max-w-5xl mx-auto pb-32">
       <div className="flex items-center justify-between mb-8">
         <div>
           <button 

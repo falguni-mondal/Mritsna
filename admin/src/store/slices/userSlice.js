@@ -65,6 +65,7 @@ const initialState = {
   },
   currentUserDetails: null,
   isLoading: false,
+  isStatsLoading: false,
   isDetailsLoading: false,
   isError: false,
   message: ''
@@ -85,14 +86,14 @@ const adminUserSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchUserStats.pending, (state) => {
-        state.isLoading = true;
+        state.isStatsLoading = true;
       })
       .addCase(fetchUserStats.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.isStatsLoading = false;
         state.stats = action.payload;
       })
       .addCase(fetchUserStats.rejected, (state, action) => {
-        state.isLoading = false;
+        state.isStatsLoading = false;
         state.isError = true;
         state.message = action.payload;
       })

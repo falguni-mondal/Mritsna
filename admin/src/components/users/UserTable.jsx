@@ -35,6 +35,7 @@ const activityOptions = [
 const UserTable = ({
   users,
   pagination,
+  currentPage,
   isLoading,
   currentType,
   currentActivity,
@@ -51,6 +52,9 @@ const UserTable = ({
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const regionRef = useRef(null);
   const activityRef = useRef(null);
+
+  const activePage = currentPage || pagination?.currentPage || 1;
+  const totalPages = pagination?.totalPages || 1;
 
   const tabs = [
     { id: "all", label: "All Profiles" },
@@ -371,22 +375,22 @@ const UserTable = ({
       </div>
 
       {/* Pagination */}
-      {!isLoading && pagination.totalPages > 1 && (
+      {!isLoading && totalPages > 1 && (
         <div className="flex justify-between items-center mt-6 pt-6 border-t border-black/5">
           <span className="text-xs opacity-50 uppercase tracking-widest font-bold">
-            Page {pagination.currentPage} of {pagination.totalPages}
+            Page {activePage} of {totalPages}
           </span>
           <div className="flex gap-2">
             <button
-              onClick={() => onPageChange(pagination.currentPage - 1)}
-              disabled={pagination.currentPage === 1}
+              onClick={() => onPageChange(activePage - 1)}
+              disabled={activePage <= 1}
               className="w-8 h-8 flex items-center justify-center border border-black/10 disabled:opacity-30 hover:bg-black/5 transition-colors cursor-pointer"
             >
               <Icon icon="ph:caret-left-bold" />
             </button>
             <button
-              onClick={() => onPageChange(pagination.currentPage + 1)}
-              disabled={pagination.currentPage === pagination.totalPages}
+              onClick={() => onPageChange(activePage + 1)}
+              disabled={activePage >= totalPages}
               className="w-8 h-8 flex items-center justify-center border border-black/10 disabled:opacity-30 hover:bg-black/5 transition-colors cursor-pointer"
             >
               <Icon icon="ph:caret-right-bold" />

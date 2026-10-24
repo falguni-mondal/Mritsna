@@ -57,7 +57,7 @@ const Carts = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f8f8f8] p-6 lg:p-10 text-[#1a1a1a]">
+    <div className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a]">
       <div className="max-w-[1600px] mx-auto">
         
         {/* Header */}

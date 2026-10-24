@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import { fetchUserStats, fetchUsersList } from "../../store/slices/userSlice";
 import UserMetrics from "../../components/users/UserMetrics";
 import UserTable from "../../components/users/UserTable";
@@ -7,59 +8,137 @@ import UserDrawer from "../../components/users/UserDrawer";
 
 const Users = () => {
   const dispatch = useDispatch();
-  const { stats, usersList, pagination, isLoading } = useSelector(
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const { stats, usersList, pagination, isLoading, isStatsLoading } = useSelector(
     (state) => state.adminUser
   );
 
-  const [currentType, setCurrentType] = useState("all"); // 'all', 'user', 'visitor'
-  const [currentActivity, setCurrentActivity] = useState("all");
-  const [currentRegion, setCurrentRegion] = useState("global");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  // Read state directly from URL search params so page reloads preserve pagination & filters
+  const currentPage = Math.max(1, parseInt(searchParams.get("page"), 10) || 1);
+  const currentType = searchParams.get("type") || "all"; // 'all', 'user', 'visitor'
+  const currentActivity = searchParams.get("activity") || "all";
+  const currentRegion = searchParams.get("region") || "global";
+  const urlSearch = searchParams.get("search") || "";
+
+  // Local state for instant typing in the search input before syncing to URL
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedEntityId, setSelectedEntityId] = useState(null);
   const [drawerInitialTab, setDrawerInitialTab] = useState("cart");
 
+  // Keep search input synced if URL changes via browser Back/Forward navigation
   useEffect(() => {
-    dispatch(fetchUserStats());
-  }, [dispatch]);
+    setSearchQuery(urlSearch);
+  }, [urlSearch]);
 
+  // Debounce search input updates to URL params
   useEffect(() => {
+    if (searchQuery === urlSearch) return;
+
     const timer = setTimeout(() => {
-      dispatch(
-        fetchUsersList({
-          page: currentPage,
-          limit: 15,
-          type: currentType,
-          activity: currentActivity,
-          region: currentRegion,
-          search: searchQuery,
-        })
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (searchQuery.trim()) {
+            next.set("search", searchQuery.trim());
+          } else {
+            next.delete("search");
+          }
+          next.set("page", "1");
+          return next;
+        },
+        { replace: true }
       );
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [dispatch, currentPage, currentType, currentActivity, currentRegion, searchQuery]);
+  }, [searchQuery, urlSearch, setSearchParams]);
+
+  // Fetch overview metrics on mount
+  useEffect(() => {
+    dispatch(fetchUserStats());
+  }, [dispatch]);
+
+  // Fetch paginated users/visitors whenever URL params change
+  useEffect(() => {
+    dispatch(
+      fetchUsersList({
+        page: currentPage,
+        limit: 15,
+        type: currentType,
+        activity: currentActivity,
+        region: currentRegion,
+        search: urlSearch,
+      })
+    );
+  }, [dispatch, currentPage, currentType, currentActivity, currentRegion, urlSearch]);
+
+  // Clamp URL page parameter if it exceeds available totalPages after loading
+  useEffect(() => {
+    if (!isLoading && pagination?.totalPages > 0 && currentPage > pagination.totalPages) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("page", String(pagination.totalPages));
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  }, [isLoading, pagination?.totalPages, currentPage, setSearchParams]);
 
   const handleTypeChange = (type) => {
-    setCurrentType(type);
-    setCurrentPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (type && type !== "all") {
+        next.set("type", type);
+      } else {
+        next.delete("type");
+      }
+      next.set("page", "1");
+      return next;
+    });
   };
 
   const handleActivityChange = (activity) => {
-    setCurrentActivity(activity);
-    setCurrentPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (activity && activity !== "all") {
+        next.set("activity", activity);
+      } else {
+        next.delete("activity");
+      }
+      next.set("page", "1");
+      return next;
+    });
   };
 
   const handleRegionChange = (region) => {
-    setCurrentRegion(region);
-    setCurrentPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (region && region !== "global") {
+        next.set("region", region);
+      } else {
+        next.delete("region");
+      }
+      next.set("page", "1");
+      return next;
+    });
   };
 
   const handleSearchChange = (q) => {
     setSearchQuery(q);
-    setCurrentPage(1);
+  };
+
+  const handlePageChange = (newPage) => {
+    const validPage = Math.max(1, Number(newPage) || 1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", String(validPage));
+      return next;
+    });
   };
 
   const handleInspectUser = (entityId, tab = "cart") => {
@@ -74,7 +153,7 @@ const Users = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f8f8f8] p-6 lg:p-10 text-[#1a1a1a]">
+    <div className="w-full min-h-screen bg-[#f8f8f8] text-[#1a1a1a]">
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
         <header className="mb-10">
@@ -87,13 +166,14 @@ const Users = () => {
         </header>
 
         {/* Metrics Grid */}
-        <UserMetrics stats={stats} isLoading={isLoading} />
+        <UserMetrics stats={stats} isLoading={isStatsLoading} />
 
         {/* Unified Directory Table */}
         <div className="mt-10 bg-white border border-black/5 p-6 shadow-sm">
           <UserTable
             users={usersList}
             pagination={pagination}
+            currentPage={currentPage}
             isLoading={isLoading}
             currentType={currentType}
             currentActivity={currentActivity}
@@ -103,7 +183,7 @@ const Users = () => {
             onActivityChange={handleActivityChange}
             onRegionChange={handleRegionChange}
             onSearchChange={handleSearchChange}
-            onPageChange={setCurrentPage}
+            onPageChange={handlePageChange}
             onInspectUser={handleInspectUser}
           />
         </div>

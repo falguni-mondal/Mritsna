@@ -33,8 +33,6 @@ const revokeSuspiciousSession = async (
     reason: reason,
     expectedDevice: session?.device_id,
     gotDevice: req.cookies.device_id,
-    expectedIp: session?.ip_address,
-    gotIp: req.ip,
     userId: session?.user,
     timestamp: new Date().toISOString(),
   });
@@ -71,7 +69,7 @@ const handleTamperedToken = async (
   refreshToken,
   isOptional,
 ) => {
-  console.warn(`[Security] Token tampering detected from IP: ${req.ip}`);
+  console.warn("[Security] Token tampering detected.");
 
   if (refreshToken) {
     try {
@@ -152,19 +150,7 @@ const refreshTokenSetup = async (
       );
     }
 
-    // 3. Security Check: IP Address Match
-    if (req.ip !== session.ip_address) {
-      return await revokeSuspiciousSession(
-        req,
-        res,
-        next,
-        session,
-        "IP Address Mismatch",
-        isOptional,
-      );
-    }
-
-    // 4. Security Check: Role Tampering
+    // 3. Security Check: Role Tampering
     if (decodedRefresh.role !== session.role) {
       return await revokeSuspiciousSession(
         req,
@@ -207,7 +193,7 @@ const refreshTokenSetup = async (
       remainingSeconds,
     );
 
-    // --- NEW: Dynamically assign cookie names based on the role ---
+    // --- Dynamically assign cookie names based on the role ---
     const tokenCookieName =
       newSession.role === "admin" ? "admin_accessToken" : "user_accessToken";
     const refreshCookieName =
