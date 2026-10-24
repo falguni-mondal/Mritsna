@@ -13,7 +13,6 @@ const formatINR = (amount) => {
   return `₹ ${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 };
 
-// Dynamic formatter for foreign currencies (USD, EUR, etc.)
 const formatForeignCurrency = (amount, currencyCode, symbol) => {
   return `${symbol} ${Number(amount || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 };
@@ -85,13 +84,16 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
       await dispatch(triggerCartReminder(cartId)).unwrap();
       toast.success("Reminder email queued.", toastConfig);
     } catch (error) {
-      toast.error("Failed to send reminder.", toastConfig);
+      toast.error(error || "Failed to send reminder.", toastConfig);
     }
   };
 
   const stopScrollPropagation = (e) => {
     e.stopPropagation();
   };
+
+  const isVisitor = cart?.isGuest || cart?.user?.isGuest || cart?.userType === "visitor";
+  const hasRealEmail = cart?.user?.email && !cart.user.email.startsWith("Anonymous");
 
   return (
     <>
@@ -109,7 +111,20 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
         `}
       >
         <div className="shrink-0 px-8 py-6 border-b border-black/10 flex justify-between items-center bg-[#f8f8f8]">
-          <h2 className="text-sm font-bold tracking-widest uppercase">Cart Details</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-bold tracking-widest uppercase">Cart Details</h2>
+            {cart && (
+              isVisitor ? (
+                <span className="bg-amber-100 text-amber-900 border border-amber-200 text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                  Visitor
+                </span>
+              ) : (
+                <span className="bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                  User
+                </span>
+              )
+            )}
+          </div>
           <button 
             onClick={handleClose}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/10 transition-colors cursor-pointer"
@@ -134,10 +149,21 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
               <div>
                 <h3 className="text-[0.65rem] uppercase tracking-widest font-bold opacity-50 mb-4">Customer Profile</h3>
                 <div className="bg-[#f8f8f8] p-5 border border-black/5 rounded-sm">
-                  <div className="flex justify-between items-start mb-1">
-                    <p className="text-lg font-medium">{cart.user.name}</p>
+                  <div className="flex justify-between items-start mb-1 gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-lg font-medium">{cart.user.name}</p>
+                      {isVisitor ? (
+                        <span className="bg-amber-100 text-amber-900 border border-amber-200 text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                          Visitor
+                        </span>
+                      ) : (
+                        <span className="bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                          User
+                        </span>
+                      )}
+                    </div>
                     {cart.summary.isForeign && (
-                      <span className="bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                      <span className="bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm shrink-0">
                         Export: {cart.user.countryCode}
                       </span>
                     )}
@@ -145,7 +171,10 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
                   <p className="text-sm opacity-60 mb-4">{cart.user.email}</p>
                   <div className="flex justify-between text-xs border-t border-black/5 pt-4 mt-2">
                     <span className="opacity-50">Phone: {cart.user.phone}</span>
-                    <span className="opacity-50">Since: {new Date(cart.user.registeredAt).toLocaleDateString()}</span>
+                    <span className="opacity-50">
+                      {isVisitor ? "First Seen: " : "Since: "}
+                      {new Date(cart.user.registeredAt).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -153,7 +182,6 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
               <div>
                 <h3 className="text-[0.65rem] uppercase tracking-widest font-bold opacity-50 mb-4">Pipeline Breakdown</h3>
                 
-                {/* DUAL DISPLAY PIPELINE TOTAL */}
                 <div className="flex justify-between items-end mb-6">
                   <div>
                     <span className="text-3xl font-light">
@@ -194,7 +222,6 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
                           )}
                         </div>
                         
-                        {/* DUAL DISPLAY ITEM TOTAL */}
                         <div className="flex justify-between items-end text-sm mt-2">
                           <span className="opacity-60">Qty: {item.quantityInCart}</span>
                           <div className="text-right">
@@ -231,10 +258,11 @@ const CartDrawer = ({ isOpen, onClose, cartId }) => {
             </button>
             <button
               onClick={handleSendReminder}
-              disabled={isActionLoading}
-              className="flex-1 py-4 bg-black border border-black text-white text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors disabled:opacity-50 cursor-pointer"
+              disabled={isActionLoading || !hasRealEmail}
+              title={!hasRealEmail ? "Visitor has not entered an email address yet" : "Send reminder email"}
+              className="flex-1 py-4 bg-black border border-black text-white text-[0.65rem] font-bold tracking-[0.2em] uppercase hover:bg-black/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
             >
-              Send Reminder
+              {hasRealEmail ? "Send Reminder" : "No Email Yet"}
             </button>
           </div>
         )}

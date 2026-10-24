@@ -9,6 +9,18 @@ const visitSchema = new mongoose.Schema(
       index: true,
       description: "Unique identifier stored in the user's 24-hour cookie"
     },
+    deviceId: {
+      type: String,
+      default: null,
+      index: true,
+      description: "Persistent 1-year device identifier linking visits to guest carts/wishlists"
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true
+    },
 
     // --- HIGH-LEVEL ATTRIBUTION (Granular Social Data) ---
     channel: {
@@ -37,11 +49,11 @@ const visitSchema = new mongoose.Schema(
     },
     
     // --- UTM MARKETING CAMPAIGNS (Future-proofing for Ads) ---
-    utmSource: { type: String, default: null },   // e.g., 'facebook', 'newsletter'
-    utmMedium: { type: String, default: null },   // e.g., 'cpc', 'email'
-    utmCampaign: { type: String, default: null }, // e.g., 'summer_sale_2026'
+    utmSource: { type: String, default: null },
+    utmMedium: { type: String, default: null },
+    utmCampaign: { type: String, default: null },
 
-    // --- TECHNICAL & DEVICE METRICS (Future-proofing for UI/UX optimization) ---
+    // --- TECHNICAL & DEVICE METRICS ---
     deviceType: {
       type: String,
       enum: ["Mobile", "Tablet", "Desktop", "Unknown"],
@@ -50,17 +62,18 @@ const visitSchema = new mongoose.Schema(
     browser: { type: String, default: null },
     os: { type: String, default: null },
 
-    // --- GEOLOCATION (Future-proofing for regional marketing) ---
+    // --- GEOLOCATION ---
     country: { type: String, default: null },
     region: { type: String, default: null },
   },
   {
-    timestamps: true, // Automatically manages createdAt and updatedAt
+    timestamps: true,
   }
 );
 
 // --- PERFORMANCE INDEXING ---
 visitSchema.index({ createdAt: -1, channel: 1 });
+visitSchema.index({ deviceId: 1, updatedAt: -1 });
 
 const Visit = mongoose.model("Visit", visitSchema);
 

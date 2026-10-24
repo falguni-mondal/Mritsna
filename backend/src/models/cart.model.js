@@ -20,40 +20,73 @@ const cartItemSchema = new mongoose.Schema({
     max: [5, 'Maximum 5 items allowed per variant per order'],
     default: 1
   }
-  // Notice: The 'price' field has been completely removed. 
-  // The database is no longer responsible for storing static financial data.
 }, { 
-  // We keep _id true so Mongoose generates a unique ID for each item in the array.
-  // This makes it much easier to target and delete specific items later.
   _id: true 
 });
 
 // ==========================================
-// Main Schema: User Cart
+// Main Schema: Unified User & Visitor Cart
 // ==========================================
 const cartSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Cart must belong to a user'],
-    unique: true, // Crucial: Ensures one user cannot accidentally spawn multiple cart documents
-    index: true   // Speeds up query time when fetching the cart on page load
+    default: null,
+  },
+  deviceId: {
+    type: String,
+    default: null,
+  },
+  guestEmail: {
+    type: String,
+    lowercase: true,
+    trim: true,
+    default: null
+  },
+  guestName: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  guestPhone: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  lastKnownRegion: {
+    countryCode: { type: String, default: 'IN' },
+    currencyCode: { type: String, default: 'INR' },
+    symbol: { type: String, default: '₹' },
+    rate: { type: Number, default: 1 }
+  },
+  forceClearLocal: {
+    type: Boolean,
+    default: false
   },
   items: {
     type: [cartItemSchema],
     default: []
   }
 }, {
-  timestamps: true, // Automatically tracks createdAt and updatedAt
+  timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// ==========================================
-// Instance Methods (Optional Enterprise Additions)
-// ==========================================
+// Partial Unique Indexes:
+// 1. One cart per authenticated User
+cartSchema.index(
+  { user: 1 },
+  { unique: true, partialFilterExpression: { user: { $type: 'objectId' } } }
+);
 
-// Quickly clear the entire cart
+// 2. One cart per anonymous Visitor deviceId (when user is null)
+cartSchema.index(
+  { deviceId: 1 },
+  { unique: true, partialFilterExpression: { deviceId: { $type: 'string' }, user: null } }
+);
+
+// Instance Method: Quickly clear the entire cart
 cartSchema.methods.clearCart = async function() {
   this.items = [];
   return this.save();

@@ -7,6 +7,7 @@ import SmoothScroll from "./SmoothScroll";
 
 const navItems = [
   { id: "dashboard", label: "Overview", path: "/admin/dashboard", icon: "solar:widget-5-linear" },
+  { id: "users", label: "Users", path: "/admin/users", icon: "ph:users-three-light" },
   { id: "products", label: "Products", path: "/admin/products", icon: "lucide:package" },
   { id: "inventory", label: "Inventory", path: "/admin/inventory", icon: "lucide:archive" },
   { id: "collections", label: "Collections", path: "/admin/collections", icon: "lucide:grid" },
@@ -22,7 +23,6 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const { admin } = useSelector((state) => state.auth);
   
-  // State to manage mobile menu toggle
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -35,11 +35,9 @@ const AdminLayout = () => {
   };
 
   return (
-    // Changed to flex-col for mobile (Header on top, content below), flex-row for desktop
     <div className="flex flex-col lg:flex-row h-screen w-full bg-light overflow-hidden">
       
       {/* --- MOBILE TOP NAVBAR --- */}
-      {/* This only shows on screens smaller than 'lg' (1024px) */}
       <header className="lg:hidden shrink-0 h-16 bg-dark flex items-center justify-between px-4 sm:px-6 border-b border-[var(--dark)]/10 z-30 shadow-md">
         <img
           src="/logo_white.svg"
@@ -55,7 +53,6 @@ const AdminLayout = () => {
       </header>
 
       {/* --- MOBILE BACKDROP --- */}
-      {/* Darkens the background when menu is open on mobile. Clicking it closes the menu. */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity"
@@ -72,7 +69,6 @@ const AdminLayout = () => {
       `}>
         
         {/* Logo Area */}
-        {/* On mobile, we add an X button to close the menu here */}
         <div className="h-16 lg:h-24 shrink-0 flex items-center justify-between lg:justify-start px-6 lg:px-10 border-b border-[var(--light)]/10">
           <img
             src="/logo_white.svg"
@@ -98,7 +94,7 @@ const AdminLayout = () => {
               <NavLink
                 key={item.id}
                 to={item.path}
-                onClick={closeMobileMenu} // Auto-close menu when a link is clicked on mobile
+                onClick={closeMobileMenu}
                 className={({ isActive }) =>
                   `group flex items-center gap-4 px-4 py-3 rounded-md transition-all duration-300 relative overflow-hidden ${isActive ? "txt-light bg-[var(--light)]/10 shadow-inner" : "txt-light opacity-50 hover:opacity-100 hover:bg-[var(--light)]/5 hover:translate-x-1"}`
                 }
@@ -141,7 +137,6 @@ const AdminLayout = () => {
       {/* --- MAIN CONTENT AREA --- */}
       <main className="flex-1 h-full min-h-0 bg-light overflow-y-auto overflow-x-hidden relative z-10 custom-scrollbar">
         <SmoothScroll wrapperId="admin-scroll-wrapper" contentId="admin-scroll-content">
-          {/* Responsive padding: smaller on mobile, larger on desktop */}
           <div id="admin-scroll-content" className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-10 pb-24 lg:pb-20">
             <Outlet />
           </div>

@@ -2,13 +2,12 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { userAxios } from '../../configs/axiosInstance'; 
 
 // ==========================================
-// LOCAL STORAGE HELPERS (DUMB GUEST CART)
+// LOCAL STORAGE HELPERS (DUMB GUEST CART + LEGACY MIGRATION)
 // ==========================================
-// We only ever load and save the "Identity" of the items, never the prices or currency.
 const loadGuestCartIds = () => {
   if (typeof window === 'undefined') return [];
   try {
-    const saved = localStorage.getItem('guest_cart_ids');
+    const saved = localStorage.getItem('guest_cart_ids') || localStorage.getItem('guest_cart');
     if (saved) {
       const parsed = JSON.parse(saved);
       return Array.isArray(parsed) ? parsed : [];
@@ -22,7 +21,6 @@ const loadGuestCartIds = () => {
 
 const saveGuestCartIds = (items) => {
   if (typeof window !== 'undefined') {
-    // Strip everything except the essential identifiers before saving
     const dumbList = items.map(item => ({
       productId: item.productId,
       variantId: item.variantId,
@@ -64,20 +62,16 @@ export const fetchUserCart = createAsyncThunk(
   }
 );
 
-// Hydrate Cart for Guest Users
-// Takes the dumb IDs from localStorage and gets the live math from the backend
+// Hydrate & Persist Guest Cart to MongoDB
+// Always calls /cart/hydrate (even when localItems is empty) so removals/clears and admin force-clears stay in sync
 export const hydrateGuestCartAPI = createAsyncThunk(
   'cart/hydrateGuestCartAPI',
-  async (_, thunkAPI) => {
+  async (options = {}, thunkAPI) => {
     try {
       const localItems = loadGuestCartIds();
-      
-      // If there's nothing in local storage, don't bother hitting the API
-      if (localItems.length === 0) {
-        return { data: { items: [], subTotal: 0 } }; 
-      }
+      const isMutation = Boolean(options?.isMutation);
 
-      const response = await userAxios.post('/cart/hydrate', { localItems });
+      const response = await userAxios.post('/cart/hydrate', { localItems, isMutation });
       return response.data;
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to hydrate guest cart');
@@ -103,7 +97,6 @@ export const updateCartQuantityDB = createAsyncThunk(
   async (cartData, { dispatch, rejectWithValue }) => {
     try {
       await userAxios.put('/cart/update', cartData);
-      // We still fetch the cart after updating DB to ensure perfect sync
       dispatch(fetchUserCart());
       return true;
     } catch (error) {
@@ -143,13 +136,11 @@ export const syncGuestCartToDB = createAsyncThunk(
   'cart/syncGuestCartToDB',
   async (_, { dispatch, rejectWithValue }) => {
     try {
-      // Read the dumb list directly from local storage for syncing
       const localItems = loadGuestCartIds();
       
-      if (localItems.length > 0) {
-        await userAxios.post('/cart/sync', { localItems });
-        dispatch(clearLocalCart());
-      }
+      // Always hit /cart/sync on login/verify so any shadow guest cart in DB for this device_id is cleaned up
+      await userAxios.post('/cart/sync', { localItems });
+      dispatch(clearLocalCart());
       
       dispatch(fetchUserCart());
       return true;
@@ -159,13 +150,10 @@ export const syncGuestCartToDB = createAsyncThunk(
   }
 );
 
-
 // ==========================================
 // REDUX SLICE & INSTANT MATH ENGINE
 // ==========================================
 
-// --- THE INSTANT FRONTEND MATH ENGINE ---
-// This safely recalculates totals using the backend-provided prices already cached in state.
 const recalculateLocalMath = (state) => {
   state.subTotal = state.items.reduce((total, item) => {
     const itemPrice = item.price || 0; 
@@ -194,7 +182,6 @@ const cartSlice = createSlice({
 
       if (existingIndex > -1) {
         const combinedQty = state.items[existingIndex].quantity + newItem.quantity;
-        // Strict fallback to prevent JS zero bug
         const limit = newItem.maxLimit !== undefined ? newItem.maxLimit : 5;
         state.items[existingIndex].quantity = Math.min(combinedQty, 5, limit);
       } else {
@@ -202,7 +189,7 @@ const cartSlice = createSlice({
       }
 
       saveGuestCartIds(state.items);
-      recalculateLocalMath(state); // Fire instant math
+      recalculateLocalMath(state);
     },
 
     updateLocalQuantity: (state, action) => {
@@ -212,7 +199,7 @@ const cartSlice = createSlice({
       if (existingItem) {
         existingItem.quantity = quantity;
         saveGuestCartIds(state.items);
-        recalculateLocalMath(state); // Fire instant math
+        recalculateLocalMath(state);
       }
     },
 
@@ -220,14 +207,16 @@ const cartSlice = createSlice({
       const variantId = action.payload;
       state.items = state.items.filter(item => item.variantId !== variantId);
       saveGuestCartIds(state.items);
-      recalculateLocalMath(state); // Fire instant math
+      recalculateLocalMath(state);
     },
 
     clearLocalCart: (state) => {
       state.items = [];
       state.subTotal = 0;
-      localStorage.removeItem('guest_cart_ids');
-      localStorage.removeItem('guest_cart'); 
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('guest_cart_ids');
+        localStorage.removeItem('guest_cart'); 
+      }
     },
 
     clearCartErrors: (state) => {
@@ -237,15 +226,19 @@ const cartSlice = createSlice({
   },
   
   extraReducers: (builder) => {
-    // Helper function to handle fulfilling both user and guest carts
     const handleCartFulfilled = (state, action) => {
       state.isLoading = false;
       const payloadData = action.payload?.data || action.payload || {};
       
+      // If an admin forcibly cleared this guest cart in the Admin Drawer, wipe localStorage too
+      if (payloadData.forceClearedByAdmin && typeof window !== 'undefined') {
+        localStorage.removeItem('guest_cart_ids');
+        localStorage.removeItem('guest_cart');
+      }
+
       state.items = payloadData.items || [];
       state.subTotal = payloadData.subTotal || 0;
       
-      // Look for currency info in either the root payload or the nested data object
       if (action.payload?.currencySymbol || payloadData.currencySymbol) {
         state.currencySymbol = action.payload?.currencySymbol || payloadData.currencySymbol;
       }
@@ -255,7 +248,6 @@ const cartSlice = createSlice({
     };
 
     builder
-      // --- LOGGED IN CART FLOW ---
       .addCase(fetchUserCart.pending, (state) => { state.isLoading = true; })
       .addCase(fetchUserCart.fulfilled, handleCartFulfilled)
       .addCase(fetchUserCart.rejected, (state, action) => {
@@ -264,7 +256,6 @@ const cartSlice = createSlice({
         state.message = action.payload;
       })
 
-      // --- GUEST HYDRATION FLOW ---
       .addCase(hydrateGuestCartAPI.pending, (state) => { state.isLoading = true; })
       .addCase(hydrateGuestCartAPI.fulfilled, handleCartFulfilled)
       .addCase(hydrateGuestCartAPI.rejected, (state, action) => {
@@ -272,7 +263,6 @@ const cartSlice = createSlice({
         console.error("Hydration failed:", action.payload); 
       })
 
-      // --- DB MUTATIONS ---
       .addCase(addToCartDB.pending, (state) => {
         state.isLoading = true;
         state.isError = false;

@@ -2,12 +2,12 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { userAxios } from '../../configs/axiosInstance'; 
 
 // ==========================================
-// LOCAL STORAGE HELPERS (DUMB GUEST WISHLIST)
+// LOCAL STORAGE HELPERS (DUMB GUEST WISHLIST + LEGACY MIGRATION)
 // ==========================================
 const loadGuestWishlistIds = () => {
   if (typeof window === 'undefined') return [];
   try {
-    const saved = localStorage.getItem('guest_wishlist_ids');
+    const saved = localStorage.getItem('guest_wishlist_ids') || localStorage.getItem('guest_wishlist');
     if (saved) {
       const parsed = JSON.parse(saved);
       return Array.isArray(parsed) ? parsed : [];
@@ -21,7 +21,6 @@ const loadGuestWishlistIds = () => {
 
 const saveGuestWishlistIds = (items) => {
   if (typeof window !== 'undefined') {
-    // Strip everything except the essential identifiers before saving
     const dumbList = items.map(item => ({
       productId: item.productId,
       variantId: item.variantId
@@ -34,7 +33,6 @@ const saveGuestWishlistIds = (items) => {
 // ASYNC THUNKS (API CALLS)
 // ==========================================
 
-// Fetch Authenticated User Wishlist (Backend handles pricing)
 export const fetchUserWishlist = createAsyncThunk(
   'wishlist/fetchUserWishlist',
   async (_, thunkAPI) => {
@@ -47,17 +45,13 @@ export const fetchUserWishlist = createAsyncThunk(
   }
 );
 
-// NEW: Hydrate Guest Wishlist (Backend handles pricing based on dumb IDs)
+// Hydrate & Persist Guest Wishlist to MongoDB
+// Always calls /wishlist/hydrate (even when localItems is empty) so removing the last item updates MongoDB
 export const hydrateGuestWishlistAPI = createAsyncThunk(
   'wishlist/hydrateGuestWishlistAPI',
   async (_, thunkAPI) => {
     try {
       const localItems = loadGuestWishlistIds();
-      
-      if (localItems.length === 0) {
-        return { data: { items: [] } }; 
-      }
-
       const response = await userAxios.post('/wishlist/hydrate', { localItems });
       return response.data;
     } catch (error) {
@@ -66,13 +60,11 @@ export const hydrateGuestWishlistAPI = createAsyncThunk(
   }
 );
 
-// Toggle Item in DB (Add/Remove)
 export const toggleWishlistDB = createAsyncThunk(
   'wishlist/toggleWishlistDB',
   async ({ productId, variantId }, { dispatch, rejectWithValue }) => {
     try {
       const response = await userAxios.post('/wishlist/toggle', { productId, variantId });
-      // Immediately fetch the fresh wishlist to guarantee sync with DB and pricing engine
       dispatch(fetchUserWishlist()); 
       return response.data; 
     } catch (error) {
@@ -81,22 +73,19 @@ export const toggleWishlistDB = createAsyncThunk(
   }
 );
 
-// Sync Guest Wishlist to DB
 export const syncGuestWishlistToDB = createAsyncThunk(
   'wishlist/syncGuestWishlistToDB',
   async (_, { dispatch, rejectWithValue }) => {
     try {
-      // Read the dumb IDs directly
       const localItems = loadGuestWishlistIds();
       
-      if (localItems.length > 0) {
-        await userAxios.post('/wishlist/sync', { localItems });
-        
-        // Nuke the local storage and old keys
+      // Always hit /wishlist/sync on login/verify so any shadow guest wishlist in DB for this device_id is cleaned up
+      await userAxios.post('/wishlist/sync', { localItems });
+      if (typeof window !== 'undefined') {
         localStorage.removeItem('guest_wishlist_ids');
         localStorage.removeItem('guest_wishlist');
-        dispatch({ type: 'wishlist/clearLocalWishlist' });
       }
+      dispatch({ type: 'wishlist/clearLocalWishlist' });
       
       dispatch(fetchUserWishlist());
       return true;
@@ -107,13 +96,12 @@ export const syncGuestWishlistToDB = createAsyncThunk(
   }
 );
 
-
 // ==========================================
 // REDUX SLICE
 // ==========================================
 
 const initialState = {
-  items: [], // Initialized empty, waiting for hydration
+  items: [],
   isLoading: false,
   isError: false,
   message: '',
@@ -125,7 +113,6 @@ const wishlistSlice = createSlice({
   name: 'wishlist',
   initialState,
   reducers: {
-    // --- GUEST WISHLIST ACTIONS (LOCAL ONLY) ---
     toggleLocalItem: (state, action) => {
       const newItem = action.payload; 
       
@@ -139,14 +126,15 @@ const wishlistSlice = createSlice({
         state.items.unshift(newItem);
       }
 
-      // Save only the dumb IDs to local storage
       saveGuestWishlistIds(state.items);
     },
 
     clearLocalWishlist: (state) => {
       state.items = [];
-      localStorage.removeItem('guest_wishlist_ids');
-      localStorage.removeItem('guest_wishlist');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('guest_wishlist_ids');
+        localStorage.removeItem('guest_wishlist');
+      }
     },
 
     clearWishlistErrors: (state) => {
@@ -156,7 +144,6 @@ const wishlistSlice = createSlice({
   },
   
   extraReducers: (builder) => {
-    // Helper function to handle fulfilling both user and guest wishlists
     const handleWishlistFulfilled = (state, action) => {
       state.isLoading = false;
       const payloadData = action.payload?.data || action.payload || {};
@@ -172,7 +159,6 @@ const wishlistSlice = createSlice({
     };
 
     builder
-      // --- FETCH USER WISHLIST ---
       .addCase(fetchUserWishlist.pending, (state) => { state.isLoading = true; state.isError = false; })
       .addCase(fetchUserWishlist.fulfilled, handleWishlistFulfilled)
       .addCase(fetchUserWishlist.rejected, (state, action) => {
@@ -181,7 +167,6 @@ const wishlistSlice = createSlice({
         state.message = action.payload;
       })
 
-      // --- HYDRATE GUEST WISHLIST ---
       .addCase(hydrateGuestWishlistAPI.pending, (state) => { state.isLoading = true; })
       .addCase(hydrateGuestWishlistAPI.fulfilled, handleWishlistFulfilled)
       .addCase(hydrateGuestWishlistAPI.rejected, (state, action) => {
@@ -189,7 +174,6 @@ const wishlistSlice = createSlice({
         console.error("Wishlist hydration failed:", action.payload); 
       })
 
-      // --- TOGGLE DB WISHLIST ---
       .addCase(toggleWishlistDB.pending, (state) => { state.isLoading = true; state.isError = false; })
       .addCase(toggleWishlistDB.fulfilled, (state) => { state.isLoading = false; })
       .addCase(toggleWishlistDB.rejected, (state, action) => {
@@ -198,7 +182,6 @@ const wishlistSlice = createSlice({
         state.message = action.payload;
       })
       
-      // --- SYNC GUEST WISHLIST ---
       .addCase(syncGuestWishlistToDB.rejected, (state, action) => {
         state.isError = true;
         state.message = action.payload;

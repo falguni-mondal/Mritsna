@@ -5,8 +5,6 @@ import { calculateRegionalPricing } from '../../utils/pricingEngine.js';
 
 // ==========================================
 // CALCULATE WISHLIST METRICS (TRUE REVENUE ENGINE)
-// Applies export markups to the Base INR if the user is foreign, 
-// strictly calculating at the item level (no total cart value).
 // ==========================================
 const calculateLiveWishlistMetrics = (wishlist, regionData = null) => {
   let totalItems = 0;
@@ -16,7 +14,6 @@ const calculateLiveWishlistMetrics = (wishlist, regionData = null) => {
 
   if (wishlist.items && wishlist.items.length > 0) {
     wishlist.items.forEach(wishlistItem => {
-      // The schema uses productId as the ref
       if (!wishlistItem.productId) return; 
 
       const product = wishlistItem.productId;
@@ -28,20 +25,17 @@ const calculateLiveWishlistMetrics = (wishlist, regionData = null) => {
         const basePrice = variant.pricing?.price || 0;
         const discount = variant.pricing?.discountPercentage || 0;
         
-        // 1. Calculate raw product price in INR
         let baseSellingPriceINR = discount > 0 
           ? Math.round(basePrice - (basePrice * (discount / 100))) 
           : basePrice;
 
-        // Inject the export markup into the base INR value if foreign
         if (isForeign) {
           const exportMarkupINR = product.isPremium ? 10000 : 5000;
           baseSellingPriceINR += exportMarkupINR;
         }
 
-        totalItems += 1; // Wishlist items don't have quantities, so it's always 1
+        totalItems += 1;
 
-        // 2. Foreign/Localized Calculation for UI display
         let localizedData = null;
         if (isForeign) {
           const regionalPricing = calculateRegionalPricing(
@@ -59,8 +53,7 @@ const calculateLiveWishlistMetrics = (wishlist, regionData = null) => {
         }
 
         detailedItems.push({
-          // wishlistItem._id is explicitly disabled in the schema, so we use variantId as the key
-          wishlistItemKey: wishlistItem.variantId, 
+          wishlistItemKey: `${product._id}-${wishlistItem.variantId}`, 
           productId: product._id,
           title: product.title,
           slug: product.slug,
@@ -71,8 +64,8 @@ const calculateLiveWishlistMetrics = (wishlist, regionData = null) => {
           baseUnitPriceINR: baseSellingPriceINR, 
           localizedData, 
           stockAvailable: variant.inventory?.quantity || 0,
-          isStockBottleneck: 1 > (variant.inventory?.quantity || 0), // Flag if out of stock
-          image: variant.images.find(img => img.isPrimary)?.baseUrl || variant.images[0]?.baseUrl,
+          isStockBottleneck: 1 > (variant.inventory?.quantity || 0),
+          image: variant.images?.find(img => img.isPrimary)?.baseUrl || variant.images?.[0]?.baseUrl,
           addedAt: wishlistItem.addedAt
         });
       }
@@ -83,7 +76,46 @@ const calculateLiveWishlistMetrics = (wishlist, regionData = null) => {
 };
 
 // ==========================================
-// GET DASHBOARD METRICS (DEMAND FORECASTING)
+// HELPER: FORMAT UNIFIED USER / VISITOR IDENTITY
+// ==========================================
+const formatUnifiedWishlistCustomer = (wishlist) => {
+  const effectiveRegion = wishlist.user?.lastKnownRegion || wishlist.lastKnownRegion || {
+    countryCode: 'IN',
+    currencyCode: 'INR',
+    symbol: '₹',
+    rate: 1
+  };
+
+  if (wishlist.user) {
+    return {
+      id: wishlist.user._id,
+      name: `${wishlist.user.firstName || ''} ${wishlist.user.lastName || ''}`.trim() || 'Registered User',
+      email: wishlist.user.email,
+      phone: wishlist.user.phoneNumber ? `${wishlist.user.phoneCode || ''} ${wishlist.user.phoneNumber}`.trim() : 'Not Provided',
+      registeredAt: wishlist.user.createdAt,
+      countryCode: effectiveRegion.countryCode || 'IN',
+      isGuest: false,
+      userType: 'user',
+      deviceId: wishlist.deviceId || null
+    };
+  }
+
+  const shortDevice = wishlist.deviceId ? wishlist.deviceId.slice(0, 6).toUpperCase() : 'ANON';
+  return {
+    id: wishlist.deviceId || `guest-${wishlist._id}`,
+    name: wishlist.guestName || `Visitor #${shortDevice}`,
+    email: wishlist.guestEmail || `Anonymous Session (${shortDevice})`,
+    phone: 'Not Provided (Guest)',
+    registeredAt: wishlist.createdAt,
+    countryCode: effectiveRegion.countryCode || 'IN',
+    isGuest: true,
+    userType: 'visitor',
+    deviceId: wishlist.deviceId || null
+  };
+};
+
+// ==========================================
+// 1. GET DASHBOARD METRICS (DEMAND FORECASTING)
 // ==========================================
 export const getWishlistDashboardStats = async (req, res, next) => {
   try {
@@ -92,13 +124,20 @@ export const getWishlistDashboardStats = async (req, res, next) => {
       .lean();
 
     let totalActiveWishlists = activeWishlists.length;
+    let userWishlistsCount = 0;
+    let visitorWishlistsCount = 0;
     let totalItemsAccrossPlatform = 0;
     
     const productPopularity = {}; 
 
     activeWishlists.forEach(wishlist => {
-      const metrics = calculateLiveWishlistMetrics(wishlist, null); // Region not needed for pure counts
-      
+      if (wishlist.user) {
+        userWishlistsCount++;
+      } else {
+        visitorWishlistsCount++;
+      }
+
+      const metrics = calculateLiveWishlistMetrics(wishlist, null);
       totalItemsAccrossPlatform += metrics.totalItems;
 
       metrics.detailedItems.forEach(item => {
@@ -122,6 +161,8 @@ export const getWishlistDashboardStats = async (req, res, next) => {
       success: true,
       data: {
         totalActiveWishlists,
+        userWishlistsCount,
+        visitorWishlistsCount,
         averageItemsPerWishlist: totalActiveWishlists > 0 ? Math.round((totalItemsAccrossPlatform / totalActiveWishlists) * 10) / 10 : 0,
         topWishlistedProducts
       }
@@ -134,22 +175,37 @@ export const getWishlistDashboardStats = async (req, res, next) => {
 };
 
 // ==========================================
-// GET PAGINATED LIST (THE REGION-FILTERED TABLE)
+// 2. GET PAGINATED LIST (UNIFIED USERS & VISITORS + REGION FILTER)
 // ==========================================
 export const getAllActiveWishlists = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, parseInt(req.query.limit) || 15);
     const regionFilter = req.query.region || 'global'; 
+    const userTypeFilter = req.query.userType || 'all'; // 'all', 'user', 'visitor'
 
-    const query = { 'items.0': { $exists: true } };
+    const andConditions = [{ 'items.0': { $exists: true } }];
 
-    // --- REGION FILTERING STRATEGY (TWO-STEP QUERY) ---
+    if (userTypeFilter === 'user') {
+      andConditions.push({ user: { $ne: null } });
+    } else if (userTypeFilter === 'visitor') {
+      andConditions.push({ user: null });
+    }
+
+    // --- UNIFIED REGION FILTERING STRATEGY ---
     if (regionFilter !== 'global') {
       let userQuery = {};
+      let guestRegionCondition = {};
 
       if (regionFilter === 'domestic') {
         userQuery = { 
+          $or: [
+            { 'lastKnownRegion.countryCode': { $in: ['IN', 'INDIA'] } },
+            { lastKnownRegion: { $exists: false } }
+          ]
+        };
+        guestRegionCondition = {
+          user: null,
           $or: [
             { 'lastKnownRegion.countryCode': { $in: ['IN', 'INDIA'] } },
             { lastKnownRegion: { $exists: false } }
@@ -160,31 +216,35 @@ export const getAllActiveWishlists = async (req, res, next) => {
           'lastKnownRegion.countryCode': { $nin: ['IN', 'INDIA', null, ''] },
           lastKnownRegion: { $exists: true }
         };
+        guestRegionCondition = {
+          user: null,
+          'lastKnownRegion.countryCode': { $nin: ['IN', 'INDIA', null, ''] },
+          lastKnownRegion: { $exists: true }
+        };
       } else {
-        userQuery = { 'lastKnownRegion.countryCode': regionFilter.toUpperCase() };
+        const targetCode = regionFilter.toUpperCase();
+        userQuery = { 'lastKnownRegion.countryCode': targetCode };
+        guestRegionCondition = { user: null, 'lastKnownRegion.countryCode': targetCode };
       }
 
       const matchingUsers = await User.find(userQuery).select('_id').lean();
       const matchingUserIds = matchingUsers.map(user => user._id);
 
-      if (matchingUserIds.length === 0) {
-        return res.status(200).json({
-          success: true,
-          data: [],
-          pagination: { totalItems: 0, totalPages: 0, currentPage: page, limit }
-        });
-      }
-
-      query.user = { $in: matchingUserIds };
+      andConditions.push({
+        $or: [
+          ...(matchingUserIds.length > 0 ? [{ user: { $in: matchingUserIds } }] : []),
+          guestRegionCondition
+        ]
+      });
     }
-    // ---------------------------------------------------
 
+    const query = andConditions.length === 1 ? andConditions[0] : { $and: andConditions };
     const skip = (page - 1) * limit;
 
     const [wishlists, totalCount] = await Promise.all([
       Wishlist.find(query)
-        .populate({ path: 'user', select: 'firstName lastName email lastKnownRegion' })
-        .sort({ updatedAt: -1 }) // Sort by most recently updated wishlists
+        .populate({ path: 'user', select: 'firstName lastName email phoneCode phoneNumber createdAt lastKnownRegion' })
+        .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -192,19 +252,18 @@ export const getAllActiveWishlists = async (req, res, next) => {
     ]);
 
     const formattedWishlists = wishlists.map(wishlist => {
-      const userRegion = wishlist.user?.lastKnownRegion;
-      const isForeign = userRegion && userRegion.countryCode !== 'IN' && userRegion.countryCode !== 'INDIA';
+      const effectiveRegion = wishlist.user?.lastKnownRegion || wishlist.lastKnownRegion;
+      const isForeign = effectiveRegion && effectiveRegion.countryCode !== 'IN' && effectiveRegion.countryCode !== 'INDIA';
+      const customerInfo = formatUnifiedWishlistCustomer(wishlist);
 
       return {
         wishlistId: wishlist._id,
-        user: wishlist.user ? {
-          id: wishlist.user._id,
-          name: `${wishlist.user.firstName || ''} ${wishlist.user.lastName || ''}`.trim() || 'Unknown User',
-          email: wishlist.user.email,
-          countryCode: userRegion?.countryCode || 'IN'
-        } : { name: 'Deleted User', email: 'N/A', countryCode: 'IN' },
+        user: customerInfo,
+        isGuest: customerInfo.isGuest,
+        userType: customerInfo.userType,
+        deviceId: wishlist.deviceId || null,
         itemCount: wishlist.items.length,
-        isForeign,
+        isForeign: Boolean(isForeign),
         lastActive: wishlist.updatedAt
       };
     });
@@ -227,7 +286,7 @@ export const getAllActiveWishlists = async (req, res, next) => {
 };
 
 // ==========================================
-// GET DEEP-DIVE DETAILS FOR A SPECIFIC WISHLIST
+// 3. GET DEEP-DIVE DETAILS FOR A SPECIFIC WISHLIST
 // ==========================================
 export const getWishlistDetails = async (req, res, next) => {
   try {
@@ -242,24 +301,11 @@ export const getWishlistDetails = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Wishlist not found' });
     }
 
-    const userRegion = wishlist.user?.lastKnownRegion;
-    const metrics = calculateLiveWishlistMetrics(wishlist, userRegion);
+    const effectiveRegion = wishlist.user?.lastKnownRegion || wishlist.lastKnownRegion;
+    const metrics = calculateLiveWishlistMetrics(wishlist, effectiveRegion);
+    const formattedUser = formatUnifiedWishlistCustomer(wishlist);
+    const isForeign = effectiveRegion && effectiveRegion.countryCode !== 'IN' && effectiveRegion.countryCode !== 'INDIA';
 
-    let formattedUser = null;
-    if (wishlist.user) {
-      formattedUser = {
-        id: wishlist.user._id,
-        name: `${wishlist.user.firstName || ''} ${wishlist.user.lastName || ''}`.trim() || 'Unknown User',
-        email: wishlist.user.email,
-        phone: wishlist.user.phoneNumber ? `${wishlist.user.phoneCode || ''} ${wishlist.user.phoneNumber}`.trim() : 'Not Provided',
-        registeredAt: wishlist.user.createdAt,
-        countryCode: userRegion?.countryCode || 'IN'
-      };
-    }
-
-    const isForeign = userRegion && userRegion.countryCode !== 'IN' && userRegion.countryCode !== 'INDIA';
-
-    // Sort items by most recently added
     metrics.detailedItems.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
 
     return res.status(200).json({
@@ -267,11 +313,14 @@ export const getWishlistDetails = async (req, res, next) => {
       data: {
         wishlistId: wishlist._id,
         user: formattedUser,
+        isGuest: formattedUser.isGuest,
+        userType: formattedUser.userType,
+        deviceId: wishlist.deviceId || null,
         summary: {
           totalItems: metrics.totalItems,
-          currencyCode: userRegion?.currencyCode || 'INR',
-          symbol: userRegion?.symbol || '₹',
-          isForeign,
+          currencyCode: effectiveRegion?.currencyCode || 'INR',
+          symbol: effectiveRegion?.symbol || '₹',
+          isForeign: Boolean(isForeign),
           lastActive: wishlist.updatedAt,
         },
         items: metrics.detailedItems

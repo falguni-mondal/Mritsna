@@ -33,6 +33,7 @@ const WishlistTable = ({
   onRowClick 
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [identityFilter, setIdentityFilter] = useState("all"); // 'all', 'user', 'visitor'
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -53,11 +54,42 @@ const WishlistTable = ({
 
   const selectedRegionLabel = regionOptions.find(opt => opt.value === currentRegion)?.label || "Global (All)";
 
+  const filteredWishlists = wishlists.filter((wishlist) => {
+    const isVisitor = wishlist.isGuest || wishlist.user?.isGuest || wishlist.userType === "visitor";
+    if (identityFilter === "user") return !isVisitor;
+    if (identityFilter === "visitor") return isVisitor;
+    return true;
+  });
+
+  const tabs = [
+    { id: "all", label: "All Wishlists" },
+    { id: "user", label: "Users" },
+    { id: "visitor", label: "Visitors" },
+  ];
+
   return (
     <div className="flex flex-col w-full">
       
-      {/* Top Controls: Just the Region Filter for Wishlists */}
-      <div className="flex justify-end border-b border-black/10 mb-6">
+      {/* Top Controls: User/Visitor Tabs + Region Filter */}
+      <div className="flex flex-wrap items-center justify-between border-b border-black/10 mb-6 gap-y-4">
+        
+        <div className="flex items-center gap-8">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setIdentityFilter(tab.id)}
+              className={`pb-4 text-xs font-bold uppercase tracking-widest transition-colors relative cursor-pointer
+                ${identityFilter === tab.id ? "text-black" : "text-black/40 hover:text-black/70"}
+              `}
+            >
+              {tab.label}
+              {identityFilter === tab.id && (
+                <span className="absolute bottom-0 left-0 w-full h-[2px] bg-black" />
+              )}
+            </button>
+          ))}
+        </div>
+
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -115,40 +147,55 @@ const WishlistTable = ({
                   <Icon icon="ph:spinner-gap-light" className="text-3xl animate-spin mx-auto opacity-30" />
                 </td>
               </tr>
-            ) : wishlists.length === 0 ? (
+            ) : filteredWishlists.length === 0 ? (
               <tr>
                 <td colSpan="3" className="py-12 text-center text-sm opacity-40">
-                  No wishlists found for this region.
+                  No wishlists found for this filter.
                 </td>
               </tr>
             ) : (
-              wishlists.map((wishlist) => (
-                <tr 
-                  key={wishlist.wishlistId} 
-                  onClick={() => onRowClick(wishlist.wishlistId)}
-                  className="border-b border-black/5 hover:bg-black/[0.02] transition-colors cursor-pointer group"
-                >
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-medium">{wishlist.user.name}</p>
-                      {wishlist.isForeign && (
-                        <span className="bg-black/5 text-black text-[0.55rem] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm">
-                          {wishlist.user.countryCode}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs opacity-50">{wishlist.user.email}</p>
-                  </td>
-                  
-                  <td className="py-4 px-4 text-sm font-medium">
-                    {wishlist.itemCount} <span className="opacity-50 font-normal ml-1">saved</span>
-                  </td>
-                  
-                  <td className="py-4 px-4 text-sm text-right opacity-60">
-                    {timeAgo(wishlist.lastActive)}
-                  </td>
-                </tr>
-              ))
+              filteredWishlists.map((wishlist) => {
+                const isVisitor = wishlist.isGuest || wishlist.user?.isGuest || wishlist.userType === "visitor";
+                return (
+                  <tr 
+                    key={wishlist.wishlistId} 
+                    onClick={() => onRowClick(wishlist.wishlistId)}
+                    className="border-b border-black/5 hover:bg-black/[0.02] transition-colors cursor-pointer group"
+                  >
+                    <td className="py-4 px-4">
+                      <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                        <p className="text-sm font-medium">{wishlist.user.name}</p>
+                        
+                        {/* USER / VISITOR BADGE */}
+                        {isVisitor ? (
+                          <span className="bg-amber-100 text-amber-900 border border-amber-200 text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                            Visitor
+                          </span>
+                        ) : (
+                          <span className="bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                            User
+                          </span>
+                        )}
+
+                        {wishlist.isForeign && (
+                          <span className="bg-black/5 text-black text-[0.55rem] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm">
+                            {wishlist.user.countryCode}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs opacity-50">{wishlist.user.email}</p>
+                    </td>
+                    
+                    <td className="py-4 px-4 text-sm font-medium">
+                      {wishlist.itemCount} <span className="opacity-50 font-normal ml-1">saved</span>
+                    </td>
+                    
+                    <td className="py-4 px-4 text-sm text-right opacity-60">
+                      {timeAgo(wishlist.lastActive)}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

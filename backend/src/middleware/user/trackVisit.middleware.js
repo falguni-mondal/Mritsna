@@ -1,24 +1,47 @@
 import crypto from "crypto";
-import Visit from "../../models/visit.model.js"; 
+import Visit from "../../models/visit.model.js";
+import { cookieOptions } from "../../utils/cookie-options.js";
 
 export const trackVisit = async (req, res, next) => {
   try {
-    // Check for existing session (24-hour cooldown)
+    // 1. Ensure a persistent 1-year device_id cookie ALWAYS exists for every visitor
+    let deviceId = req.cookies?.device_id;
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      res.cookie("device_id", deviceId, {
+        ...cookieOptions,
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+      });
+      if (req.cookies) {
+        req.cookies.device_id = deviceId;
+      }
+    }
+
+    // 2. Check for existing 24-hour visit session
     if (req.cookies && req.cookies.store_session) {
+      // Touch/link deviceId or user in the background if missing
+      Visit.findOneAndUpdate(
+        { sessionId: req.cookies.store_session },
+        {
+          $set: {
+            deviceId,
+            ...(req.user ? { user: req.user } : {}),
+            ...(req.region?.countryCode ? { country: req.region.countryCode } : {})
+          }
+        }
+      ).catch(() => {});
       return next();
     }
 
-    // Extract Data from the Request
+    // 3. Extract Data from the Request
     const referer = req.get("Referrer") || req.get("Referer") || "";
     const userAgent = req.get("User-Agent") || "";
     const { utm_source, utm_medium, utm_campaign } = req.query;
 
-    // The Categorization Engine (Now highly granular)
     let channel = "Direct Traffic";
     const refererLower = referer.toLowerCase();
     const sourceLower = (utm_source || "").toLowerCase();
 
-    // Check for Organic Search
     if (
       refererLower.includes("google.") || 
       refererLower.includes("bing.com") || 
@@ -27,7 +50,6 @@ export const trackVisit = async (req, res, next) => {
     ) {
       channel = "Organic Search";
     } 
-    // Check for Granular Social Media Networks
     else if (refererLower.includes("instagram.com") || sourceLower.includes("instagram")) {
       channel = "Instagram";
     } 
@@ -46,7 +68,6 @@ export const trackVisit = async (req, res, next) => {
     else if (refererLower.includes("tiktok.com") || sourceLower.includes("tiktok")) {
       channel = "TikTok";
     } 
-    // Check for standard Referrals (Not search, not social, but came from a link)
     else if (referer !== "") {
       const host = req.get("host") || "";
       if (!refererLower.includes(host.toLowerCase())) {
@@ -65,32 +86,28 @@ export const trackVisit = async (req, res, next) => {
       deviceType = "Mobile";
     }
 
-    // Generate a unique ID for this session
     const sessionId = crypto.randomUUID();
 
-    // Save the record to the database silently
     await Visit.create({
       sessionId,
+      deviceId,
+      user: req.user || null,
       channel,
       sourceUrl: referer || null,
       utmSource: utm_source || null,
       utmMedium: utm_medium || null,
       utmCampaign: utm_campaign || null,
       deviceType,
-      browser: userAgent.substring(0, 100), 
+      browser: userAgent.substring(0, 100),
+      country: req.region?.countryCode || "IN"
     });
 
-    // Drop the 24-hour cookie into the user's browser
     res.cookie("store_session", sessionId, {
+      ...cookieOptions,
       maxAge: 24 * 60 * 60 * 1000,
-      httpOnly: true, 
-      secure: process.env.NODE_ENV === "production", 
-      sameSite: "lax",
     });
 
-    // Continue to the actual requested route
     next();
-
   } catch (error) {
     console.error("[Analytics Error]: Failed to track visit -", error.message);
     next();

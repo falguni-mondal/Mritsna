@@ -4,9 +4,6 @@ import cors from "cors";
 
 // Custom Middlewares & Utils
 import { globalLimiter } from "./middleware/common/rateLimiter.js";
-// import noCache from "./middlewares/global/no-cache.js";
-// import LeakyLimiter from "./utils/leaky-limiter.js";
-// import UserLimiter from "./utils/user-limiter.js";
 
 // Routes
 import adminAuthRoutes from "./routes/admin/admin.auth.routes.js";
@@ -18,6 +15,7 @@ import adminCouponRoutes from './routes/admin/admin.coupon.routes.js';
 import adminOrderRoutes from './routes/admin/admin.order.routes.js';
 import adminReviewRoutes from './routes/admin/admin.review.routes.js';
 import adminCollectionRoutes from './routes/admin/admin.collection.routes.js';
+import adminUserRoutes from './routes/admin/admin.user.routes.js';
 
 import authRouter from "./routes/common/auth.routes.js";
 import productRoutes from './routes/common/product.routes.js';
@@ -34,29 +32,21 @@ import collectionRoutes from './routes/common/collection.routes.js';
 const app = express();
 
 // Trust Proxy (Crucial for Rate Limiters behind Load Balancers/Render)
-// This ensures the rate limiter blocks the attacker's IP, not Render's internal IP.
-app.set("trust proxy", true);
+app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
 
-
-// Webhook Specific Parser (Stripe/Payment Gateways need raw buffers)
-// We isolate this so we don't waste memory buffering every standard JSON request
+// Webhook Specific Parser
 app.use("/api/v1/webhooks", express.raw({ type: "application/json" }));
 app.use('/api/v1/webhooks', webhookRoutes);
 
-
 // Standard Body Parsers & Cookies
-// RAM SHIELD: Lowered from 10mb to 2mb. 10mb JSON payloads can easily crash a 512MB RAM server via a DoS attack.
 app.use(express.json({ limit: "2mb" })); 
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(parser());
 
-
 // GLOBAL RATE LIMITER
-// Applied here so it protects all standard API routes below, but allows Webhooks above to bypass it.
 app.use(globalLimiter);
 
-
-// Dynamic CORS -----------------------------------------------------------------------------------------------------------------------------
+// Dynamic CORS
 const allowedOrigins = [process.env.FRONTEND_URL, process.env.ADMIN_FRONTEND_URL, process.env.SUB_FRONTEND_URL];
 
 app.use(
@@ -72,8 +62,7 @@ app.use(
   })
 );
 
-
-// ROUTES -------------------------------------------------------------------------------------------------------
+// ROUTES
 app.get("/api/health", (req, res) => {
   res.status(200).json({ success: true, message: "Server is healthy." });
 });
@@ -88,6 +77,7 @@ app.use('/api/v1/admin/coupons', adminCouponRoutes);
 app.use('/api/v1/admin/orders', adminOrderRoutes);
 app.use('/api/v1/admin/reviews', adminReviewRoutes);
 app.use('/api/v1/admin/collections', adminCollectionRoutes);
+app.use('/api/v1/admin/users', adminUserRoutes);
 
 // Public Routes
 app.use("/api/v1/auth", authRouter);
@@ -101,8 +91,7 @@ app.use('/api/v1/addresses', addressRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
 app.use('/api/v1/collections', collectionRoutes);
 
-
-// Global Catch-All Error Handler (MANDATORY for preventing server crashes)
+// Global Catch-All Error Handler
 app.use((err, req, res, next) => {
   console.error("[Global Error]:", err.message || err);
   

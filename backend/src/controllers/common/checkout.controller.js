@@ -4,37 +4,30 @@ import { createRequire } from "module";
 import Order from "../../models/order.model.js";
 import Product from "../../models/product.model.js";
 import Coupon from "../../models/coupon.model.js";
+import Cart from "../../models/cart.model.js";
+import Wishlist from "../../models/wishlist.model.js";
 import { calculateRegionalPricing } from "../../utils/pricingEngine.js";
 import { sendEmail } from "../../utils/email.sender.js";
 import { sendMetaPurchaseEvent } from "../../utils/meta.service.js";
 
-
-// Safe JSON Import
 const require = createRequire(import.meta.url);
 const hsnMap = require("../../config/hsnRates.json");
 
-// Initialize Razorpay Instance
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// --- Prefix-matching HSN Lookup Engine ---
 const getGSTRate = (hsnCode) => {
   if (!hsnCode) return hsnMap["DEFAULT"].rate;
-
   const codeStr = hsnCode.toString().trim();
-
   if (hsnMap[codeStr]) return hsnMap[codeStr].rate;
-
   if (codeStr.length > 6 && hsnMap[codeStr.substring(0, 6)]) {
     return hsnMap[codeStr.substring(0, 6)].rate;
   }
-
   if (codeStr.length >= 4 && hsnMap[codeStr.substring(0, 4)]) {
     return hsnMap[codeStr.substring(0, 4)].rate;
   }
-
   return hsnMap["DEFAULT"].rate;
 };
 
@@ -51,7 +44,6 @@ const processCheckoutMath = async (
   let subTotal = 0;
   const validatedItems = [];
 
-  // FIX: Safely fallback strings to prevent .toLowerCase() crashes on initial load
   const safeCountry = country || "";
   const safeState = state || "";
 
@@ -105,7 +97,6 @@ const processCheckoutMath = async (
   let appliedEligibleSubTotal = 0;
 
   const evaluateCouponEligibility = async (coupon) => {
-    // Defensive array mapping to prevent crash on old DB documents
     if (
       Array.isArray(coupon.applicableRegions) &&
       coupon.applicableRegions.length > 0
@@ -411,8 +402,20 @@ export const calculateCheckoutTotals = async (req, res) => {
       guestEmail,
     } = req.body;
     const userId = req.user;
-
     const deviceId = req.cookies.device_id || req.body.deviceId;
+
+    // --- SILENT LEAD CAPTURE FOR GUEST CARTS & WISHLISTS ---
+    if (!userId && deviceId && guestEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+      const cleanGuestEmail = guestEmail.trim().toLowerCase();
+      Cart.findOneAndUpdate(
+        { deviceId, user: null },
+        { $set: { guestEmail: cleanGuestEmail } }
+      ).catch(() => {});
+      Wishlist.findOneAndUpdate(
+        { deviceId, user: null },
+        { $set: { guestEmail: cleanGuestEmail } }
+      ).catch(() => {});
+    }
 
     const safePaymentOption = paymentOption
       ? paymentOption.toString().trim().toUpperCase()
@@ -480,6 +483,34 @@ export const createRazorpayOrder = async (req, res) => {
     const deviceId = req.cookies.device_id || req.body.deviceId;
     const isGuestCheckout = !userId;
 
+    // Enrich guest Cart & Wishlist with shipping contact details if guest
+    if (isGuestCheckout && deviceId && shippingAddress) {
+      const fullName = `${shippingAddress.firstName || ""} ${shippingAddress.lastName || ""}`.trim();
+      const cleanEmail = (guestEmail || shippingAddress.email || "").trim().toLowerCase() || null;
+      const cleanPhone = shippingAddress.phone || null;
+
+      Cart.findOneAndUpdate(
+        { deviceId, user: null },
+        {
+          $set: {
+            ...(cleanEmail ? { guestEmail: cleanEmail } : {}),
+            ...(fullName ? { guestName: fullName } : {}),
+            ...(cleanPhone ? { guestPhone: cleanPhone } : {})
+          }
+        }
+      ).catch(() => {});
+
+      Wishlist.findOneAndUpdate(
+        { deviceId, user: null },
+        {
+          $set: {
+            ...(cleanEmail ? { guestEmail: cleanEmail } : {}),
+            ...(fullName ? { guestName: fullName } : {})
+          }
+        }
+      ).catch(() => {});
+    }
+
     const safePaymentOption = paymentOption
       ? paymentOption.toString().trim().toUpperCase()
       : "FULL_ONLINE";
@@ -523,7 +554,7 @@ export const createRazorpayOrder = async (req, res) => {
     const newOrder = new Order({
       user: userId,
       isGuestCheckout,
-      guestEmail: guestEmail ? guestEmail.toLowerCase() : null,
+      guestEmail: guestEmail ? guestEmail.toLowerCase() : (shippingAddress?.email?.toLowerCase() || null),
       deviceId,
       shippingAddress,
       billingAddress,
@@ -608,9 +639,14 @@ export const verifyRazorpayPayment = async (req, res) => {
 
       const confirmedOrder = await pendingOrder.save();
 
-      // =================================================================
-      // --- META CONVERSIONS API: FIRE SECURE SERVER-SIDE PURCHASE ---
-      // =================================================================
+      // Clear the guest cart in MongoDB upon confirmed purchase
+      if (confirmedOrder.isGuestCheckout && confirmedOrder.deviceId) {
+        Cart.findOneAndUpdate(
+          { deviceId: confirmedOrder.deviceId, user: null },
+          { $set: { items: [] } }
+        ).catch(() => {});
+      }
+
       try {
         const userData = {
           email: confirmedOrder.isGuestCheckout ? confirmedOrder.guestEmail : confirmedOrder.shippingAddress.email,
@@ -630,14 +666,12 @@ export const verifyRazorpayPayment = async (req, res) => {
           }))
         };
 
-        // Fire asynchronously (no await) to prevent blocking the checkout response
         sendMetaPurchaseEvent(req, orderData, userData).catch(err => 
           console.error("[Meta CAPI Error in Controller]:", err)
         );
       } catch (metaErr) {
         console.error("[Meta CAPI Extraction Error]:", metaErr);
       }
-      // =================================================================
 
       if (confirmedOrder.couponApplied) {
         await Coupon.findByIdAndUpdate(confirmedOrder.couponApplied, {
@@ -645,7 +679,6 @@ export const verifyRazorpayPayment = async (req, res) => {
         });
       }
 
-      // --- Add product ID for accuracy and .exec() to properly trigger the Promise ---
       const inventoryUpdates = confirmedOrder.items.map(async (item) => {
         const product = await Product.findById(item.product);
         if (product) {
@@ -653,14 +686,12 @@ export const verifyRazorpayPayment = async (req, res) => {
           if (variant) {
             variant.inventory.quantity = Math.max(0, variant.inventory.quantity - item.quantity);
             product.markModified('variants'); 
-            
             await product.save();
           }
         }
       });
       await Promise.all(inventoryUpdates);
 
-      // --- EMAIL ENGINE ---
       const customerEmail = confirmedOrder.isGuestCheckout ? confirmedOrder.guestEmail : confirmedOrder.shippingAddress.email;
       const customerName = confirmedOrder.shippingAddress.firstName;
       
@@ -668,7 +699,6 @@ export const verifyRazorpayPayment = async (req, res) => {
       const queryParams = confirmedOrder.isGuestCheckout && confirmedOrder.guestEmail ? `?email=${encodeURIComponent(customerEmail)}` : "";
       const trackingLink = `${baseUrl}/track-order/${confirmedOrder.orderNumber}${queryParams}`;
 
-      // Currency Formatter
       const formatCurrency = (amount, currencyCode) => {
         const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
         return new Intl.NumberFormat(locale, {
@@ -678,7 +708,6 @@ export const verifyRazorpayPayment = async (req, res) => {
         }).format(amount);
       };
 
-      // Ensure URL is safe for Email Clients
       const getSafeImage = (url) => {
         if (!url) return '';
         const encodedUrl = encodeURI(url);

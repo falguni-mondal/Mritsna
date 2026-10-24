@@ -1,6 +1,6 @@
+import mongoose from "mongoose";
 import Wishlist from "../../models/wishlist.model.js";
 import Product from "../../models/product.model.js";
-// --- NEW: Inject the universal pricing engine ---
 import { calculateRegionalPricing } from "../../utils/pricingEngine.js";
 
 // ==========================================
@@ -9,17 +9,13 @@ import { calculateRegionalPricing } from "../../utils/pricingEngine.js";
 export const getWishlist = async (req, res) => {
   try {
     const userId = req.user;
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
-    // Find the wishlist and populate the actual product data
     const wishlist = await Wishlist.findOne({ user: userId }).populate({
       path: "items.productId",
       select: "title slug category isPremium status variants",
     });
 
-    // Extract the region data dynamically attached by our middleware
-    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
-
-    // If empty wishlist, still send back the currency info so the UI knows what to render
     if (!wishlist) {
       return res.status(200).json({
         success: true,
@@ -31,16 +27,22 @@ export const getWishlist = async (req, res) => {
       });
     }
 
-    // Filter out items where the parent product was deleted from the DB
+    Wishlist.findByIdAndUpdate(wishlist._id, {
+      lastKnownRegion: {
+        countryCode: regionData.countryCode,
+        currencyCode: regionData.currencyCode,
+        symbol: regionData.symbol,
+        rate: regionData.rate
+      }
+    }).catch(() => {});
+
     const validItems = wishlist.items.filter((item) => item.productId !== null);
 
-    // If we filtered out dead products, silently save the cleaned-up array back to the DB
     if (validItems.length !== wishlist.items.length) {
       wishlist.items = validItems;
       await wishlist.save();
     }
 
-    // --- THE DTO OPTIMIZATION WITH PRICING ENGINE ---
     const formattedItems = validItems.map((item) => {
       const product = item.productId;
       
@@ -56,7 +58,6 @@ export const getWishlist = async (req, res) => {
         imgUrl = primaryImg.baseUrl || primaryImg.url || "";
       }
 
-      // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
         variant.pricing.price, 
         variant.pricing.discountPercentage || 0, 
@@ -71,7 +72,7 @@ export const getWishlist = async (req, res) => {
         slug: product.slug || "#",
         img: imgUrl,
         colorName: variant.colorName || "Unknown Color",
-        price: localizedPricing.sellingPrice, // Now perfectly converted + marked up
+        price: localizedPricing.sellingPrice,
         originalPrice: localizedPricing.originalPrice, 
         status: product.status ? product.status.toLowerCase() : "active",
         inStock: variant.inventory?.quantity > 0,
@@ -97,14 +98,33 @@ export const getWishlist = async (req, res) => {
 };
 
 // ==========================================
-// HYDRATE GUEST WISHLIST (NEW: DYNAMIC PRICING FOR LOCALSTORAGE)
+// HYDRATE & PERSIST GUEST WISHLIST (UNIFIED DB RECORDING)
 // ==========================================
-export const hydrateGuestWishlist = async (req, res, next) => {
+export const hydrateGuestWishlist = async (req, res) => {
   try {
     const { localItems } = req.body; 
+    const deviceId = req.cookies?.device_id;
     const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
+    // 1. If localItems is empty, clear any existing guest wishlist in DB
     if (!localItems || !Array.isArray(localItems) || localItems.length === 0) {
+      if (deviceId && !req.user) {
+        await Wishlist.findOneAndUpdate(
+          { deviceId, user: null },
+          {
+            $set: {
+              items: [],
+              lastKnownRegion: {
+                countryCode: regionData.countryCode,
+                currencyCode: regionData.currencyCode,
+                symbol: regionData.symbol,
+                rate: regionData.rate
+              }
+            }
+          }
+        );
+      }
+
       return res.status(200).json({
         success: true,
         data: { items: [], currencySymbol: regionData.symbol, currencyCode: regionData.currencyCode }
@@ -112,11 +132,11 @@ export const hydrateGuestWishlist = async (req, res, next) => {
     }
 
     const formattedItems = [];
+    const dbItemsToPersist = [];
 
-    // Fetch live product data for the IDs sent from localStorage
+    // 2. Fetch live product data for the IDs sent from localStorage
     for (const item of localItems) {
-      // Validate IDs before querying MongoDB to prevent cast errors
-      if (!item.productId || !item.variantId) continue;
+      if (!item.productId || !item.variantId || !mongoose.Types.ObjectId.isValid(item.productId)) continue;
 
       const product = await Product.findOne({ _id: item.productId, status: 'active' })
         .select('title slug category isPremium variants status')
@@ -133,7 +153,6 @@ export const hydrateGuestWishlist = async (req, res, next) => {
         imgUrl = primaryImg.baseUrl || primaryImg.url || "";
       }
 
-      // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
         variant.pricing.price, 
         variant.pricing.discountPercentage || 0, 
@@ -153,8 +172,40 @@ export const hydrateGuestWishlist = async (req, res, next) => {
         status: product.status.toLowerCase(),
         inStock: variant.inventory?.quantity > 0,
         stockQuantity: variant.inventory?.quantity || 0,
-        addedAt: new Date().toISOString()
+        addedAt: item.addedAt || new Date().toISOString()
       });
+
+      const alreadyAdded = dbItemsToPersist.some(
+        dbI => dbI.productId.toString() === product._id.toString() && dbI.variantId === item.variantId.toString()
+      );
+      if (!alreadyAdded) {
+        dbItemsToPersist.push({
+          productId: product._id,
+          variantId: item.variantId.toString(),
+          addedAt: item.addedAt ? new Date(item.addedAt) : new Date()
+        });
+      }
+    }
+
+    // 3. Upsert the Guest Wishlist into MongoDB for real-time Admin visibility
+    if (deviceId && !req.user) {
+      await Wishlist.findOneAndUpdate(
+        { deviceId, user: null },
+        {
+          $set: {
+            deviceId,
+            user: null,
+            items: dbItemsToPersist,
+            lastKnownRegion: {
+              countryCode: regionData.countryCode,
+              currencyCode: regionData.currencyCode,
+              symbol: regionData.symbol,
+              rate: regionData.rate
+            }
+          }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
     }
 
     return res.status(200).json({
@@ -171,7 +222,6 @@ export const hydrateGuestWishlist = async (req, res, next) => {
     return res.status(500).json({ success: false, message: "Failed to hydrate guest wishlist." });
   }
 };
-
 
 // ==========================================
 // TOGGLE WISHLIST ITEM (DUMB DB UPDATE)
@@ -240,62 +290,59 @@ export const toggleWishlistItem = async (req, res) => {
   }
 };
 
-
 // ==========================================
-// GUEST TO USER MERGE (DUMB DB UPDATE)
+// GUEST TO USER MERGE (WITH SHADOW WISHLIST CLEANUP)
 // ==========================================
 export const syncWishlist = async (req, res) => {
   try {
     const userId = req.user;
+    const deviceId = req.cookies?.device_id;
     const itemsToSync = req.body.localItems || req.body.items;
 
-    if (!itemsToSync || !Array.isArray(itemsToSync) || itemsToSync.length === 0) {
-      return res
-        .status(200)
-        .json({ success: true, message: "Nothing to sync." });
-    }
+    if (itemsToSync && Array.isArray(itemsToSync) && itemsToSync.length > 0) {
+      let wishlist = await Wishlist.findOne({ user: userId });
 
-    let wishlist = await Wishlist.findOne({ user: userId });
+      if (!wishlist) {
+        const cleanItems = itemsToSync.map(i => ({
+           productId: i.productId || i.product, 
+           variantId: i.variantId || i.variant 
+        })).filter(i => i.productId && i.variantId);
 
-    if (!wishlist) {
-      // Map it down to just the IDs just in case the frontend sent rich data
-      const cleanItems = itemsToSync.map(i => ({
-         productId: i.productId || i.product, 
-         variantId: i.variantId || i.variant 
-      })).filter(i => i.productId && i.variantId);
-
-      await Wishlist.create({
-        user: userId,
-        items: cleanItems,
-      });
-      return res
-        .status(200)
-        .json({ success: true, message: "Wishlist synced successfully." });
-    }
-
-    let addedCount = 0;
-
-    itemsToSync.forEach((localItem) => {
-      const pId = localItem.productId || localItem.product;
-      const vId = localItem.variantId || localItem.variant;
-
-      const exists = wishlist.items.some(
-        (dbItem) =>
-          dbItem.productId.toString() === pId &&
-          dbItem.variantId === vId,
-      );
-
-      if (!exists && pId && vId) {
-        wishlist.items.unshift({
-          productId: pId,
-          variantId: vId,
+        await Wishlist.create({
+          user: userId,
+          items: cleanItems,
         });
-        addedCount++;
-      }
-    });
+      } else {
+        let addedCount = 0;
 
-    if (addedCount > 0) {
-      await wishlist.save();
+        itemsToSync.forEach((localItem) => {
+          const pId = localItem.productId || localItem.product;
+          const vId = localItem.variantId || localItem.variant;
+
+          const exists = wishlist.items.some(
+            (dbItem) =>
+              dbItem.productId.toString() === pId &&
+              dbItem.variantId === vId,
+          );
+
+          if (!exists && pId && vId) {
+            wishlist.items.unshift({
+              productId: pId,
+              variantId: vId,
+            });
+            addedCount++;
+          }
+        });
+
+        if (addedCount > 0) {
+          await wishlist.save();
+        }
+      }
+    }
+
+    // Delete the shadow guest wishlist for this deviceId so it does not duplicate in Admin
+    if (deviceId) {
+      await Wishlist.deleteOne({ deviceId, user: null });
     }
 
     return res
@@ -308,7 +355,6 @@ export const syncWishlist = async (req, res) => {
       .json({ success: false, message: "Failed to sync wishlist." });
   }
 };
-
 
 export const clearWishlist = async (req, res) => {
   try {

@@ -11,6 +11,7 @@ import {
   updateCartQuantityDB,
   removeFromCartDB,
   verifyStock,
+  hydrateGuestCartAPI,
 } from "../store/features/cartSlice";
 
 const getOptimizedImgUrl = (url) => {
@@ -36,7 +37,6 @@ const Cart = () => {
 
   const isAuth = useSelector((state) => state.auth?.isAuthenticated);
 
-  // Staged quantity allows instant UI updates before hitting the database
   const [stagedQty, setStagedQty] = useState({});
   const [isVerifying, setIsVerifying] = useState({});
   const debounceTimers = useRef({});
@@ -52,14 +52,11 @@ const Cart = () => {
     return `${currencySymbol || "₹"} ${Number(price).toLocaleString(locale, { maximumFractionDigits: 0 })}`;
   };
 
-  // --- THE INSTANT MATH ENGINE ---
-  // Calculates the master subtotal in real-time based on the user's staged clicks
   const liveSubTotal = cartItems.reduce((total, item) => {
     const currentQty = stagedQty[item.variantId] ?? item.quantity;
     return total + (item.price * currentQty);
   }, 0);
 
-  // --- ACTIONS ---
   const handleQuantityChange = (item, type) => {
     const currentQty = stagedQty[item.variantId] ?? item.quantity;
     let newQty = currentQty;
@@ -107,6 +104,8 @@ const Cart = () => {
               quantity: newQty,
             }),
           );
+          // Sync updated guest cart quantity to MongoDB for Admin visibility
+          dispatch(hydrateGuestCartAPI({ isMutation: true }));
         }
       } catch (error) {
         alert("Failed to verify stock.");
@@ -137,12 +136,13 @@ const Cart = () => {
           dispatch(removeFromCartDB(variantId));
         } else {
           dispatch(removeLocalItem(variantId));
+          // Sync guest cart item removal to MongoDB for Admin visibility
+          dispatch(hydrateGuestCartAPI({ isMutation: true }));
         }
       },
     });
   };
 
-  // --- GSAP CONTEXT & ANIMATIONS ---
   const { contextSafe } = useGSAP(() => {
     if (cartItems.length > 0) {
       gsap.fromTo(".cart-item-row", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "power2.out" });
@@ -196,7 +196,6 @@ const Cart = () => {
     }
   });
 
-  // --- EMPTY STATE ---
   if (cartItems.length === 0) {
     return (
       <main onMouseMove={handleMouseMove} className="w-full min-h-screen pt-32 pb-20 px-6 lg:px-12 bg-[#f8f8f8] flex flex-col items-center justify-center text-[#1a1a1a] overflow-hidden">
@@ -224,7 +223,6 @@ const Cart = () => {
     );
   }
 
-  // --- POPULATED CART STATE ---
   return (
     <main ref={containerRef} className="w-full min-h-screen pt-32 pb-20 px-6 lg:px-12 bg-[#f8f8f8] text-[#1a1a1a]">
       <div className="max-w-[1400px] mx-auto">
@@ -254,7 +252,6 @@ const Cart = () => {
                         <p className="text-xs opacity-50 uppercase tracking-wider mt-1">Color: {item.colorName}</p>
                       </div>
                       
-                      {/* INDIVIDUAL ITEM INSTANT MATH */}
                       <div className="text-right">
                         <p className="text-sm font-medium text-[#1a1a1a]">{formatPrice(item.price * displayQty)}</p>
                         {displayQty > 1 && (
@@ -302,7 +299,6 @@ const Cart = () => {
               <div className="flex flex-col gap-4 text-sm mb-8 border-b border-black/10 pb-8">
                 <div className="flex justify-between">
                   <span className="opacity-60">Subtotal</span>
-                  {/* LIVE MASTER SUBTOTAL */}
                   <span className="font-medium text-[#1a1a1a]">{formatPrice(liveSubTotal)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -313,7 +309,6 @@ const Cart = () => {
 
               <div className="flex justify-between items-end mb-8">
                 <span className="text-base font-medium uppercase tracking-widest">Total</span>
-                {/* LIVE MASTER TOTAL */}
                 <span className="text-xl font-bold text-[#1a1a1a]">{formatPrice(liveSubTotal)}</span>
               </div>
 

@@ -20,7 +20,6 @@ const timeAgo = (dateString) => {
   return `${Math.floor(diffInSeconds / 86400)}d ago`;
 };
 
-// Defined outside to prevent recreation on every render
 const regionOptions = [
   { value: "global", label: "Global (All)" },
   { value: "domestic", label: "Domestic (India)" },
@@ -48,11 +47,12 @@ const CartTable = ({
 
   const tabs = [
     { id: "all", label: "All Carts" },
+    { id: "users", label: "Users" },
+    { id: "visitors", label: "Visitors" },
     { id: "recent", label: "Recent (< 24h)" },
     { id: "abandoned", label: "Abandoned (> 24h)" },
   ];
 
-  // Close custom dropdown when clicking outside of it
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -73,7 +73,6 @@ const CartTable = ({
     setIsDropdownOpen(false);
   };
 
-  // Find the label for the currently selected region
   const selectedRegionLabel = regionOptions.find(opt => opt.value === currentRegion)?.label || "Global (All)";
 
   return (
@@ -82,13 +81,13 @@ const CartTable = ({
       {/* Top Controls: Tabs & Custom Region Filter */}
       <div className="flex flex-wrap items-center justify-between border-b border-black/10 mb-6 gap-y-4">
         
-        {/* Left: Time Filters */}
-        <div className="flex items-center gap-8">
+        {/* Left: Time & Identity Filters */}
+        <div className="flex flex-wrap items-center gap-6 lg:gap-8">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => onFilterChange(tab.id)}
-              className={`pb-4 text-xs font-bold uppercase tracking-widest transition-colors relative
+              className={`pb-4 text-xs font-bold uppercase tracking-widest transition-colors relative cursor-pointer
                 ${currentFilter === tab.id ? "text-black" : "text-black/40 hover:text-black/70"}
               `}
             >
@@ -116,7 +115,6 @@ const CartTable = ({
             />
           </button>
 
-          {/* Floating Dropdown Menu */}
           {isDropdownOpen && (
             <div className="absolute top-full right-0 mt-1 w-56 bg-white shadow-xl border border-black/5 z-[60] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
               {regionOptions.map((option, index) => {
@@ -173,59 +171,74 @@ const CartTable = ({
                 </td>
               </tr>
             ) : (
-              carts.map((cart) => (
-                <tr 
-                  key={cart.cartId} 
-                  onClick={() => onRowClick(cart.cartId)}
-                  className="border-b border-black/5 hover:bg-black/[0.02] transition-colors cursor-pointer group"
-                >
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-medium">{cart.user.name}</p>
-                      {cart.isForeign && (
-                        <span className="bg-black/5 text-black text-[0.55rem] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm">
-                          {cart.user.countryCode}
+              carts.map((cart) => {
+                const isVisitor = cart.isGuest || cart.user?.isGuest || cart.userType === "visitor";
+                return (
+                  <tr 
+                    key={cart.cartId} 
+                    onClick={() => onRowClick(cart.cartId)}
+                    className="border-b border-black/5 hover:bg-black/[0.02] transition-colors cursor-pointer group"
+                  >
+                    <td className="py-4 px-4">
+                      <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                        <p className="text-sm font-medium">{cart.user.name}</p>
+                        
+                        {/* USER / VISITOR BADGE */}
+                        {isVisitor ? (
+                          <span className="bg-amber-100 text-amber-900 border border-amber-200 text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                            Visitor
+                          </span>
+                        ) : (
+                          <span className="bg-black text-white text-[0.55rem] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm">
+                            User
+                          </span>
+                        )}
+
+                        {cart.isForeign && (
+                          <span className="bg-black/5 text-black text-[0.55rem] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm">
+                            {cart.user.countryCode}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs opacity-50">{cart.user.email}</p>
+                    </td>
+                    
+                    <td className="py-4 px-4 text-sm">{cart.itemCount}</td>
+                    
+                    {/* DUAL DISPLAY VALUE COLUMN */}
+                    <td className="py-4 px-4">
+                      {cart.isForeign ? (
+                        <div>
+                          <p className="text-sm font-medium">
+                            {formatForeignCurrency(cart.cartValueLocalized, cart.currencyCode, cart.symbol)}
+                          </p>
+                          <p className="text-[0.65rem] opacity-50 font-medium mt-0.5">
+                            Base: {formatINR(cart.cartValueBaseINR)}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-medium">{formatINR(cart.cartValueBaseINR)}</p>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-4">
+                      {cart.isAbandoned ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-red-100 text-red-800 text-[0.65rem] uppercase tracking-widest font-bold">
+                          Abandoned
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-green-100 text-green-800 text-[0.65rem] uppercase tracking-widest font-bold">
+                          Active
                         </span>
                       )}
-                    </div>
-                    <p className="text-xs opacity-50">{cart.user.email}</p>
-                  </td>
-                  
-                  <td className="py-4 px-4 text-sm">{cart.itemCount}</td>
-                  
-                  {/* DUAL DISPLAY VALUE COLUMN */}
-                  <td className="py-4 px-4">
-                    {cart.isForeign ? (
-                      <div>
-                        <p className="text-sm font-medium">
-                          {formatForeignCurrency(cart.cartValueLocalized, cart.currencyCode, cart.symbol)}
-                        </p>
-                        <p className="text-[0.65rem] opacity-50 font-medium mt-0.5">
-                          Base: {formatINR(cart.cartValueBaseINR)}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-sm font-medium">{formatINR(cart.cartValueBaseINR)}</p>
-                    )}
-                  </td>
-
-                  <td className="py-4 px-4">
-                    {cart.isAbandoned ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-red-100 text-red-800 text-[0.65rem] uppercase tracking-widest font-bold">
-                        Abandoned
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-green-100 text-green-800 text-[0.65rem] uppercase tracking-widest font-bold">
-                        Active
-                      </span>
-                    )}
-                  </td>
-                  
-                  <td className="py-4 px-4 text-sm text-right opacity-60">
-                    {timeAgo(cart.lastActive)}
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    
+                    <td className="py-4 px-4 text-sm text-right opacity-60">
+                      {timeAgo(cart.lastActive)}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

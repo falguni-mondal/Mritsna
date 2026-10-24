@@ -50,13 +50,12 @@ export const checkStock = async (req, res, next) => {
 export const getCart = async (req, res, next) => {
   try {
     const userId = req.user;
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
     const cart = await Cart.findOne({ user: userId }).populate({
       path: 'items.product',
       select: 'title slug category isPremium variants'
     });
-
-    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
     if (userId) {
       User.findByIdAndUpdate(userId, {
@@ -68,7 +67,17 @@ export const getCart = async (req, res, next) => {
         }
       }).catch(err => console.error("[Silent Tracking Error]:", err));
     }
-    // -----------------------------------
+
+    if (cart) {
+      Cart.findByIdAndUpdate(cart._id, {
+        lastKnownRegion: {
+          countryCode: regionData.countryCode,
+          currencyCode: regionData.currencyCode,
+          symbol: regionData.symbol,
+          rate: regionData.rate
+        }
+      }).catch(() => {});
+    }
 
     if (!cart || !cart.items.length) {
       return res.status(200).json({ 
@@ -84,7 +93,6 @@ export const getCart = async (req, res, next) => {
 
     let subTotal = 0;
     
-    // We run every saved item through the pricing engine
     const formattedItems = cart.items.map(cartItem => {
       if (!cartItem.product) return null;
 
@@ -94,7 +102,6 @@ export const getCart = async (req, res, next) => {
 
       if (!activeVariant) return null;
 
-      // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
         activeVariant.pricing.price, 
         activeVariant.pricing.discountPercentage || 0, 
@@ -137,14 +144,55 @@ export const getCart = async (req, res, next) => {
 };
 
 // ==========================================
-// HYDRATE GUEST CART (NEW: DYNAMIC PRICING FOR LOCALSTORAGE)
+// HYDRATE & PERSIST GUEST CART (UNIFIED DB RECORDING)
 // ==========================================
 export const hydrateGuestCart = async (req, res, next) => {
   try {
-    const { localItems } = req.body; 
+    const { localItems, isMutation } = req.body; 
+    const deviceId = req.cookies?.device_id;
     const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
+    // 1. Check if an Admin forcibly cleared this guest cart while the user was away
+    if (deviceId && !req.user) {
+      const existingGuestCart = await Cart.findOne({ deviceId, user: null });
+      if (existingGuestCart && existingGuestCart.forceClearLocal && !isMutation) {
+        existingGuestCart.forceClearLocal = false;
+        existingGuestCart.items = [];
+        await existingGuestCart.save();
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            items: [],
+            subTotal: 0,
+            currencySymbol: regionData.symbol,
+            currencyCode: regionData.currencyCode,
+            forceClearedByAdmin: true
+          }
+        });
+      }
+    }
+
+    // 2. If localItems is empty, ensure any existing guest cart in DB is cleared too
     if (!localItems || !Array.isArray(localItems) || localItems.length === 0) {
+      if (deviceId && !req.user) {
+        await Cart.findOneAndUpdate(
+          { deviceId, user: null },
+          {
+            $set: {
+              items: [],
+              forceClearLocal: false,
+              lastKnownRegion: {
+                countryCode: regionData.countryCode,
+                currencyCode: regionData.currencyCode,
+                symbol: regionData.symbol,
+                rate: regionData.rate
+              }
+            }
+          }
+        );
+      }
+
       return res.status(200).json({
         success: true,
         data: { items: [], subTotal: 0, currencySymbol: regionData.symbol, currencyCode: regionData.currencyCode }
@@ -153,8 +201,9 @@ export const hydrateGuestCart = async (req, res, next) => {
 
     let subTotal = 0;
     const formattedItems = [];
+    const dbItemsToPersist = [];
 
-    // Fetch live product data for the IDs sent from localStorage
+    // 3. Fetch live product data for the IDs sent from localStorage
     for (const item of localItems) {
       if (!mongoose.Types.ObjectId.isValid(item.productId) || !mongoose.Types.ObjectId.isValid(item.variantId)) {
         continue;
@@ -169,13 +218,11 @@ export const hydrateGuestCart = async (req, res, next) => {
       const activeVariant = product.variants.find(v => v._id.toString() === item.variantId.toString());
       if (!activeVariant) continue;
 
-      // Enforce absolute maximum limits based on DB inventory
       const maxAllowed = activeVariant.inventory.allowBackorder ? 3 : Math.min(3, activeVariant.inventory.quantity);
-      const safeQuantity = Math.min(item.quantity, maxAllowed);
+      const safeQuantity = Math.min(Number(item.quantity) || 1, maxAllowed);
 
       if (safeQuantity <= 0 && !activeVariant.inventory.allowBackorder) continue;
 
-      // --- APPLY THE PRICING ENGINE ---
       const localizedPricing = calculateRegionalPricing(
         activeVariant.pricing.price, 
         activeVariant.pricing.discountPercentage || 0, 
@@ -187,7 +234,7 @@ export const hydrateGuestCart = async (req, res, next) => {
       subTotal += itemTotalConverted;
 
       formattedItems.push({
-        cartItemId: `guest-${item.variantId}`, // Fake ID for React keys
+        cartItemId: `guest-${item.variantId}`,
         productId: product._id,
         variantId: item.variantId,
         slug: product.slug,
@@ -200,6 +247,42 @@ export const hydrateGuestCart = async (req, res, next) => {
         itemTotal: itemTotalConverted,
         maxLimit: maxAllowed
       });
+
+      // Deduplicate variants if localStorage had duplicates
+      const existingIdx = dbItemsToPersist.findIndex(
+        dbI => dbI.variantId.toString() === item.variantId.toString()
+      );
+      if (existingIdx > -1) {
+        dbItemsToPersist[existingIdx].quantity = Math.min(dbItemsToPersist[existingIdx].quantity + safeQuantity, maxAllowed);
+      } else {
+        dbItemsToPersist.push({
+          product: product._id,
+          variantId: activeVariant._id,
+          quantity: safeQuantity
+        });
+      }
+    }
+
+    // 4. Upsert the Guest Cart into MongoDB so Admins have real-time visibility
+    if (deviceId && !req.user) {
+      await Cart.findOneAndUpdate(
+        { deviceId, user: null },
+        {
+          $set: {
+            deviceId,
+            user: null,
+            items: dbItemsToPersist,
+            forceClearLocal: false,
+            lastKnownRegion: {
+              countryCode: regionData.countryCode,
+              currencyCode: regionData.currencyCode,
+              symbol: regionData.symbol,
+              rate: regionData.rate
+            }
+          }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
     }
 
     return res.status(200).json({
@@ -324,57 +407,72 @@ export const clearCart = async (req, res, next) => {
 };
 
 // ==========================================
-// GUEST TO USER MERGE (DUMB DATABASE UPDATE)
+// GUEST TO USER MERGE (WITH SHADOW CART CLEANUP)
 // ==========================================
 export const syncCart = async (req, res, next) => {
   try {
     const userId = req.user;
+    const deviceId = req.cookies?.device_id;
     const { localItems } = req.body; 
-
-    if (!localItems || !localItems.length) {
-      return res.status(200).json({ success: true, message: 'No local items to sync.' });
-    }
+    const regionData = req.region || { countryCode: 'IN', currencyCode: 'INR', symbol: '₹', rate: 1 };
 
     let cart = await Cart.findOne({ user: userId });
-    if (!cart) cart = new Cart({ user: userId, items: [] });
+    if (!cart) {
+      cart = new Cart({
+        user: userId,
+        items: [],
+        lastKnownRegion: {
+          countryCode: regionData.countryCode,
+          currencyCode: regionData.currencyCode,
+          symbol: regionData.symbol,
+          rate: regionData.rate
+        }
+      });
+    }
 
-    for (const localItem of localItems) {
-      if (!mongoose.Types.ObjectId.isValid(localItem.productId) || !mongoose.Types.ObjectId.isValid(localItem.variantId)) {
-        continue;
-      }
+    if (localItems && Array.isArray(localItems) && localItems.length > 0) {
+      for (const localItem of localItems) {
+        if (!mongoose.Types.ObjectId.isValid(localItem.productId) || !mongoose.Types.ObjectId.isValid(localItem.variantId)) {
+          continue;
+        }
 
-      const product = await Product.findOne(
-        { _id: localItem.productId, status: 'active', 'variants._id': localItem.variantId },
-        { 'variants.$': 1 }
-      ).lean();
+        const product = await Product.findOne(
+          { _id: localItem.productId, status: 'active', 'variants._id': localItem.variantId },
+          { 'variants.$': 1 }
+        ).lean();
 
-      if (product && product.variants.length > 0) {
-        const variant = product.variants[0];
-        const dbStock = variant.inventory.quantity;
+        if (product && product.variants.length > 0) {
+          const variant = product.variants[0];
+          const dbStock = variant.inventory.quantity;
 
-        if (dbStock > 0 || variant.inventory.allowBackorder) {
-          const existingItemIndex = cart.items.findIndex(
-            i => i.variantId.toString() === localItem.variantId.toString()
-          );
-          
-          // FIX: Calculate effective stock for syncing bounds
-          const effectiveStock = variant.inventory.allowBackorder ? 3 : dbStock;
+          if (dbStock > 0 || variant.inventory.allowBackorder) {
+            const existingItemIndex = cart.items.findIndex(
+              i => i.variantId.toString() === localItem.variantId.toString()
+            );
+            
+            const effectiveStock = variant.inventory.allowBackorder ? 3 : dbStock;
 
-          if (existingItemIndex > -1) {
-            const combinedQty = cart.items[existingItemIndex].quantity + localItem.quantity;
-            cart.items[existingIndex].quantity = Math.min(combinedQty, 3, effectiveStock);
-          } else {
-            cart.items.push({
-              product: localItem.productId,
-              variantId: localItem.variantId,
-              quantity: Math.min(localItem.quantity, 3, effectiveStock),
-            });
+            if (existingItemIndex > -1) {
+              const combinedQty = cart.items[existingItemIndex].quantity + localItem.quantity;
+              cart.items[existingItemIndex].quantity = Math.min(combinedQty, 3, effectiveStock);
+            } else {
+              cart.items.push({
+                product: localItem.productId,
+                variantId: localItem.variantId,
+                quantity: Math.min(localItem.quantity, 3, effectiveStock),
+              });
+            }
           }
         }
       }
+      await cart.save();
     }
 
-    await cart.save();
+    // Delete the shadow guest cart for this deviceId so it does not appear twice in Admin
+    if (deviceId) {
+      await Cart.deleteOne({ deviceId, user: null });
+    }
+
     return res.status(200).json({ success: true, message: 'Cart synchronized successfully.' });
 
   } catch (error) {

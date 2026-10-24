@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { GuestGuard, VerifyGuard, AdminGuard } from "./Guards";
 
 // Layout Shell
-import AdminLayout from "../components/Layout/AdminLayout";
+import AdminLayout from "../components/layout/AdminLayout";
 
 // Auth Pages
 import SignIn from "../pages/auth/SignIn";
@@ -11,6 +11,7 @@ import Verification from "../pages/auth/Verification";
 
 // Panel Pages
 import Dashboard from "../pages/panel/Dashboard";
+import Users from "../pages/panel/Users";
 import Products from "../pages/panel/Products";
 import AddProduct from "../pages/services/product/AddProduct";
 import EditProduct from "../pages/services/product/EditProduct";
@@ -24,11 +25,6 @@ import Reviews from "../pages/panel/Reviews";
 import ReviewDetails from "../pages/services/reviews/ReviewDetails";
 import Collections from "../pages/panel/Collections";
 import CollectionForm from "../pages/services/collection/CollectionForm";
-// import Orders from "../pages/panel/Orders";
-// import Carts from "../pages/panel/Carts";
-// import Wishlists from "../pages/panel/Wishlists";
-// import Reviews from "../pages/panel/Reviews";
-// import Coupons from "../pages/panel/Coupons";
 
 const PageRouter = () => {
   return (
@@ -64,8 +60,8 @@ const PageRouter = () => {
           </AdminGuard>
         }
       >
-        {/* Child routes injected seamlessly into the AdminLayout Outlet */}
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="users" element={<Users />} />
         
         {/* Product Routes */}
         <Route path="products" element={<Products />} />
@@ -82,13 +78,6 @@ const PageRouter = () => {
         <Route path="collections" element={<Collections />} />
         <Route path="collections/new" element={<CollectionForm />} />
         <Route path="collections/edit/:id" element={<CollectionForm />} />
-
-
-        {/* <Route path="orders" element={<Orders />} /> */}
-        {/* <Route path="carts" element={<Carts />} /> */}
-        {/* <Route path="wishlists" element={<Wishlists />} /> */}
-        {/* <Route path="reviews" element={<Reviews />} /> */}
-        {/* <Route path="coupons" element={<Coupons />} /> */}
 
         {/* Fallback for anyone hitting /admin directly without a sub-path */}
         <Route index element={<Navigate to="dashboard" replace />} />

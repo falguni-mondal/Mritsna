@@ -3,8 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 
-// Redux Actions
-import { verifyStock, addToCartDB, addLocalItem } from "../../store/features/cartSlice";
+import { verifyStock, addToCartDB, addLocalItem, hydrateGuestCartAPI } from "../../store/features/cartSlice";
 
 const CollectionBundle = ({ bundleData, collectionTitle, currencyCode }) => {
   const dispatch = useDispatch();
@@ -13,7 +12,6 @@ const CollectionBundle = ({ bundleData, collectionTitle, currencyCode }) => {
   const { user } = useSelector((state) => state.auth || {}); 
   const isAuthenticated = Boolean(user);
 
-  // --- 1. Math & Stock Calculations (On Render) ---
   const { basePrice, discountedPrice, isOutOfStock } = useMemo(() => {
     let base = 0;
     let outOfStock = false;
@@ -39,7 +37,6 @@ const CollectionBundle = ({ bundleData, collectionTitle, currencyCode }) => {
     return { basePrice: base, discountedPrice: finalPrice, isOutOfStock: outOfStock };
   }, [bundleData]);
 
-  // --- DYNAMIC CURRENCY FORMATTER ---
   const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
   
   const formattedPrice = new Intl.NumberFormat(locale, {
@@ -54,7 +51,6 @@ const CollectionBundle = ({ bundleData, collectionTitle, currencyCode }) => {
     maximumFractionDigits: 0
   }).format(basePrice);
 
-  // --- 2. Add To Cart Handler (Dual-Layer Protection) ---
   const handleShopSet = async () => {
     setIsAddingSet(true);
     
@@ -104,6 +100,11 @@ const CollectionBundle = ({ bundleData, collectionTitle, currencyCode }) => {
         }
       }
 
+      // Sync the newly added guest bundle items to MongoDB
+      if (!isAuthenticated) {
+        dispatch(hydrateGuestCartAPI({ isMutation: true }));
+      }
+
       toast.success(`The ${collectionTitle} set has been added to your cart.`);
 
     } catch (error) {
@@ -121,7 +122,6 @@ const CollectionBundle = ({ bundleData, collectionTitle, currencyCode }) => {
     <section className="w-full bg-[#1a1a1a] text-white py-24 lg:py-32 px-6 lg:px-12">
       <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row justify-between items-start lg:items-center gap-16">
         
-        {/* Left Side: Product Roster */}
         <div className="w-full lg:w-1/2">
           <h2 className="head-font text-5xl lg:text-7xl mb-8">Acquire the <br className="hidden lg:block"/> Complete Look</h2>
           <ul className="flex flex-col gap-4 text-sm font-medium text-white/60">
@@ -134,7 +134,6 @@ const CollectionBundle = ({ bundleData, collectionTitle, currencyCode }) => {
           </ul>
         </div>
 
-        {/* Right Side: Pricing & Actions */}
         <div className="w-full lg:w-auto flex flex-col items-start lg:items-end border-t border-white/20 lg:border-none pt-12 lg:pt-0">
           
           {bundleData.discountPercentage > 0 && (

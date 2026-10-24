@@ -5,8 +5,6 @@ import { calculateRegionalPricing } from '../../utils/pricingEngine.js';
 
 // ==========================================
 // HELPER: CALCULATE CART VALUE (TRUE REVENUE ENGINE)
-// Applies export markups to the Base INR if the user is foreign, 
-// ensuring the dashboard reflects accurate Gross Merchandise Value.
 // ==========================================
 const calculateLiveCartMetrics = (cart, regionData = null) => {
   let cartTotalBaseINR = 0; 
@@ -14,14 +12,13 @@ const calculateLiveCartMetrics = (cart, regionData = null) => {
   let totalItems = 0;
   const detailedItems = [];
 
-  // Determine if user is foreign based on passed region data
   const isForeign = regionData && regionData.countryCode !== 'IN' && regionData.countryCode !== 'INDIA';
 
   if (cart.items && cart.items.length > 0) {
     cart.items.forEach(cartItem => {
       if (!cartItem.product) return; 
 
-      const variant = cartItem.product.variants.find(
+      const variant = cartItem.product.variants?.find(
         v => v._id.toString() === cartItem.variantId.toString()
       );
 
@@ -29,14 +26,10 @@ const calculateLiveCartMetrics = (cart, regionData = null) => {
         const basePrice = variant.pricing?.price || 0;
         const discount = variant.pricing?.discountPercentage || 0;
         
-        // 1. Calculate raw product price in INR
         let baseSellingPriceINR = discount > 0 
           ? Math.round(basePrice - (basePrice * (discount / 100))) 
           : basePrice;
 
-        // --- OPTION A: TRUE REVENUE INJECTION ---
-        // If the user is foreign, we inject the export markup into the base INR value.
-        // This ensures the admin sees the true INR equivalent of what the user is paying.
         if (isForeign) {
           const exportMarkupINR = cartItem.product.isPremium ? 10000 : 5000;
           baseSellingPriceINR += exportMarkupINR;
@@ -45,7 +38,6 @@ const calculateLiveCartMetrics = (cart, regionData = null) => {
         cartTotalBaseINR += baseSellingPriceINR * cartItem.quantity;
         totalItems += cartItem.quantity;
 
-        // 2. Foreign/Localized Calculation for UI display
         let localizedData = null;
         if (isForeign) {
           const regionalPricing = calculateRegionalPricing(
@@ -79,7 +71,7 @@ const calculateLiveCartMetrics = (cart, regionData = null) => {
           quantityInCart: cartItem.quantity,
           stockAvailable: variant.inventory?.quantity || 0,
           isStockBottleneck: cartItem.quantity > (variant.inventory?.quantity || 0),
-          image: variant.images.find(img => img.isPrimary)?.baseUrl || variant.images[0]?.baseUrl
+          image: variant.images?.find(img => img.isPrimary)?.baseUrl || variant.images?.[0]?.baseUrl
         });
       }
     });
@@ -89,25 +81,72 @@ const calculateLiveCartMetrics = (cart, regionData = null) => {
 };
 
 // ==========================================
+// HELPER: FORMAT UNIFIED USER / VISITOR IDENTITY
+// ==========================================
+const formatUnifiedCartCustomer = (cart) => {
+  const effectiveRegion = cart.user?.lastKnownRegion || cart.lastKnownRegion || {
+    countryCode: 'IN',
+    currencyCode: 'INR',
+    symbol: '₹',
+    rate: 1
+  };
+
+  if (cart.user) {
+    return {
+      id: cart.user._id,
+      name: `${cart.user.firstName || ''} ${cart.user.lastName || ''}`.trim() || 'Registered User',
+      email: cart.user.email,
+      phone: cart.user.phoneNumber ? `${cart.user.phoneCode || ''} ${cart.user.phoneNumber}`.trim() : 'Not Provided',
+      registeredAt: cart.user.createdAt,
+      countryCode: effectiveRegion.countryCode || 'IN',
+      isGuest: false,
+      userType: 'user',
+      deviceId: cart.deviceId || null
+    };
+  }
+
+  const shortDevice = cart.deviceId ? cart.deviceId.slice(0, 6).toUpperCase() : 'ANON';
+  return {
+    id: cart.deviceId || `guest-${cart._id}`,
+    name: cart.guestName || `Visitor #${shortDevice}`,
+    email: cart.guestEmail || `Anonymous Session (${shortDevice})`,
+    phone: cart.guestPhone || 'Not Provided (Guest)',
+    registeredAt: cart.createdAt,
+    countryCode: effectiveRegion.countryCode || 'IN',
+    isGuest: true,
+    userType: 'visitor',
+    deviceId: cart.deviceId || null
+  };
+};
+
+// ==========================================
 // 1. GET DASHBOARD METRICS (OVERVIEW)
 // ==========================================
 export const getCartDashboardStats = async (req, res, next) => {
   try {
     const activeCarts = await Cart.find({ 'items.0': { $exists: true } })
       .populate({ path: 'user', select: 'lastKnownRegion' })
-      .populate({ path: 'items.product', select: 'variants isPremium' })
+      .populate({ path: 'items.product', select: 'title variants isPremium' })
       .lean();
 
     let totalPipelineValue = 0;
     let abandonedCartsCount = 0;
     let totalActiveCarts = activeCarts.length;
+    let userCartsCount = 0;
+    let visitorCartsCount = 0;
     
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const productPopularity = {}; 
 
     activeCarts.forEach(cart => {
-      const userRegion = cart.user?.lastKnownRegion;
-      const metrics = calculateLiveCartMetrics(cart, userRegion);
+      if (cart.user) {
+        userCartsCount++;
+      } else {
+        visitorCartsCount++;
+      }
+
+      const effectiveRegion = cart.user?.lastKnownRegion || cart.lastKnownRegion;
+      const metrics = calculateLiveCartMetrics(cart, effectiveRegion);
       
       totalPipelineValue += metrics.cartTotalBaseINR;
 
@@ -131,6 +170,8 @@ export const getCartDashboardStats = async (req, res, next) => {
       success: true,
       data: {
         totalActiveCarts,
+        userCartsCount,
+        visitorCartsCount,
         abandonedCartsCount,
         totalPipelineValue,
         averageCartValue: totalActiveCarts > 0 ? Math.round(totalPipelineValue / totalActiveCarts) : 0,
@@ -145,14 +186,15 @@ export const getCartDashboardStats = async (req, res, next) => {
 };
 
 // ==========================================
-//  GET PAGINATED LIST (THE SPLIT-VIEW TABLE WITH REGION FILTER)
+// 2. GET PAGINATED LIST (UNIFIED USERS & VISITORS + REGION FILTER)
 // ==========================================
 export const getAllActiveCarts = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, parseInt(req.query.limit) || 15);
     const filterType = req.query.filter || 'all'; 
-    const regionFilter = req.query.region || 'global'; // 'global', 'domestic', 'international', or 'US', 'GB', etc.
+    const regionFilter = req.query.region || 'global';
+    const userTypeFilter = req.query.userType || 'all'; // 'all', 'user', 'visitor'
 
     let dateFilter = {};
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -163,54 +205,70 @@ export const getAllActiveCarts = async (req, res, next) => {
       dateFilter = { updatedAt: { $gte: yesterday } };
     }
 
-    const query = { 'items.0': { $exists: true }, ...dateFilter };
+    const andConditions = [{ 'items.0': { $exists: true } }];
+    if (Object.keys(dateFilter).length > 0) {
+      andConditions.push(dateFilter);
+    }
 
-    // --- REGION FILTERING STRATEGY (TWO-STEP QUERY) ---
+    // Filter by User vs Visitor if requested
+    if (userTypeFilter === 'user' || filterType === 'users') {
+      andConditions.push({ user: { $ne: null } });
+    } else if (userTypeFilter === 'visitor' || filterType === 'visitors') {
+      andConditions.push({ user: null });
+    }
+
+    // --- UNIFIED REGION FILTERING (USERS + VISITORS) ---
     if (regionFilter !== 'global') {
       let userQuery = {};
+      let guestRegionCondition = {};
 
       if (regionFilter === 'domestic') {
-        // Find users with IN/INDIA, or legacy users with no region set
         userQuery = { 
           $or: [
             { 'lastKnownRegion.countryCode': { $in: ['IN', 'INDIA'] } },
             { lastKnownRegion: { $exists: false } }
           ]
         };
+        guestRegionCondition = {
+          user: null,
+          $or: [
+            { 'lastKnownRegion.countryCode': { $in: ['IN', 'INDIA'] } },
+            { lastKnownRegion: { $exists: false } }
+          ]
+        };
       } else if (regionFilter === 'international') {
-        // Find all users who actively have a non-India region
         userQuery = { 
           'lastKnownRegion.countryCode': { $nin: ['IN', 'INDIA', null, ''] },
           lastKnownRegion: { $exists: true }
         };
+        guestRegionCondition = {
+          user: null,
+          'lastKnownRegion.countryCode': { $nin: ['IN', 'INDIA', null, ''] },
+          lastKnownRegion: { $exists: true }
+        };
       } else {
-        // Exact match for specific countries like 'US', 'GB'
-        userQuery = { 'lastKnownRegion.countryCode': regionFilter.toUpperCase() };
+        const targetCode = regionFilter.toUpperCase();
+        userQuery = { 'lastKnownRegion.countryCode': targetCode };
+        guestRegionCondition = { user: null, 'lastKnownRegion.countryCode': targetCode };
       }
 
-      // Step 1: Get matching User IDs
       const matchingUsers = await User.find(userQuery).select('_id').lean();
       const matchingUserIds = matchingUsers.map(user => user._id);
 
-      // Early Return: If no users match the region, stop the query and return empty to save DB load
-      if (matchingUserIds.length === 0) {
-        return res.status(200).json({
-          success: true,
-          data: [],
-          pagination: { totalItems: 0, totalPages: 0, currentPage: page, limit }
-        });
-      }
-
-      // Bind User IDs to the main cart query
-      query.user = { $in: matchingUserIds };
+      andConditions.push({
+        $or: [
+          ...(matchingUserIds.length > 0 ? [{ user: { $in: matchingUserIds } }] : []),
+          guestRegionCondition
+        ]
+      });
     }
-    // ---------------------------------------------------
 
+    const query = andConditions.length === 1 ? andConditions[0] : { $and: andConditions };
     const skip = (page - 1) * limit;
 
     const [carts, totalCount] = await Promise.all([
       Cart.find(query)
-        .populate({ path: 'user', select: 'firstName lastName email lastKnownRegion' })
+        .populate({ path: 'user', select: 'firstName lastName email phoneCode phoneNumber createdAt lastKnownRegion' })
         .populate({ path: 'items.product', select: 'title slug isPremium variants' }) 
         .sort({ updatedAt: -1 })
         .skip(skip)
@@ -220,25 +278,24 @@ export const getAllActiveCarts = async (req, res, next) => {
     ]);
 
     const formattedCarts = carts.map(cart => {
-      const userRegion = cart.user?.lastKnownRegion;
-      const metrics = calculateLiveCartMetrics(cart, userRegion);
+      const effectiveRegion = cart.user?.lastKnownRegion || cart.lastKnownRegion;
+      const metrics = calculateLiveCartMetrics(cart, effectiveRegion);
       const isAbandoned = new Date(cart.updatedAt) < yesterday;
-      const isForeign = userRegion && userRegion.countryCode !== 'IN' && userRegion.countryCode !== 'INDIA';
+      const isForeign = effectiveRegion && effectiveRegion.countryCode !== 'IN' && effectiveRegion.countryCode !== 'INDIA';
+      const customerInfo = formatUnifiedCartCustomer(cart);
 
       return {
         cartId: cart._id,
-        user: cart.user ? {
-          id: cart.user._id,
-          name: `${cart.user.firstName || ''} ${cart.user.lastName || ''}`.trim() || 'Unknown User',
-          email: cart.user.email,
-          countryCode: userRegion?.countryCode || 'IN'
-        } : { name: 'Deleted User', email: 'N/A', countryCode: 'IN' },
+        user: customerInfo,
+        isGuest: customerInfo.isGuest,
+        userType: customerInfo.userType,
+        deviceId: cart.deviceId || null,
         itemCount: metrics.totalItems,
         cartValueBaseINR: metrics.cartTotalBaseINR,
         cartValueLocalized: metrics.cartTotalLocalized,
-        currencyCode: userRegion?.currencyCode || 'INR',
-        symbol: userRegion?.symbol || '₹',
-        isForeign,
+        currencyCode: effectiveRegion?.currencyCode || 'INR',
+        symbol: effectiveRegion?.symbol || '₹',
+        isForeign: Boolean(isForeign),
         isAbandoned,
         lastActive: cart.updatedAt
       };
@@ -277,35 +334,26 @@ export const getCartDetails = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
 
-    const userRegion = cart.user?.lastKnownRegion;
-    const metrics = calculateLiveCartMetrics(cart, userRegion);
-
-    let formattedUser = null;
-    if (cart.user) {
-      formattedUser = {
-        id: cart.user._id,
-        name: `${cart.user.firstName || ''} ${cart.user.lastName || ''}`.trim() || 'Unknown User',
-        email: cart.user.email,
-        phone: cart.user.phoneNumber ? `${cart.user.phoneCode || ''} ${cart.user.phoneNumber}`.trim() : 'Not Provided',
-        registeredAt: cart.user.createdAt,
-        countryCode: userRegion?.countryCode || 'IN'
-      };
-    }
-
-    const isForeign = userRegion && userRegion.countryCode !== 'IN' && userRegion.countryCode !== 'INDIA';
+    const effectiveRegion = cart.user?.lastKnownRegion || cart.lastKnownRegion;
+    const metrics = calculateLiveCartMetrics(cart, effectiveRegion);
+    const formattedUser = formatUnifiedCartCustomer(cart);
+    const isForeign = effectiveRegion && effectiveRegion.countryCode !== 'IN' && effectiveRegion.countryCode !== 'INDIA';
 
     return res.status(200).json({
       success: true,
       data: {
         cartId: cart._id,
         user: formattedUser,
+        isGuest: formattedUser.isGuest,
+        userType: formattedUser.userType,
+        deviceId: cart.deviceId || null,
         summary: {
           totalItems: metrics.totalItems,
           cartValueBaseINR: metrics.cartTotalBaseINR,
           cartValueLocalized: metrics.cartTotalLocalized,
-          currencyCode: userRegion?.currencyCode || 'INR',
-          symbol: userRegion?.symbol || '₹',
-          isForeign,
+          currencyCode: effectiveRegion?.currencyCode || 'INR',
+          symbol: effectiveRegion?.symbol || '₹',
+          isForeign: Boolean(isForeign),
           lastActive: cart.updatedAt,
         },
         items: metrics.detailedItems
@@ -319,7 +367,7 @@ export const getCartDetails = async (req, res, next) => {
 };
 
 // ==========================================
-// 4. ADMIN OVERRIDE: CLEAR A CART
+// 4. ADMIN OVERRIDE: CLEAR A CART (USER OR VISITOR)
 // ==========================================
 export const adminClearUserCart = async (req, res, next) => {
   try {
@@ -331,6 +379,10 @@ export const adminClearUserCart = async (req, res, next) => {
     }
 
     cart.items = [];
+    // If it's a visitor cart, set forceClearLocal so their localStorage is wiped on next hydration
+    if (!cart.user) {
+      cart.forceClearLocal = true;
+    }
     await cart.save();
 
     return res.status(200).json({ 
@@ -345,20 +397,28 @@ export const adminClearUserCart = async (req, res, next) => {
 };
 
 // ==========================================
-// 5. ABANDONED CART ACTION: SEND REMINDER (MOCK)
+// 5. ABANDONED CART ACTION: SEND REMINDER
 // ==========================================
 export const triggerAbandonedCartEmail = async (req, res, next) => {
   try {
     const { cartId } = req.params;
 
     const cart = await Cart.findById(cartId).populate('user');
-    if (!cart || !cart.user) {
-      return res.status(404).json({ success: false, message: 'Valid cart and user required' });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
+
+    const targetEmail = cart.user?.email || cart.guestEmail;
+    if (!targetEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Anonymous visitor has not provided an email address yet.'
+      });
     }
 
     return res.status(200).json({ 
       success: true, 
-      message: `Abandoned cart reminder queued for ${cart.user.email}` 
+      message: `Abandoned cart reminder queued for ${targetEmail}` 
     });
 
   } catch (error) {

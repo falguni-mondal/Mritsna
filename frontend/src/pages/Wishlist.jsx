@@ -5,10 +5,9 @@ import { Icon } from "@iconify/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
-import { toggleWishlistDB, toggleLocalItem } from "../store/features/wishlistSlice";
-import { verifyStock, addToCartDB, addLocalItem } from "../store/features/cartSlice";
+import { toggleWishlistDB, toggleLocalItem, hydrateGuestWishlistAPI } from "../store/features/wishlistSlice";
+import { verifyStock, addToCartDB, addLocalItem, hydrateGuestCartAPI } from "../store/features/cartSlice";
 
-// --- Helper: ImageKit Optimization ---
 const getOptimizedImgUrl = (url) => {
   if (!url) return null; 
   if (url.includes("tr=")) return url;
@@ -27,7 +26,6 @@ const Wishlist = () => {
   const baseHeartRef = useRef(null);
   const crackRef = useRef(null);
 
-  // --- THE FIX 1: Extract the currency data from Redux ---
   const { 
     items: wishlistItems, 
     isLoading, 
@@ -40,9 +38,7 @@ const Wishlist = () => {
 
   const [addingToCartId, setAddingToCartId] = useState(null);
 
-  // --- THE FIX 2: Dynamic Formatter ---
   const formatPrice = (price) => {
-    // Falls back to en-IN (Lakhs) for INR, uses standard en-US (Thousands) for foreign currency
     const locale = currencyCode === "INR" ? "en-IN" : "en-US";
     return `${currencySymbol || "₹"} ${Number(price || 0).toLocaleString(locale, { maximumFractionDigits: 0 })}`;
   };
@@ -62,9 +58,6 @@ const Wishlist = () => {
     };
   };
 
-  // ==========================================
-  // ANIMATIONS
-  // ==========================================
   const { contextSafe } = useGSAP(() => {
     if (wishlistItems.length > 0) {
       gsap.fromTo(
@@ -119,9 +112,6 @@ const Wishlist = () => {
     gsap.to(crackRef.current, { strokeDashoffset: 0, duration: 0.4, delay: 0.1, ease: "power2.out", overwrite: true });
   });
 
-  // ==========================================
-  // HANDLERS
-  // ==========================================
   const handleRemove = contextSafe((productId, variantId, index) => {
     const card = cardRefs.current[index];
     
@@ -135,7 +125,9 @@ const Wishlist = () => {
         if (isAuth) {
           dispatch(toggleWishlistDB({ productId, variantId }));
         } else {
-          dispatch(toggleLocalItem({ productId, variantId })); 
+          dispatch(toggleLocalItem({ productId, variantId }));
+          // Sync guest wishlist removal to MongoDB for Admin visibility
+          dispatch(hydrateGuestWishlistAPI());
         }
       }
     });
@@ -176,6 +168,7 @@ const Wishlist = () => {
           quantity: 1,
           maxLimit: stockCheck.availableStock,
         }));
+        dispatch(hydrateGuestCartAPI({ isMutation: true }));
       }
 
       gsap.to(card, {
@@ -189,6 +182,7 @@ const Wishlist = () => {
             dispatch(toggleWishlistDB({ productId: itemData.productId, variantId: itemData.variantId }));
           } else {
             dispatch(toggleLocalItem({ productId: itemData.productId, variantId: itemData.variantId }));
+            dispatch(hydrateGuestWishlistAPI());
           }
         }
       });
@@ -199,9 +193,6 @@ const Wishlist = () => {
     }
   });
 
-  // ==========================================
-  // RENDER: EMPTY STATE
-  // ==========================================
   if (wishlistItems.length === 0) {
     return (
       <main 
@@ -256,9 +247,6 @@ const Wishlist = () => {
     );
   }
 
-  // ==========================================
-  // RENDER: POPULATED WISHLIST
-  // ==========================================
   return (
     <main ref={containerRef} className="w-full min-h-screen pt-32 pb-20 px-6 lg:px-12 bg-[#f8f8f8] text-[#1a1a1a]">
       <div className="max-w-[1600px] mx-auto">
