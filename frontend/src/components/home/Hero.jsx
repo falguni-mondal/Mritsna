@@ -1,346 +1,204 @@
-import React, { useRef, useContext } from "react";
-import { Icon } from "@iconify/react";
+// frontend/src/components/home/Hero.jsx
+import React, { useEffect, useState, useContext, useRef } from "react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
-import { IntroContext } from "../../context/IntroContext"; // <-- Import the context
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import * as IntroContextModule from "../../context/IntroContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
-// Custom helper to split text into individually animatable words
-const SplitText = ({ children, className = "" }) => {
-  if (typeof children !== "string") return <span className={className}>{children}</span>;
-  
-  return (
-    <span className={`inline-block ${className}`}>
-      {children.split(" ").map((word, index) => (
-        <span key={index} className="inline-block mr-[0.25em] whitespace-nowrap">
-          <span className="reveal-word inline-block will-change-[transform,filter,opacity]">
-            {word}
-          </span>
-        </span>
-      ))}
-    </span>
-  );
-};
+const IntroContext =
+  IntroContextModule.IntroContext || IntroContextModule.default;
 
 const Hero = () => {
-  const masterRef = useRef(null); 
-  const mediaWrapperRef = useRef(null); 
-  const curtainRef = useRef(null); 
-  const videoRef = useRef(null); 
-  const containerRef = useRef(null); 
+  const introCtx = (IntroContext ? useContext(IntroContext) : null) || {};
+  const introComplete =
+    introCtx.introComplete ?? introCtx.introPlayed ?? true;
 
-  const bgRef = useRef(null); 
-  const subheadingRef = useRef(null);
-  const exclusiveTextRef = useRef(null);
-  const productCardRef = useRef(null);
+  const [revealed, setRevealed] = useState(false);
+  const heroSectionRef = useRef(null);
+  const parallaxBgRef = useRef(null);
 
-  // CTA Refs
-  const ctaRef = useRef(null);
-  const rippleRef = useRef(null);
-  const ctaTextDarkRef = useRef(null);
-  const ctaTextLightRef = useRef(null);
-  const ctaIconDarkRef = useRef(null);
-  const ctaIconLightRef = useRef(null);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setRevealed(true);
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [introComplete]);
 
-  // Consume the global state
-  const { introPlayed, setIntroPlayed } = useContext(IntroContext);
+  // Smooth GSAP ScrollTrigger Parallax for Background Image
+  useGSAP(
+    () => {
+      if (!parallaxBgRef.current || !heroSectionRef.current) return;
 
-  const { contextSafe } = useGSAP(() => {
-    // ==========================================
-    // 1. Background Parallax Animation (Always Runs)
-    // ==========================================
-    gsap.to(bgRef.current, {
-      yPercent: 20,
-      ease: "none",
-      scrollTrigger: {
-        trigger: masterRef.current,
-        start: "top top",
-        end: "bottom top",
-        scrub: true,
-      }
-    });
-
-    const words = gsap.utils.toArray(".reveal-word", containerRef.current);
-
-    if (!introPlayed) {
-      // ==========================================
-      // HEAVY INTRO: First Visit or Hard Reload
-      // ==========================================
-      
-      // Initial setups for the grand reveal
-      gsap.set(mediaWrapperRef.current, { scale: 0.4 }); 
-      gsap.set(curtainRef.current, { yPercent: 0 }); 
-      gsap.set(containerRef.current, { autoAlpha: 0 }); 
-      gsap.set([subheadingRef.current, exclusiveTextRef.current], { autoAlpha: 0, y: 20, filter: "blur(6px)" });
-      gsap.set(ctaRef.current, { autoAlpha: 0, y: 20 });
-      gsap.set(productCardRef.current, { autoAlpha: 0, y: 30 });
-
-      // Timeline with onComplete to update global state
-      const tl = gsap.timeline({ 
-        delay: 0.3,
-        onComplete: () => {
-          setIntroPlayed(true); // Flag the intro as finished
+      gsap.fromTo(
+        parallaxBgRef.current,
+        { yPercent: -10 },
+        {
+          yPercent: 10,
+          ease: "none",
+          scrollTrigger: {
+            trigger: heroSectionRef.current,
+            start: "top top",
+            end: "bottom top",
+            scrub: true,
+            invalidateOnRefresh: true,
+          },
         }
-      });
-
-      tl.to(curtainRef.current, {
-        yPercent: -100,
-        duration: 1.5,
-        ease: "power4.inOut"
-      }, 0)
-      .to(mediaWrapperRef.current, {
-        scale: 1,
-        borderRadius: "0px",
-        duration: 1.5,
-        ease: "power4.inOut"
-      }, 1)
-      .to(".hero-overlay", {
-        opacity: 1,
-        duration: 1.5,
-        ease: "power2.out"
-      }, 1.2)
-      .to(containerRef.current, {
-        autoAlpha: 1,
-        duration: 0.1,
-      }, 0.8)
-      .fromTo(words,
-        { opacity: 0, y: 30, filter: "blur(12px)", scale: 0.95 },
-        { opacity: 1, y: 0, filter: "blur(0px)", scale: 1, duration: 1.2, stagger: 0.08, ease: "power3.out" },
-        1.8
-      )
-      .to([subheadingRef.current, exclusiveTextRef.current], {
-        autoAlpha: 1,
-        y: 0,
-        filter: "blur(0px)",
-        duration: 1.2,
-        stagger: 0.1,
-        ease: "power3.out"
-      }, 2) 
-      .to(ctaRef.current, {
-        autoAlpha: 1,
-        y: 0,
-        duration: 1,
-        ease: "power3.out"
-      }, 2.2)
-      .to(productCardRef.current, {
-        autoAlpha: 1,
-        y: 0,
-        duration: 1.2,
-        ease: "power3.out"
-      }, 2.2);
-
-    } else {
-      // ==========================================
-      // LIGHT ENTRY: Returning from another page
-      // ==========================================
-      
-      // Instantly snap the layout to its final cinematic state
-      gsap.set(mediaWrapperRef.current, { scale: 1, borderRadius: "0px" });
-      gsap.set(curtainRef.current, { display: "none" }); 
-      gsap.set(videoRef.current, { display: "none" }); // Skip the video, jump to image
-      gsap.set(".hero-overlay", { opacity: 1 });
-      gsap.set(containerRef.current, { autoAlpha: 1 });
-      
-      // Fast, clean stagger reveal for the UI elements
-      gsap.fromTo(words,
-        { opacity: 0, y: 20, filter: "blur(4px)" },
-        { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.8, stagger: 0.04, ease: "power2.out", delay: 0.2 }
       );
-      
-      gsap.fromTo([subheadingRef.current, exclusiveTextRef.current], 
-        { autoAlpha: 0, y: 15 },
-        { autoAlpha: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power2.out", delay: 0.4 }
-      );
-      
-      gsap.fromTo([ctaRef.current, productCardRef.current], 
-        { autoAlpha: 0, y: 20 },
-        { autoAlpha: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power2.out", delay: 0.5 }
-      );
-    }
-  }, { scope: masterRef }); // Runs once on mount
+    },
+    { scope: heroSectionRef }
+  );
 
-  // ==========================================
-  // 3. Independent Video Swap
-  // ==========================================
-  const handleVideoEnd = contextSafe(() => {
-    // Only fade out if the video is actually playing (First visit)
-    if (!introPlayed) {
-      gsap.to(videoRef.current, {
-        opacity: 0,
-        duration: 1.5,
-        ease: "power2.inOut"
-      });
-    }
-  });
-
-  // ==========================================
-  // 4. Custom Hover Interactions
-  // ==========================================
-  const handleMouseEnter = contextSafe((e) => {
-    const rect = ctaRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    gsap.set(rippleRef.current, { x: x, y: y, scale: 0 });
-    gsap.to(rippleRef.current, { scale: 1, duration: 0.5, ease: "power3.out" });
-
-    gsap.to(ctaTextDarkRef.current, { opacity: 0, duration: 0.3, ease: "power2.out" });
-    gsap.to(ctaTextLightRef.current, { opacity: 1, duration: 0.3, ease: "power2.out" });
-    gsap.to([ctaIconDarkRef.current, ctaIconLightRef.current], { rotation: -35, duration: 0.3, ease: "power2.out" });
-  });
-
-  const handleMouseLeave = contextSafe((e) => {
-    const rect = ctaRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    gsap.to(rippleRef.current, { scale: 0, x: x, y: y, duration: 0.5, ease: "power3.out" });
-
-    gsap.to(ctaTextDarkRef.current, { opacity: 1, duration: 0.3, ease: "power2.out" });
-    gsap.to(ctaTextLightRef.current, { opacity: 0, duration: 0.3, ease: "power2.out" });
-    gsap.to([ctaIconDarkRef.current, ctaIconLightRef.current], { rotation: 0, duration: 0.3, ease: "power2.out" });
-  });
+  const featuredPiece = {
+    tag: "Exclusive of this month",
+    name: "The Patina Gourd Vase",
+    image: "/hero_prod.webp",
+    link: "/shop",
+  };
 
   return (
-    <main 
-      ref={masterRef} 
-      className="relative w-full min-h-[100svh] h-fit lg:h-[100vh] lg:max-h-[880px] bg-[#f8f8f8] flex items-center justify-center overflow-hidden" 
-      id="home-hero"
+    <section
+      ref={heroSectionRef}
+      className="relative w-full h-screen min-h-[700px] bg-[#EFECE6] text-[#1a1a1a] overflow-hidden select-none"
     >
-      
-      {/* THE CINEMATIC BOX */}
-      <div 
-        ref={mediaWrapperRef} 
-        className="absolute z-10 w-full h-full overflow-hidden"
+      {/* =========================================================
+          PARALLAX BACKGROUND IMAGE (Shared across Mobile & Desktop)
+         ========================================================= */}
+      <div
+        ref={parallaxBgRef}
+        className="pointer-events-none absolute -top-[12%] left-0 w-full h-[124%] will-change-transform"
       >
-        <div 
-          ref={bgRef}
-          className="absolute top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat will-change-transform"
-          style={{ backgroundImage: 'url("/hero.webp")' }}
+        <img
+          src="/hero.webp"
+          alt="Mritsna handmade studio ceramics styled on a floating fluted oak console"
+          fetchPriority="high"
+          decoding="async"
+          className={`w-full h-full object-cover object-[52%_center] lg:object-center transition-transform duration-[1600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            revealed ? "scale-100" : "scale-[1.06]"
+          }`}
         />
-        
-        {/* Only render the video on the first visit so it doesn't drain resources */}
-        {!introPlayed && (
-          <video 
-            ref={videoRef}
-            src="/hero.webm" 
-            autoPlay 
-            muted 
-            playsInline
-            onEnded={handleVideoEnd}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        )}
-
-        <div 
-          ref={curtainRef}
-          className="absolute inset-0 bg-[#f8f8f8] z-20"
-        />
-
-        <div className="hero-overlay absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.0))] opacity-0 pointer-events-none z-30" />
       </div>
 
-      {/* THE UI LAYER */}
-      <section
-        ref={containerRef}
-        className="absolute inset-0 z-40 flex flex-col lg:flex-row justify-between pt-5 md:pt-32 lg:pt-0 px-6 md:px-12 lg:px-24 txt-light pb-5 lg:pb-0 invisible"
-      >
-        <div className="hero-left flex flex-col justify-center h-full pt-10 lg:pt-0 pointer-events-none">
-          <div className="hero-heading-container w-full mb-6 md:mb-10 lg:mb-8 mt-4 lg:mt-0">
-            <h1 className="hero-heading text-[3.5rem] md:text-7xl lg:text-[6.5rem] tracking-tight lg:tracking-tighter leading-[0.95] lg:leading-[0.9] head-font flex flex-col">
-              <div className="pb-1"><SplitText>Crafted in silence.</SplitText></div>
-              <div className="pb-1"><SplitText>Felt in every detail.</SplitText></div>
+      {/* Ambient Top & Bottom Gradients for Readability Over Background Image */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-[#EFECE6]/85 via-[#EFECE6]/35 to-transparent"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#E5DEC9]/90 via-[#E5DEC9]/40 to-transparent"
+        aria-hidden="true"
+      />
+
+      {/* =========================================================
+          CONTENT OVERLAY (Padding: px-6 lg:px-10 2xl:px-14)
+         ========================================================= */}
+      <div className="relative z-10 w-full h-full px-6 lg:px-10 2xl:px-14 pt-24 sm:pt-28 lg:pt-28 2xl:pt-32 pb-6 sm:pb-8 lg:pb-10 2xl:pb-12 flex flex-col justify-between">
+        
+        {/* ================= TOP ROW: Headings (Using head-font & Larger on Mobile) ================= */}
+        <div className="w-full flex flex-col lg:flex-row items-start justify-between gap-1.5 sm:gap-2 lg:gap-8">
+          {/* 1st Half of Heading (Top Left) */}
+          <div
+            className={`transition-all duration-1000 delay-100 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          >
+            <h1 className="head-font font-light text-[#1a1a1a] text-[2.5rem] sm:text-5xl md:text-6xl lg:text-5xl xl:text-6xl 2xl:text-7xl leading-[1.05] tracking-tight">
+              Handmade Studio <br className="hidden sm:block" />
+              Ceramics.
             </h1>
           </div>
 
-          <div ref={subheadingRef} className="hero-subheading text-sm md:text-lg lg:text-base font-light w-full lg:w-[45ch] mb-8 md:mb-12 lg:mb-10 txt-light opacity-80 leading-relaxed">
-            Handcrafted pottery designed to bring warmth, texture, and timeless
-            elegance into your space.
+          {/* 2nd Half of Heading (Top Right on Desktop, Stacked on Mobile) */}
+          <div
+            className={`lg:text-right transition-all duration-1000 delay-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          >
+            <p className="head-font font-light text-[#1a1a1a] text-[2rem] sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl 2xl:text-7xl leading-[1.06] tracking-tight">
+              Crafted for{" "}
+              <br className="hidden lg:block" />
+              <span className="italic font-normal">modern living.</span>
+            </p>
           </div>
+        </div>
 
-          <div className="hero-CTA uppercase pointer-events-auto w-fit">
+        {/* ================= BOTTOM ROW: White CTA Card (Left) + Untinted Frosted Card (Right) ================= */}
+        <div className="w-full flex flex-col lg:flex-row items-stretch lg:items-end justify-between gap-3.5 sm:gap-5 lg:gap-8 z-20">
+          
+          {/* Bottom-Left: White Card with Subcopy + Animated Explore CTA + Trust Bar */}
+          <div
+            className={`w-full lg:max-w-md xl:max-w-lg bg-white/85 backdrop-blur-md border border-black/10 p-4 sm:p-5 lg:p-6 shadow-[0_12px_40px_rgba(28,26,23,0.08)] transition-all duration-1000 delay-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          >
+            <p className="text-xs sm:text-sm md:text-base xl:text-lg leading-relaxed text-[#1a1a1a]/90 font-normal mb-3.5 sm:mb-5">
+              Thoughtfully wheel-thrown pottery designed to bring warmth &amp;
+              texture into your everyday spaces.
+            </p>
+
+            {/* Animated Explore CTA Button */}
             <Link
               to="/shop"
-              ref={ctaRef}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              className="relative inline-flex items-center justify-center w-44 md:w-56 lg:w-48 py-4 md:py-6 lg:py-4 rounded bg-light shadow-lg overflow-hidden group"
+              className="group relative overflow-hidden inline-flex items-center justify-between w-full sm:w-auto gap-6 bg-[#1a1a1a] text-white px-6 sm:px-7 xl:px-8 py-3 sm:py-3.5 xl:py-4 text-[11px] sm:text-xs xl:text-sm tracking-[0.22em] uppercase font-medium border border-[#1a1a1a] transition-colors duration-500"
             >
-              <div 
-                ref={rippleRef} 
-                className="absolute bg-dark rounded-full pointer-events-none z-0"
-                style={{ width: '400px', height: '400px', top: '-200px', left: '-200px', transform: 'scale(0)' }}
+              <span
+                className="absolute inset-0 bg-[#EFECE6] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.77,0,0.175,1)]"
+                aria-hidden="true"
               />
-
-              <span ref={ctaTextDarkRef} className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-semibold txt-dark">
-                explore now 
-                <div ref={ctaIconDarkRef} className="flex items-center justify-center">
-                  <Icon className="text-sm md:text-lg lg:text-sm" icon="iconamoon:arrow-right-1" />
-                </div>
+              <span className="relative z-10 transition-colors duration-500 group-hover:text-[#1a1a1a]">
+                Explore Collection
               </span>
-
-              <span ref={ctaTextLightRef} className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-semibold txt-light opacity-0">
-                explore now 
-                <div ref={ctaIconLightRef} className="flex items-center justify-center">
-                  <Icon className="text-sm md:text-lg lg:text-sm" icon="iconamoon:arrow-right-1" />
-                </div>
-              </span>
-
-              <span className="invisible flex items-center gap-2 text-[0.6rem] md:text-[0.8rem] lg:text-[0.7rem] tracking-[0.05em] font-semibold">
-                explore now 
-                <div className="flex items-center justify-center">
-                  <Icon className="text-sm md:text-lg lg:text-sm" icon="iconamoon:arrow-right-1" />
-                </div>
+              <span className="relative z-10 inline-block transition-all duration-500 group-hover:translate-x-1.5 group-hover:text-[#1a1a1a]">
+                &rarr;
               </span>
             </Link>
-          </div>
-        </div>
 
-        <div className="hero-right flex flex-col lg:items-end justify-end mt-16 md:mt-20 lg:mt-0 mb-2 lg:mb-12 pointer-events-none">
-          <div className="mb-4 lg:mb-6">
-            <h2 ref={exclusiveTextRef} className="uppercase text-[0.6rem] md:text-[0.7rem] lg:text-[0.65rem] font-bold tracking-[0.3em] txt-light opacity-60">
-              Exclusive from this month
-            </h2>
+            {/* Trust Bar */}
+            <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-black/10 flex flex-wrap items-center gap-x-5 gap-y-1 text-[10px] sm:text-xs xl:text-sm tracking-[0.04em] text-[#1a1a1a]/80 font-medium">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[#1a1a1a] font-semibold">&#10003;</span>
+                Breakage-Safe Transit
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[#1a1a1a] font-semibold">&#10003;</span>
+                Studio Crafted
+              </span>
+            </div>
           </div>
 
+          {/* Bottom-Right: Horizontal Frosted Glass Card (No Black Tint, With "Exclusive of this month" Heading) */}
           <Link
-            to="/product/the-patina-gourd-vase"
-            ref={productCardRef}
-            data-cursor="explore"
-            className="relative group w-full md:w-[28rem] lg:w-[22rem] flex flex-row lg:flex-col items-center lg:items-start gap-5 lg:gap-4 txt-light pointer-events-auto"
+            to={featuredPiece.link}
+            className={`group w-full lg:w-auto bg-white/35 backdrop-blur-xl border border-white/60 p-2.5 sm:p-3 xl:p-3.5 shadow-[0_16px_40px_rgba(28,26,23,0.1)] flex flex-row items-center gap-3.5 sm:gap-4 xl:gap-5 transition-all duration-500 hover:bg-white/50 ${
+              revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
           >
-            <div
-              className="w-24 md:w-32 lg:w-full aspect-[4/5] rounded-[2px] overflow-hidden shrink-0 bg-[#1a1a1a]"
-              id="hero-product-img"
-            >
+            {/* Image Container: Product image takes 100% of container */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 xl:w-24 xl:h-24 shrink-0 overflow-hidden">
               <img
-                className="w-full h-full object-cover transition-transform duration-[2s] ease-out group-hover:scale-105"
-                src="/hero_prod.webp"
-                alt="hero-product"
+                src={featuredPiece.image}
+                alt={featuredPiece.name}
+                loading="eager"
+                className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
               />
             </div>
 
-            <div className="flex flex-col lg:flex-row justify-center lg:justify-between lg:items-end w-full lg:px-1 flex-1">
-              <div className="flex flex-col">
-                <span className="uppercase text-[0.55rem] md:text-[0.65rem] tracking-[0.2em] font-medium opacity-60 mb-1 lg:mb-1.5">
-                  Vases
-                </span>
-                <h2 className="text-lg md:text-xl lg:text-xl head-font tracking-wide mb-2 lg:mb-0">
-                  The Patina Gourd Vase
-                </h2>
-              </div>
-
-              <div className="text-xs md:text-sm tracking-widest font-light border-b border-[rgba(248,248,248,0.3)] pb-1 w-fit">
-                ₹ 5,000.00
-              </div>
+            {/* Right Info Stack: "Exclusive of this month" Heading + Product Name */}
+            <div className="flex flex-col justify-center pr-2 sm:pr-4 xl:pr-5">
+              <span className="text-[10px] sm:text-[11px] xl:text-xs tracking-[0.18em] uppercase font-semibold text-[#1a1a1a]/75 mb-1">
+                {featuredPiece.tag}
+              </span>
+              <h2 className="head-font text-base sm:text-lg xl:text-xl 2xl:text-2xl text-[#1a1a1a] leading-snug font-normal">
+                {featuredPiece.name}
+              </h2>
             </div>
           </Link>
+
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
   );
 };
 

@@ -1,39 +1,37 @@
-import React, { createContext, useState } from 'react';
+// frontend/src/context/IntroContext.jsx
+import React, { createContext, useContext, useState, useEffect } from "react";
 
-export const IntroContext = createContext();
+const IntroContext = createContext({
+  introComplete: true,
+  setIntroComplete: () => {},
+  isIntroComplete: true,
+  setIsIntroComplete: () => {},
+});
 
 export const IntroProvider = ({ children }) => {
-  // 1. Initialize state lazily by checking sessionStorage first.
-  // If they have been here this session, it returns true. Otherwise, false.
-  const [introPlayed, setIntroPlayedState] = useState(() => {
-    return sessionStorage.getItem("introPlayed") === "true";
-  });
+  const [introComplete, setIntroComplete] = useState(false);
 
-  // 2. Create a custom setter function that updates BOTH React State and Session Storage
-  const setIntroPlayed = (value) => {
-    setIntroPlayedState(value);
-    sessionStorage.setItem("introPlayed", value.toString());
-  };
+  useEffect(() => {
+    // Trigger immediately on first paint so Meta Ad visitors never wait on a blank screen
+    const timer = requestAnimationFrame(() => {
+      setIntroComplete(true);
+    });
+    return () => cancelAnimationFrame(timer);
+  }, []);
 
   return (
-    <IntroContext.Provider value={{ introPlayed, setIntroPlayed }}>
+    <IntroContext.Provider
+      value={{
+        introComplete,
+        setIntroComplete,
+        isIntroComplete: introComplete,
+        setIsIntroComplete: setIntroComplete,
+      }}
+    >
       {children}
     </IntroContext.Provider>
   );
 };
 
-
-// import React, { createContext, useState } from 'react';
-
-// export const IntroContext = createContext();
-
-// export const IntroProvider = ({ children }) => {
-//   // False on first load or hard refresh. 
-//   const [introPlayed, setIntroPlayed] = useState(false);
-
-//   return (
-//     <IntroContext.Provider value={{ introPlayed, setIntroPlayed }}>
-//       {children}
-//     </IntroContext.Provider>
-//   );
-// };
+export const useIntro = () => useContext(IntroContext);
+export default IntroContext;

@@ -6,7 +6,7 @@ import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Navmenu from "./Navmenu";
 import SearchOverlay from "./SearchOverlay";
-import { IntroContext } from "../../context/IntroContext"; 
+import * as IntroContextModule from "../../context/IntroContext";
 import { useSelector, useDispatch } from "react-redux";
 
 import { setManualRegion } from "../../store/features/regionSlice";
@@ -14,16 +14,20 @@ import { userAxios } from "../../configs/axiosInstance";
 
 gsap.registerPlugin(ScrollTrigger);
 
+// Safely resolve IntroContext whether exported as default or named export
+const IntroContext =
+  IntroContextModule.IntroContext || IntroContextModule.default;
+
 const Navbar = () => {
   const dispatch = useDispatch();
   const [isOpen, setIsOpen] = useState(false);
-  
+
   // --- THE ONLY SEARCH STATE IN NAVBAR ---
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  
+
   const cartItems = useSelector((state) => state.cart?.items || []);
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-  
+
   const regionData = useSelector((state) => state.region?.data);
   const [isRegionDropdownOpen, setIsRegionDropdownOpen] = useState(false);
   const [isChangingRegion, setIsChangingRegion] = useState(false);
@@ -33,8 +37,10 @@ const Navbar = () => {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
-  const { introPlayed } = useContext(IntroContext);
-  
+  const introCtx = (IntroContext ? useContext(IntroContext) : null) || {};
+  const introPlayed =
+    introCtx.introPlayed ?? introCtx.introComplete ?? true;
+
   const [currentPath, setCurrentPath] = useState(location.pathname);
 
   const navbarRef = useRef(null);
@@ -77,8 +83,10 @@ const Navbar = () => {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
-        desktopRegionRef.current && !desktopRegionRef.current.contains(event.target) &&
-        mobileRegionRef.current && !mobileRegionRef.current.contains(event.target)
+        desktopRegionRef.current &&
+        !desktopRegionRef.current.contains(event.target) &&
+        mobileRegionRef.current &&
+        !mobileRegionRef.current.contains(event.target)
       ) {
         setIsRegionDropdownOpen(false);
       }
@@ -92,61 +100,64 @@ const Navbar = () => {
       setIsRegionDropdownOpen(false);
       return;
     }
-    
+
     setIsChangingRegion(true);
     try {
-      const response = await userAxios.get('/region/detect', {
-        headers: { 'x-user-region': countryCode }
+      const response = await userAxios.get("/region/detect", {
+        headers: { "x-user-region": countryCode },
       });
-      
+
       dispatch(setManualRegion(response.data.data));
-      window.location.reload(); 
+      window.location.reload();
     } catch (error) {
       console.error("Failed to change region", error);
       setIsChangingRegion(false);
     }
   };
 
-  const scrollBlendRoutes = ["/"]; 
+  const scrollBlendRoutes = ["/"];
   const isScrollBlendRoute = scrollBlendRoutes.includes(location.pathname);
 
   if (location.pathname !== currentPath) {
     setCurrentPath(location.pathname);
     setIsScrolled(false);
-    setIsRegionDropdownOpen(false); 
+    setIsOpen(false);
+    setIsRegionDropdownOpen(false);
     setIsSearchOpen(false); // Close search heavily on route change
   }
 
-  const isDarkTheme = !isScrollBlendRoute || isScrolled;
+  // When mobile Navmenu is open (`isOpen`), switch logo & navbar items to light/white.
+  // Otherwise, use dark text/logo so navbar is visible on the warm cream hero background.
+  const isLightMode = isOpen;
 
-  const { contextSafe } = useGSAP(() => {
-    const entryDelay = (!introPlayed && location.pathname === "/") ? 2.4 : 0.2;
+  const { contextSafe } = useGSAP(
+    () => {
+      const entryDelay = !introPlayed && location.pathname === "/" ? 0.2 : 0.2;
 
-    gsap.set(navbarRef.current, { yPercent: -30, opacity: 0 });
-    gsap.to(navbarRef.current, {
-      yPercent: 0,
-      opacity: 1,
-      duration: 1,
-      ease: "power3.out",
-      delay: entryDelay, 
-    });
-
-    const existingTrigger = ScrollTrigger.getById("nav-blend");
-    if (existingTrigger) {
-      existingTrigger.kill();
-    }
-
-    if (isScrollBlendRoute) {
-      ScrollTrigger.create({
-        id: "nav-blend", 
-        start: () => window.innerHeight * 0.9, 
-        onEnter: () => setIsScrolled(true),      
-        onLeaveBack: () => setIsScrolled(false), 
-        invalidateOnRefresh: true, 
+      gsap.set(navbarRef.current, { yPercent: -30, opacity: 0 });
+      gsap.to(navbarRef.current, {
+        yPercent: 0,
+        opacity: 1,
+        duration: 1,
+        ease: "power3.out",
+        delay: entryDelay,
       });
-    } 
-    
-  }, { scope: navbarRef, dependencies: [location.pathname] }); 
+
+      const existingTrigger = ScrollTrigger.getById("nav-blend");
+      if (existingTrigger) {
+        existingTrigger.kill();
+      }
+
+      ScrollTrigger.create({
+        id: "nav-blend",
+        start: () => (isScrollBlendRoute ? window.innerHeight * 0.08 : 20),
+        onEnter: () => setIsScrolled(true),
+        onLeaveBack: () => setIsScrolled(false),
+        invalidateOnRefresh: true,
+      });
+    },
+    { scope: navbarRef, dependencies: [location.pathname] }
+  );
 
   const handleItemEnter = contextSafe((e) => {
     const item = e.currentTarget;
@@ -164,7 +175,7 @@ const Navbar = () => {
       opacity: 1,
       duration: 0.4,
       ease: "power3.out",
-      overwrite: true, 
+      overwrite: true,
     });
   });
 
@@ -200,7 +211,7 @@ const Navbar = () => {
       opacity: 1,
       duration: 0.4,
       ease: "power3.out",
-      overwrite: true, 
+      overwrite: true,
     });
   });
 
@@ -218,26 +229,32 @@ const Navbar = () => {
     });
   });
 
-  const currentRegionDetails = availableRegions.find(r => r.code === regionData?.countryCode) || availableRegions[0];
+  const currentRegionDetails =
+    availableRegions.find((r) => r.code === regionData?.countryCode) ||
+    availableRegions[0];
 
   return (
     <>
-      <div 
-        key={location.pathname} 
-        ref={navbarRef} 
-        className={`navbar w-full fixed top-0 left-0 z-[99999] transition-colors duration-500 border-b h-[75px]
-          ${isDarkTheme ? "bg-[#f8f8f8]/80 backdrop-blur-md border-black/5" : "bg-transparent border-transparent"}
+      <div
+        key={location.pathname}
+        ref={navbarRef}
+        className={`navbar w-full fixed top-0 left-0 z-[99999] transition-all duration-500 h-[75px]
+          ${
+            isScrolled && !isOpen
+              ? "bg-[#f8f8f8]/80 backdrop-blur-md shadow-[0_4px_24px_rgba(26,26,26,0.06)] border-b border-black/[0.05]"
+              : "bg-transparent shadow-none border-b border-transparent"
+          }
         `}
       >
         <div
-          className={`w-full py-4 px-6 lg:px-10 flex justify-between items-center transition-colors duration-500
-            ${isDarkTheme ? "text-[#1a1a1a]" : "text-white"}
+          className={`w-full py-4 px-6 lg:px-10 2xl:px-14 flex justify-between items-center transition-colors duration-500
+            ${isLightMode ? "text-[#f8f8f8]" : "text-[#1a1a1a]"}
           `}
           id="navbar-content"
         >
           {/* LEFT NAV */}
           <nav className="w-1/3 hidden lg:block" id="desktop-first-nav">
-            <ul 
+            <ul
               ref={navContainerRef}
               onMouseLeave={handleNavLeave}
               className="nav-list flex items-center gap-10 uppercase text-[0.7rem] tracking-wider relative"
@@ -245,21 +262,18 @@ const Navbar = () => {
               <li
                 ref={underlineRef}
                 className={`absolute -bottom-1 h-px opacity-0 pointer-events-none transition-colors duration-500
-                  ${isDarkTheme ? "bg-[#1a1a1a]" : "bg-white"}
+                  ${isLightMode ? "bg-[#f8f8f8]" : "bg-[#1a1a1a]"}
                 `}
                 style={{ left: 0, width: 0 }}
               />
 
               {navigations.map(({ name, path }) => (
-                <li 
-                  key={`${name}-desk-nav`} 
+                <li
+                  key={`${name}-desk-nav`}
                   className="nav-list-item"
                   onMouseEnter={handleItemEnter}
                 >
-                  <Link 
-                    to={path}
-                    className="py-1 inline-block"
-                  >
+                  <Link to={path} className="py-1 inline-block">
                     {name}
                   </Link>
                 </li>
@@ -269,18 +283,18 @@ const Navbar = () => {
 
           {/* LOGO */}
           <div className="logo lg:w-1/3 flex justify-start lg:justify-center items-center">
-            <Link to="/">
-              <img 
-                className="w-22 lg:w-36 transition-opacity duration-500" 
-                src={isDarkTheme ? "/logo_black.svg" : "/logo_white.svg"} 
-                alt="Mritsna Logo" 
+            <Link to="/" onClick={() => setIsOpen(false)}>
+              <img
+                className="w-22 lg:w-36 transition-opacity duration-500"
+                src={isLightMode ? "/logo_white.svg" : "/logo_black.svg"}
+                alt="Mritsna Logo"
               />
             </Link>
           </div>
 
           {/* RIGHT NAV (DESKTOP) */}
           <nav className="w-1/3 hidden lg:block" id="desktop-second-nav">
-            <ul 
+            <ul
               ref={rightNavContainerRef}
               onMouseLeave={handleRightNavLeave}
               className="nav-list flex justify-end items-center gap-10 uppercase text-[0.7rem] tracking-wider relative"
@@ -288,84 +302,92 @@ const Navbar = () => {
               <li
                 ref={rightUnderlineRef}
                 className={`absolute -bottom-1 h-px opacity-0 pointer-events-none transition-colors duration-500
-                  ${isDarkTheme ? "bg-[#1a1a1a]" : "bg-white"}
+                  ${isLightMode ? "bg-[#f8f8f8]" : "bg-[#1a1a1a]"}
                 `}
                 style={{ right: 0, width: 0 }}
               />
 
               {/* REGION DROPDOWN */}
-              <li 
+              <li
                 ref={desktopRegionRef}
                 className="nav-list-item relative"
                 onMouseEnter={handleRightItemEnter}
               >
-                <span 
+                <span
                   className="cursor-pointer py-1 flex items-center gap-1.5 select-none"
                   onClick={() => setIsRegionDropdownOpen(!isRegionDropdownOpen)}
                 >
-                  <img 
-                    src={`https://flagcdn.com/w20/${currentRegionDetails.code.toLowerCase()}.png`} 
-                    alt={currentRegionDetails.code} 
+                  <img
+                    src={`https://flagcdn.com/w20/${currentRegionDetails.code.toLowerCase()}.png`}
+                    alt={currentRegionDetails.code}
                     className="w-[18px] object-contain rounded-sm"
                   />
-                  {isChangingRegion ? '...' : currentRegionDetails.code}
-                  <Icon 
-                    icon="lucide:chevron-down" 
-                    className={`w-3 h-3 opacity-70 transition-transform duration-300 ${isRegionDropdownOpen ? "rotate-180" : ""}`} 
+                  {isChangingRegion ? "..." : currentRegionDetails.code}
+                  <Icon
+                    icon="lucide:chevron-down"
+                    className={`w-3 h-3 opacity-70 transition-transform duration-300 ${
+                      isRegionDropdownOpen ? "rotate-180" : ""
+                    }`}
                   />
                 </span>
 
-                <div 
+                <div
                   className={`absolute top-full right-0 mt-[1.2rem] w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-xl border transition-all duration-300 origin-top
-                    ${isRegionDropdownOpen ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0 pointer-events-none'}
-                    ${isDarkTheme ? 'bg-white border-black/5 text-black' : 'bg-[#1a1a1a] border-white/10 text-white'}
+                    ${
+                      isRegionDropdownOpen
+                        ? "opacity-100 scale-y-100"
+                        : "opacity-0 scale-y-0 pointer-events-none"
+                    }
+                    bg-white border-black/5 text-black
                   `}
-                  onWheel={(e) => e.stopPropagation()} 
+                  onWheel={(e) => e.stopPropagation()}
                   onTouchMove={(e) => e.stopPropagation()}
                 >
                   {availableRegions.map((r) => (
-                    <button 
+                    <button
                       key={r.code}
                       onClick={() => handleRegionChange(r.code)}
-                      className={`text-left px-4 py-3 text-[0.65rem] uppercase tracking-wider transition-colors flex items-center gap-3
-                        ${isDarkTheme ? 'hover:bg-gray-100' : 'hover:bg-white/10'}
-                        ${regionData?.countryCode === r.code ? 'font-bold opacity-40 cursor-default' : ''}
+                      className={`text-left px-4 py-3 text-[0.65rem] uppercase tracking-wider transition-colors flex items-center gap-3 hover:bg-gray-100
+                        ${
+                          regionData?.countryCode === r.code
+                            ? "font-bold opacity-40 cursor-default"
+                            : ""
+                        }
                       `}
                     >
-                      <img 
-                        src={`https://flagcdn.com/w20/${r.code.toLowerCase()}.png`} 
-                        alt={r.code} 
+                      <img
+                        src={`https://flagcdn.com/w20/${r.code.toLowerCase()}.png`}
+                        alt={r.code}
                         className="w-[18px] object-contain rounded-sm shadow-sm"
                       />
-                      <span>{r.label} ({r.currency})</span>
+                      <span>
+                        {r.label} ({r.currency})
+                      </span>
                     </button>
                   ))}
                 </div>
               </li>
 
               {/* DESKTOP SEARCH TRIGGER */}
-              <li 
+              <li
                 className="nav-list-item"
                 onMouseEnter={handleRightItemEnter}
               >
-                <span 
+                <span
                   className="cursor-pointer py-1 inline-block"
                   onClick={() => setIsSearchOpen(true)}
                 >
                   search
                 </span>
               </li>
-              
+
               {serviceNavs.map(({ name, path }) => (
-                <li 
-                  key={`${name}-desk-nav`} 
+                <li
+                  key={`${name}-desk-nav`}
                   className="nav-list-item"
                   onMouseEnter={handleRightItemEnter}
                 >
-                  <Link 
-                    className="py-1 inline-block" 
-                    to={path}
-                  >
+                  <Link className="py-1 inline-block" to={path}>
                     {name}
                     {name === "cart" && (
                       <span className="ml-1 tracking-widest font-medium opacity-80">
@@ -380,50 +402,54 @@ const Navbar = () => {
 
           {/* MOBILE NAV ACTIONS */}
           <div className="flex items-center gap-5 lg:hidden">
-            
             <div className="relative" ref={mobileRegionRef}>
-              <div 
+              <div
                 className="cursor-pointer text-[0.65rem] font-bold tracking-wider flex items-center gap-1.5 uppercase select-none"
                 onClick={() => setIsRegionDropdownOpen(!isRegionDropdownOpen)}
               >
-                <img 
-                  src={`https://flagcdn.com/w20/${currentRegionDetails.code.toLowerCase()}.png`} 
-                  alt={currentRegionDetails.code} 
+                <img
+                  src={`https://flagcdn.com/w20/${currentRegionDetails.code.toLowerCase()}.png`}
+                  alt={currentRegionDetails.code}
                   className="w-[18px] object-contain rounded-sm"
                 />
-                {isChangingRegion ? '...' : currentRegionDetails.code}
-                <Icon 
-                  icon="lucide:chevron-down" 
-                  className={`w-3 h-3 opacity-70 transition-transform duration-300 ${isRegionDropdownOpen ? "rotate-180" : ""}`} 
+                {isChangingRegion ? "..." : currentRegionDetails.code}
+                <Icon
+                  icon="lucide:chevron-down"
+                  className={`w-3 h-3 opacity-70 transition-transform duration-300 ${
+                    isRegionDropdownOpen ? "rotate-180" : ""
+                  }`}
                 />
               </div>
 
               {isRegionDropdownOpen && (
-                <div 
-                  className={`absolute top-full -right-4 mt-6 w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-2xl border
-                    ${isDarkTheme ? 'bg-white border-black/5 text-black' : 'bg-[#1a1a1a] border-white/10 text-white'}
-                  `}
-                  onWheel={(e) => e.stopPropagation()} 
+                <div
+                  className="absolute top-full -right-4 mt-6 w-48 max-h-[300px] overflow-y-auto overscroll-none pointer-events-auto custom-scrollbar flex flex-col shadow-2xl border bg-white border-black/5 text-black"
+                  onWheel={(e) => e.stopPropagation()}
                   onTouchMove={(e) => e.stopPropagation()}
                 >
                   {availableRegions.map((r) => (
-                    <button 
+                    <button
                       key={r.code}
                       onClick={() => {
                         handleRegionChange(r.code);
                         setIsRegionDropdownOpen(false);
                       }}
-                      className={`text-left px-4 py-3 text-[0.65rem] uppercase tracking-wider transition-colors flex items-center gap-3
-                        ${isDarkTheme ? 'hover:bg-gray-100' : 'hover:bg-white/10'}
-                        ${regionData?.countryCode === r.code ? 'font-bold opacity-40 cursor-default' : ''}
+                      className={`text-left px-4 py-3 text-[0.65rem] uppercase tracking-wider transition-colors flex items-center gap-3 hover:bg-gray-100
+                        ${
+                          regionData?.countryCode === r.code
+                            ? "font-bold opacity-40 cursor-default"
+                            : ""
+                        }
                       `}
                     >
-                      <img 
-                        src={`https://flagcdn.com/w20/${r.code.toLowerCase()}.png`} 
-                        alt={r.code} 
+                      <img
+                        src={`https://flagcdn.com/w20/${r.code.toLowerCase()}.png`}
+                        alt={r.code}
                         className="w-[18px] object-contain rounded-sm shadow-sm"
                       />
-                      <span>{r.label} ({r.currency})</span>
+                      <span>
+                        {r.label} ({r.currency})
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -431,26 +457,30 @@ const Navbar = () => {
             </div>
 
             {/* MOBILE SEARCH TRIGGER */}
-            <div 
+            <div
               className="cursor-pointer text-xl flex items-center justify-center hover:opacity-70 transition-opacity duration-300"
-              onClick={() => setIsSearchOpen(true)}
+              onClick={() => {
+                setIsOpen(false);
+                setIsSearchOpen(true);
+              }}
             >
               <Icon icon="iconamoon:search" />
             </div>
 
+            {/* MOBILE HAMBURGER ICON */}
             <div
               onClick={() => setIsOpen((prev) => !prev)}
               className="nav-icon w-6 h-2 flex flex-col justify-between cursor-pointer"
             >
               <span
                 className={`block h-[1.5px] transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] 
-                  ${isDarkTheme ? "bg-[#1a1a1a]" : "bg-white"} 
+                  ${isLightMode ? "bg-[#f8f8f8]" : "bg-[#1a1a1a]"} 
                   ${isOpen ? "rotate-45 translate-y-[3px]" : ""}
                 `}
               />
               <span
                 className={`block h-[1.5px] transition-all duration-300 ease-[cubic-bezier(0.77,0,0.175,1)] 
-                  ${isDarkTheme ? "bg-[#1a1a1a]" : "bg-white"} 
+                  ${isLightMode ? "bg-[#f8f8f8]" : "bg-[#1a1a1a]"} 
                   ${isOpen ? "-rotate-45 -translate-y-[3px]" : ""}
                 `}
               />
@@ -458,11 +488,14 @@ const Navbar = () => {
           </div>
         </div>
       </div>
-      
+
       <Navmenu isOpen={isOpen} setIsOpen={setIsOpen} />
 
       {/* SEARCH OVERLAY COMPONENT */}
-      <SearchOverlay isSearchOpen={isSearchOpen} setIsSearchOpen={setIsSearchOpen} />
+      <SearchOverlay
+        isSearchOpen={isSearchOpen}
+        setIsSearchOpen={setIsSearchOpen}
+      />
     </>
   );
 };
